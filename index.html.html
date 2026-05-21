@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema Menu CICSA</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+
+:root{--bd:#2C1810;--bm:#5C3D2E;--bl:#8B6F47;--gold:#D4AF37;--cream:#F5F1E8;--tc:#C8553D;--green:#588B4F}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Lato,sans-serif;background:linear-gradient(135deg,var(--cream),#E8DCC8);color:var(--bd);min-height:100vh}
+.hdr{background:linear-gradient(135deg,var(--bd),var(--bm));color:var(--gold);padding:2rem;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.hdr-inner{max-width:1400px;margin:0 auto}
+.hdr-top{display:flex;align-items:center;gap:2rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.logo{background:#fff;padding:.875rem;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+.logo-txt{width:68px;height:68px;background:linear-gradient(135deg,var(--bd),var(--bm));border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-size:1.4rem;font-weight:900;color:var(--gold);text-align:center;line-height:1.2}
+.empresa{font-size:.68rem;letter-spacing:3px;text-transform:uppercase;opacity:.8;margin-bottom:.35rem}
+h1{font-family:"Playfair Display",serif;font-size:clamp(1.8rem,4vw,3rem);font-weight:900;line-height:1.1}
+h1 em{font-style:italic;color:var(--gold)}
+.sub{font-size:.95rem;font-weight:300;color:var(--cream);opacity:.8;margin-top:.25rem}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;max-width:400px}
+.stat-n{font-family:"Playfair Display",serif;font-size:2.2rem;font-weight:700;color:var(--gold);display:block}
+.stat-l{font-size:.65rem;text-transform:uppercase;letter-spacing:2px;color:var(--cream);opacity:.8}
+.nav{position:sticky;top:0;z-index:100;background:#fff;border-bottom:2px solid rgba(212,175,55,.2);box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.tabs{display:flex;max-width:1400px;margin:0 auto;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:transparent;border:none;border-bottom:3px solid transparent;padding:.875rem 1.2rem;font-family:Lato,sans-serif;font-size:.78rem;font-weight:700;color:var(--bl);cursor:pointer;transition:all .3s;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.tab:hover{color:var(--bd);background:rgba(212,175,55,.05)}
+.tab.on{color:var(--gold);border-bottom-color:var(--gold)}
+.page{display:none}
+.page.on{display:block;animation:fi .35s ease}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.wrap{max-width:1400px;margin:0 auto;padding:1.5rem}
+.card{background:#fff;border-radius:12px;padding:1.5rem;margin-bottom:1.5rem;box-shadow:0 4px 20px rgba(44,24,16,.1);border:1px solid rgba(212,175,55,.15)}
+.ch{font-family:"Playfair Display",serif;font-size:1.4rem;color:var(--bd);margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:2px solid var(--gold)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:1.25rem}
+.day{background:#fff;border:1.5px solid rgba(212,175,55,.2);border-radius:10px;overflow:hidden;transition:all .3s}
+.day:hover{transform:translateY(-3px);box-shadow:0 8px 30px rgba(44,24,16,.15);border-color:var(--gold)}
+.dh{background:linear-gradient(135deg,var(--bd),var(--bm));padding:.875rem 1rem;display:flex;justify-content:space-between;align-items:center}
+.dn{font-family:"Playfair Display",serif;font-size:1.4rem;font-weight:700;color:var(--gold);line-height:1}
+.dw{font-size:.65rem;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,.6);margin-top:2px}
+.dc{background:var(--gold);color:var(--bd);padding:.25rem .65rem;border-radius:99px;font-size:.82rem;font-weight:700}
+.pl{padding:.7rem 1rem;border-bottom:1px solid var(--cream);position:relative}
+.pl::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--green)}
+.pl:last-child{border-bottom:none}
+.plt{font-size:.62rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--bl);font-weight:700;margin-bottom:.15rem}
+.pln{font-size:.88rem;font-weight:700;color:var(--bd)}
+.plm{display:flex;gap:1rem;margin-top:.25rem;font-size:.76rem;color:var(--bl)}
+.btn{background:linear-gradient(135deg,var(--tc),#A94438);color:#fff;border:none;padding:.7rem 1.4rem;font-family:Lato,sans-serif;font-size:.82rem;font-weight:700;border-radius:6px;cursor:pointer;transition:all .3s;text-transform:uppercase;letter-spacing:.8px;box-shadow:0 4px 12px rgba(200,85,61,.3)}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(200,85,61,.4)}
+.bsec{background:linear-gradient(135deg,var(--bm),var(--bd));box-shadow:0 4px 12px rgba(44,24,16,.2)}
+.bgold{background:linear-gradient(135deg,var(--gold),#B8941F);color:var(--bd);box-shadow:0 4px 12px rgba(212,175,55,.3)}
+.bsm{padding:.45rem .9rem;font-size:.75rem}
+.bfull{width:100%;display:block;text-align:center}
+.fbar{display:flex;gap:.5rem;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center}
+.fl{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--bl);white-space:nowrap}
+.fb{padding:.45rem 1rem;border:1.5px solid rgba(212,175,55,.3);background:#fff;color:var(--bd);border-radius:99px;cursor:pointer;font-family:Lato,sans-serif;font-size:.76rem;font-weight:600;transition:all .3s;white-space:nowrap}
+.fb:hover{border-color:var(--gold);color:var(--gold)}
+.fb.on{background:var(--gold);border-color:var(--gold);color:var(--bd)}
+.fg{margin-bottom:1.2rem}
+.fl2{display:block;font-weight:700;color:var(--bd);margin-bottom:.35rem;font-size:.76rem;text-transform:uppercase;letter-spacing:1px}
+.fi,.fs,.ft{width:100%;padding:.7rem 1rem;border:1.5px solid rgba(122,92,58,.25);border-radius:6px;font-family:Lato,sans-serif;font-size:.92rem;background:#fff;color:var(--bd);transition:all .3s;max-width:100%}
+.fi:focus,.fs:focus,.ft:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.1)}
+.ft{resize:vertical;min-height:100px}
+.modal{display:none;position:fixed;inset:0;background:rgba(44,24,16,.9);z-index:1000;overflow-y:auto;align-items:flex-start;justify-content:center;padding:2rem}
+.mc{background:#fff;border-radius:12px;max-width:860px;width:92%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 30px 80px rgba(0,0,0,.4)}
+.mh{background:linear-gradient(135deg,var(--bd),var(--bm));color:var(--gold);padding:1.5rem 2rem;border-radius:12px 12px 0 0;font-family:"Playfair Display",serif;font-size:1.35rem;position:sticky;top:0;z-index:1}
+.mb{padding:1.75rem}
+.cx{position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:var(--gold);font-size:1.2rem;cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .3s}
+.cx:hover{background:rgba(212,175,55,.2)}
+.ing-row{display:grid;grid-template-columns:2fr 1fr 1fr .5fr;gap:.4rem;margin-bottom:.4rem}
+.ibox{background:var(--cream);border-radius:6px;padding:.7rem 1rem;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center;border:1px solid rgba(212,175,55,.15)}
+.csum{background:linear-gradient(135deg,var(--green),#4A7340);color:#fff;padding:1.25rem;border-radius:8px;margin-top:1.25rem}
+.crow{display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.2)}
+.crow:last-child{border-bottom:none;font-size:1.1rem;font-weight:700}
+.loader{display:none;text-align:center;padding:2rem}
+.loader.on{display:block}
+.spin{width:44px;height:44px;border:3px solid var(--cream);border-top-color:var(--gold);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:2rem;right:2rem;z-index:9999;background:var(--bd);color:#fff;padding:.875rem 1.5rem;border-radius:8px;border-left:4px solid var(--gold);font-size:.875rem;font-weight:500;box-shadow:0 8px 30px rgba(0,0,0,.3);display:none;max-width:300px}
+.toast.on{display:block;animation:sli .4s ease}
+@keyframes sli{from{opacity:0;transform:translateX(100%)}to{opacity:1;transform:translateX(0)}}
+.infobox{background:linear-gradient(135deg,rgba(88,139,79,.1),rgba(88,139,79,.05));border:1.5px solid rgba(88,139,79,.3);border-radius:8px;padding:1.2rem;margin-bottom:1.5rem}
+.infobox h3{color:var(--green);margin-bottom:.75rem;font-size:1rem}
+@media(max-width:768px){h1{font-size:1.7rem}.grid{grid-template-columns:1fr}.stats{max-width:100%}.card{padding:1rem}}
+
+</style>
+</head>
+<body>
+<div id="toast" class="toast"></div>
+
+<div class="hdr">
+  <div class="hdr-inner">
+    <div class="hdr-top">
+      <div class="logo"><div class="logo-txt">CI<br>CS</div></div>
+      <div style="flex:1">
+        <div class="empresa">CICSA &middot; Comedores Industriales de Cuauht&eacute;moc S.A. de C.V.</div>
+        <h1>Sistema Men&uacute; <em>CICSA</em></h1>
+        <div class="sub">Sistema de Gesti&oacute;n de Men&uacute;s</div>
+      </div>
+    </div>
+    <div class="stats">
+      <div><span class="stat-n" id="stat-plat">40</span><span class="stat-l">Platillos</span></div>
+      <div><span class="stat-n">3</span><span class="stat-l">Por D&iacute;a</span></div>
+      <div><span class="stat-n">$35-65</span><span class="stat-l">Costo MP/PAX</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="nav">
+  <div class="tabs">
+    <button class="tab on" onclick="go(this,'menu')">&#128197; Men&uacute;</button>
+    <button class="tab" onclick="go(this,'agregar')">&#10133; Agregar Receta</button>
+    <button class="tab" onclick="go(this,'cat')">&#128218; Cat&aacute;logo (<span id="cnt">0</span>)</button>
+    <button class="tab" onclick="go(this,'precios')">&#128176; Precios</button>
+    <button class="tab" onclick="go(this,'generar')">&#10024; Generar Receta</button>
+    <button class="tab" onclick="go(this,'exportar')">&#128196; Exportar</button>
+    <button class="tab" onclick="sincronizarDesdeFirebase()" style="color:var(--green)">☁️ Sync</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- MENU -->
+<div id="menu" class="page on">
+  <div class="card">
+    <div class="ch">Men&uacute; Personalizado</div>
+    <div class="infobox" style="margin-bottom:1rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:center">
+        <div>
+          <div class="fl2" style="margin-bottom:.75rem">Duraci&oacute;n del men&uacute;</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem">
+            <button class="fb" data-dias onclick="setDias(7,this)">7 d&iacute;as</button>
+            <button class="fb" data-dias onclick="setDias(14,this)">14 d&iacute;as</button>
+            <button class="fb" data-dias onclick="setDias(21,this)">21 d&iacute;as</button>
+            <button class="fb on" data-dias onclick="setDias(30,this)">30 d&iacute;as</button>
+          </div>
+        </div>
+        <div>
+          <div class="fl2" style="margin-bottom:.75rem">Personalizado</div>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input type="number" id="dcustom" class="fi" min="1" max="60" value="30" style="flex:1">
+            <button class="btn bgold bsm" onclick="setDiasC()">Aplicar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="fbar">
+      <span class="fl">Filtrar:</span>
+      <button class="fb on" data-fc onclick="filtCosto('todos',this)">Todos</button>
+      <button class="fb" data-fc onclick="filtCosto('economico',this)">&#128154; &lt;$50</button>
+      <button class="fb" data-fc onclick="filtCosto('medio',this)">&#128993; $50-80</button>
+      <button class="fb" data-fc onclick="filtCosto('premium',this)">&#128308; $80+</button>
+      <button class="btn bgold bsm" onclick="genMenu()">&#128260; Regenerar</button>
+      <button class="btn bsm" onclick="listaCompras()">&#128722; Lista Compras</button>
+      <button class="btn bsec bsm" onclick="imprimirMenu()">&#128424; Imprimir</button>
+    </div>
+    <div id="grid" class="grid"></div>
+  </div>
+</div>
+
+<!-- AGREGAR RECETA -->
+<div id="agregar" class="page">
+  <div class="card">
+    <div class="ch">&#10133; Agregar Receta de Internet</div>
+    <div class="infobox">
+      <h3>&#128203; Instrucciones</h3>
+      <ol style="margin-left:1.5rem;line-height:2.2;color:var(--bd)">
+        <li>Copia la receta completa de cualquier sitio web</li>
+        <li>P&eacute;gala en el cuadro de texto</li>
+        <li>Selecciona el tipo: Guisado o Garnacha</li>
+        <li>Click en "Agregar al Sistema"</li>
+      </ol>
+    </div>
+    <div class="fg"><label class="fl2">Pega aqu&iacute; la receta completa</label>
+      <textarea id="rtxt" class="ft" style="min-height:280px" placeholder="Nombre del platillo&#10;&#10;Ingredientes:&#10;500g de pollo&#10;2 jitomates...&#10;&#10;Preparacion:&#10;1. Cocinar el pollo..."></textarea>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+      <div class="fg"><label class="fl2">Nombre (opcional)</label><input type="text" id="rnombre" class="fi" placeholder="Se detecta auto..."></div>
+      <div class="fg"><label class="fl2">Tipo</label>
+        <select id="rtipo" class="fs">
+          <option value="guisado">&#127858; Guisado</option>
+          <option value="garnacha">&#129362; Garnacha</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl2">Regi&oacute;n</label>
+        <select id="rregion" class="fs">
+          <option value="Mexico">Auto</option>
+          <option value="Michoacan">Michoac&aacute;n</option>
+          <option value="Yucatan">Yucat&aacute;n</option>
+          <option value="Oaxaca">Oaxaca</option>
+          <option value="Veracruz">Veracruz</option>
+          <option value="Puebla">Puebla</option>
+          <option value="Jalisco">Jalisco</option>
+          <option value="CDMX">CDMX</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl2">Porciones originales</label><input type="number" id="rpax" class="fi" value="4" min="1"></div>
+    </div>
+    <button class="btn bgold bfull" onclick="agregarReceta()">&#10024; Agregar y Escalar a 500 Comensales</button>
+    <div id="prev" style="display:none;margin-top:2rem"></div>
+  </div>
+</div>
+
+<!-- CATALOGO -->
+<div id="cat" class="page">
+  <div class="card">
+    <div class="ch">&#128218; Cat&aacute;logo de Platillos</div>
+    <div class="infobox">Cat&aacute;logo completo: platillos del sistema + tus recetas. Edita ingredientes, cambia tipo y elimina platillos.</div>
+    <div class="fbar">
+      <span class="fl">Ver:</span>
+      <button class="fb on" data-fcat onclick="setFiltCat('todos',this)">Todos</button>
+      <button class="fb" data-fcat onclick="setFiltCat('precargados',this)">&#127869;&#65039; Precargados</button>
+      <button class="fb" data-fcat onclick="setFiltCat('misrecetas',this)">&#11088; Mis Recetas</button>
+      <button class="btn bgold bsm" onclick="exportarTxt()">&#128190; Exportar .TXT</button>
+    </div>
+    <div id="catcon"></div>
+  </div>
+</div>
+
+<!-- PRECIOS -->
+<div id="precios" class="page">
+  <div class="card">
+    <div class="ch">&#128176; Precios de Ingredientes</div>
+    <div class="infobox">
+      <h3>&#128203; Actualizar desde factura</h3>
+      <ol style="margin-left:1.5rem;line-height:2.2;color:var(--bd)">
+        <li>Env&iacute;a tu factura PDF a Claude</li>
+        <li>Claude te genera el CSV</li>
+        <li>Pega el CSV abajo &#11015;&#65039;</li>
+      </ol>
+    </div>
+    <div style="padding:1.5rem;background:var(--cream);border-radius:8px;border:2px dashed rgba(212,175,55,.4);margin-bottom:1.5rem">
+      <h3 style="margin-bottom:1rem">&#128202; Pega el CSV aqu&iacute;:</h3>
+      <textarea id="csvtxt" class="ft" style="min-height:150px;font-family:monospace;font-size:.875rem" placeholder="Ingrediente,Precio por Kg/L,Fecha&#10;Papa,44.00,21/04/2026&#10;&#10;O pega el contenido de tu factura directamente."></textarea>
+      <button class="btn bgold bfull" onclick="importarCSV()" style="margin-top:1rem">&#9989; Importar Precios</button>
+      <div id="csvres" style="display:none;margin-top:1rem"></div>
+    </div>
+    <div style="padding:1.5rem;background:#fff;border-radius:8px;border:1px solid rgba(212,175,55,.2)">
+      <h3 style="margin-bottom:1rem">&#128202; Tabla de Precios</h3>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-bottom:1rem">
+        <input type="text" class="fi" placeholder="&#128269; Buscar ingrediente..." oninput="filtrarPrecios(this.value)">
+        <button class="btn bsec bsm" onclick="exportarPrecios()">&#128229; Exportar CSV</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;padding:1rem;background:var(--cream);border-radius:6px;text-align:center">
+        <div><div style="font-size:1.5rem;font-weight:700;color:var(--gold)" id="pst">0</div><div style="font-size:.8rem;color:var(--bl)">Ingredientes</div></div>
+        <div><div style="font-size:1.5rem;font-weight:700;color:var(--green)" id="psp">$0</div><div style="font-size:.8rem;color:var(--bl)">Promedio</div></div>
+        <div><div style="font-size:1.5rem;font-weight:700;color:var(--tc)" id="psh">0</div><div style="font-size:.8rem;color:var(--bl)">Hoy</div></div>
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:var(--bd);color:var(--gold)"><th style="padding:.75rem;text-align:left">Ingrediente</th><th style="padding:.75rem;text-align:center">Precio/Kg</th><th style="padding:.75rem;text-align:center">Fecha</th><th style="padding:.75rem;text-align:center">Acciones</th></tr></thead>
+        <tbody id="tpre"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:1.5rem;padding:1.5rem;background:var(--cream);border-radius:8px">
+      <h3 style="margin-bottom:1rem">&#9999;&#65039; Actualizaci&oacute;n Manual</h3>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:1rem">
+        <div class="fg"><label class="fl2">Ingrediente</label><input type="text" id="pnombre" class="fi" placeholder="Ej: Pollo pechuga"></div>
+        <div class="fg"><label class="fl2">Precio/Kg</label><input type="number" id="pprecio" class="fi" placeholder="99.00" step="0.01" min="0"></div>
+        <div class="fg"><label class="fl2" style="opacity:0">-</label><button class="btn bgold bfull" onclick="agregarPrecio()">&#10133; Agregar</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GENERAR RECETA -->
+<div id="generar" class="page">
+  <div class="card">
+    <div class="ch">&#10024; Generar Receta</div>
+    <div class="infobox">Escribe el nombre del platillo y el sistema genera la receta escalada con ingredientes y costos.</div>
+    <div class="fg"><label class="fl2">Nombre del Platillo</label><input type="text" id="gnombre" class="fi" placeholder="Ej: Pozole, Tinga de Pollo, Quesadillas"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div class="fg"><label class="fl2">N&uacute;mero de Comensales</label><input type="number" id="gpax" class="fi" value="500" min="1"></div>
+      <div class="fg"><label class="fl2">Tipo</label>
+        <select id="gtipo" class="fs">
+          <option value="guisado">Guisado Principal (150g)</option>
+          <option value="garnacha">Garnacha</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn bgold bfull" onclick="generarReceta()">&#10024; Generar Receta</button>
+    <div id="gloader" class="loader"><div class="spin"></div><p style="margin-top:1rem;color:var(--bl)">Generando...</p></div>
+    <div id="gres" style="display:none;margin-top:2rem"></div>
+  </div>
+</div>
+
+<!-- EXPORTAR -->
+<div id="exportar" class="page">
+  <div class="card">
+    <div class="ch">&#9881;&#65039; Configuraci&oacute;n Admin</div>
+    <div class="infobox">
+      <h3>&#128272; API Key de Anthropic</h3>
+      <p style="color:var(--bd);margin-bottom:1rem;font-size:.9rem">Solo el administrador necesita configurar esto. Permite generar recetas con inteligencia artificial. Los dem&aacute;s usuarios pueden usar la app sin API key.</p>
+      <div style="display:flex;gap:.75rem;align-items:center">
+        <input type="password" id="apikey-input" class="fi" style="flex:1" placeholder="sk-ant-api03-...">
+        <button class="btn bgold bsm" onclick="guardarApiKey()">&#128190; Guardar</button>
+        <button class="btn bsm" style="background:var(--tc)" onclick="borrarApiKey()">&#128465;&#65039;</button>
+      </div>
+      <div id="apikey-status" style="margin-top:.75rem;font-size:.85rem"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch">&#128196; Exportar</div>
+    <div style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+      <button class="btn bfull" onclick="exportExcel()">&#128202; Men&uacute; a Excel</button>
+      <button class="btn bsec bfull" onclick="imprimirMenu()">&#128424; Imprimir Men&uacute;</button>
+      <button class="btn bgold bfull" onclick="exportarLibro()">&#128218; Libro de Recetas</button>
+    </div>
+    <div style="margin-top:1.5rem;padding:1.25rem;background:var(--cream);border-radius:8px;line-height:2.4;font-size:.88rem;color:var(--bm)">
+      <strong>&#128202; Excel:</strong> Descarga el men&uacute; en .xlsx<br>
+      <strong>&#128424; Imprimir Men&uacute;:</strong> Descarga HTML para imprimir<br>
+      <strong>&#128218; Libro de Recetas:</strong> Genera libro con todas tus recetas guardadas
+    </div>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+
+<!-- MODAL -->
+<div id="modal" class="modal">
+  <div class="mc">
+    <div class="mh">
+      <button class="cx" onclick="closeModal()">&#10005;</button>
+      <div id="mt"></div>
+    </div>
+    <div class="mb" id="mb"></div>
+  </div>
+</div>
+
+<script>
+const DB = {
+"Tinga de Pollo":{region:"Mexico",carnico:"Pollo",tipo:"guisado",ingredientes:[{nombre:"Pechuga de pollo",cantidad:80,unidad:"g",precio_kg:99},{nombre:"Zanahoria",cantidad:20,unidad:"g",precio_kg:18},{nombre:"Cebolla",cantidad:15,unidad:"g",precio_kg:18},{nombre:"Chipotle",cantidad:8,unidad:"g",precio_kg:45},{nombre:"Pure de tomate",cantidad:20,unidad:"g",precio_kg:25},{nombre:"Aceite",cantidad:5,unidad:"ml",precio_kg:35}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Estofado de Res":{region:"Mexico",carnico:"Res",tipo:"guisado",ingredientes:[{nombre:"Carne de res",cantidad:100,unidad:"g",precio_kg:142},{nombre:"Jitomate",cantidad:30,unidad:"g",precio_kg:25},{nombre:"Chile poblano",cantidad:20,unidad:"g",precio_kg:35},{nombre:"Zanahoria",cantidad:15,unidad:"g",precio_kg:18},{nombre:"Cebolla",cantidad:10,unidad:"g",precio_kg:18}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Puerco con Repollo":{region:"Mexico",carnico:"Cerdo",tipo:"guisado",ingredientes:[{nombre:"Milanesa de cerdo",cantidad:100,unidad:"g",precio_kg:85},{nombre:"Repollo",cantidad:30,unidad:"g",precio_kg:15},{nombre:"Cebolla",cantidad:15,unidad:"g",precio_kg:18},{nombre:"Mostaza",cantidad:5,unidad:"g",precio_kg:45}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Pozole":{region:"Mexico",carnico:"Cerdo",tipo:"guisado",ingredientes:[{nombre:"Carne de cerdo",cantidad:80,unidad:"g",precio_kg:85},{nombre:"Maiz pozolero",cantidad:60,unidad:"g",precio_kg:28},{nombre:"Chile guajillo",cantidad:8,unidad:"g",precio_kg:95},{nombre:"Ajo",cantidad:3,unidad:"g",precio_kg:25},{nombre:"Cebolla",cantidad:10,unidad:"g",precio_kg:18}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Lenteja a la Mexicana":{region:"Mexico",carnico:"Verdura",tipo:"guisado",ingredientes:[{nombre:"Lenteja",cantidad:60,unidad:"g",precio_kg:35},{nombre:"Papa",cantidad:20,unidad:"g",precio_kg:22},{nombre:"Zanahoria",cantidad:15,unidad:"g",precio_kg:18},{nombre:"Jitomate",cantidad:20,unidad:"g",precio_kg:25}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Carne a la Jardinera":{region:"Mexico",carnico:"Res",tipo:"guisado",ingredientes:[{nombre:"Cecina de res",cantidad:100,unidad:"g",precio_kg:142},{nombre:"Calabacita",cantidad:20,unidad:"g",precio_kg:22},{nombre:"Papa",cantidad:20,unidad:"g",precio_kg:22},{nombre:"Zanahoria",cantidad:15,unidad:"g",precio_kg:18},{nombre:"Jitomate",cantidad:20,unidad:"g",precio_kg:25}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Pechugas Rellenas Empanizadas":{region:"Mexico",carnico:"Pollo",tipo:"guisado",ingredientes:[{nombre:"Pechuga de pollo",cantidad:100,unidad:"g",precio_kg:99},{nombre:"Jamon",cantidad:20,unidad:"g",precio_kg:85},{nombre:"Queso Oaxaca",cantidad:20,unidad:"g",precio_kg:136},{nombre:"Huevo",cantidad:15,unidad:"g",precio_kg:45},{nombre:"Pan molido",cantidad:10,unidad:"g",precio_kg:25},{nombre:"Aceite",cantidad:10,unidad:"ml",precio_kg:35}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Arroz con Pollo":{region:"Mexico",carnico:"Pollo",tipo:"guisado",ingredientes:[{nombre:"Arroz",cantidad:50,unidad:"g",precio_kg:24},{nombre:"Pollo en trozos",cantidad:60,unidad:"g",precio_kg:99},{nombre:"Zanahoria",cantidad:10,unidad:"g",precio_kg:18},{nombre:"Chicharos",cantidad:10,unidad:"g",precio_kg:22},{nombre:"Elote",cantidad:10,unidad:"g",precio_kg:22}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Barbacoa de Res":{region:"Mexico",carnico:"Res",tipo:"guisado",ingredientes:[{nombre:"Carne de res chambarete",cantidad:100,unidad:"g",precio_kg:142},{nombre:"Chile guajillo",cantidad:8,unidad:"g",precio_kg:95},{nombre:"Chile ancho",cantidad:5,unidad:"g",precio_kg:95},{nombre:"Ajo",cantidad:3,unidad:"g",precio_kg:25},{nombre:"Cebolla",cantidad:15,unidad:"g",precio_kg:18}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Menudo":{region:"Mexico",carnico:"Res",tipo:"guisado",ingredientes:[{nombre:"Pancita de res",cantidad:80,unidad:"g",precio_kg:85},{nombre:"Maiz pozolero",cantidad:40,unidad:"g",precio_kg:28},{nombre:"Chile guajillo",cantidad:8,unidad:"g",precio_kg:95},{nombre:"Ajo",cantidad:3,unidad:"g",precio_kg:25},{nombre:"Cebolla",cantidad:10,unidad:"g",precio_kg:18}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Pastel de Carne":{region:"Mexico",carnico:"Res",tipo:"guisado",ingredientes:[{nombre:"Carne molida res",cantidad:70,unidad:"g",precio_kg:120},{nombre:"Carne molida cerdo",cantidad:30,unidad:"g",precio_kg:85},{nombre:"Zanahoria",cantidad:15,unidad:"g",precio_kg:18},{nombre:"Papa",cantidad:15,unidad:"g",precio_kg:22},{nombre:"Huevo",cantidad:10,unidad:"g",precio_kg:45}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Higado Encebollado":{region:"Mexico",carnico:"Res",tipo:"guisado",ingredientes:[{nombre:"Higado de res",cantidad:100,unidad:"g",precio_kg:85},{nombre:"Cebolla",cantidad:30,unidad:"g",precio_kg:18},{nombre:"Jitomate",cantidad:20,unidad:"g",precio_kg:25},{nombre:"Jalapeno",cantidad:5,unidad:"g",precio_kg:45},{nombre:"Aceite",cantidad:5,unidad:"ml",precio_kg:35}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Rollo de Carne":{region:"Mexico",carnico:"Res",tipo:"guisado",ingredientes:[{nombre:"Carne molida mixta",cantidad:90,unidad:"g",precio_kg:105},{nombre:"Zanahoria",cantidad:15,unidad:"g",precio_kg:18},{nombre:"Espinaca",cantidad:10,unidad:"g",precio_kg:25},{nombre:"Huevo",cantidad:10,unidad:"g",precio_kg:45},{nombre:"Jitomate",cantidad:15,unidad:"g",precio_kg:25}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Pollo con Tallarines":{region:"Mexico",carnico:"Pollo",tipo:"guisado",ingredientes:[{nombre:"Pollo en trozos",cantidad:80,unidad:"g",precio_kg:99},{nombre:"Tallarines",cantidad:30,unidad:"g",precio_kg:28},{nombre:"Zanahoria",cantidad:10,unidad:"g",precio_kg:18},{nombre:"Calabacita",cantidad:10,unidad:"g",precio_kg:22}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Espagueti con Pollo al Chipotle":{region:"Mexico",carnico:"Pollo",tipo:"guisado",ingredientes:[{nombre:"Espagueti",cantidad:70,unidad:"g",precio_kg:28},{nombre:"Pechuga de pollo",cantidad:50,unidad:"g",precio_kg:99},{nombre:"Chipotle",cantidad:8,unidad:"g",precio_kg:45},{nombre:"Crema",cantidad:15,unidad:"ml",precio_kg:65}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Tortitas de Zanahoria y Calabacita":{region:"Mexico",carnico:"Verdura",tipo:"guisado",ingredientes:[{nombre:"Zanahoria",cantidad:50,unidad:"g",precio_kg:18},{nombre:"Calabacita",cantidad:40,unidad:"g",precio_kg:22},{nombre:"Huevo",cantidad:20,unidad:"g",precio_kg:45},{nombre:"Harina",cantidad:10,unidad:"g",precio_kg:18},{nombre:"Aceite",cantidad:8,unidad:"ml",precio_kg:35}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Frijoles Charros":{region:"Mexico",carnico:"Cerdo",tipo:"guisado",ingredientes:[{nombre:"Frijol bayo",cantidad:60,unidad:"g",precio_kg:35},{nombre:"Chorizo",cantidad:20,unidad:"g",precio_kg:85},{nombre:"Tocino",cantidad:10,unidad:"g",precio_kg:120},{nombre:"Jitomate",cantidad:15,unidad:"g",precio_kg:25},{nombre:"Cebolla",cantidad:10,unidad:"g",precio_kg:18}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Frijoles Negros con Epazote":{region:"Mexico",carnico:"Verdura",tipo:"guisado",ingredientes:[{nombre:"Frijol negro",cantidad:70,unidad:"g",precio_kg:38},{nombre:"Epazote",cantidad:3,unidad:"g",precio_kg:20},{nombre:"Cebolla",cantidad:10,unidad:"g",precio_kg:18},{nombre:"Chile serrano",cantidad:3,unidad:"g",precio_kg:45}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Frijoles Puercos":{region:"Mexico",carnico:"Cerdo",tipo:"guisado",ingredientes:[{nombre:"Frijol",cantidad:60,unidad:"g",precio_kg:35},{nombre:"Chorizo",cantidad:20,unidad:"g",precio_kg:85},{nombre:"Chipotle",cantidad:5,unidad:"g",precio_kg:45},{nombre:"Queso fresco",cantidad:10,unidad:"g",precio_kg:136},{nombre:"Manteca",cantidad:5,unidad:"g",precio_kg:45}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Frijol con Chorizo":{region:"Mexico",carnico:"Cerdo",tipo:"guisado",ingredientes:[{nombre:"Frijol",cantidad:60,unidad:"g",precio_kg:35},{nombre:"Chorizo",cantidad:25,unidad:"g",precio_kg:85},{nombre:"Aceite",cantidad:3,unidad:"ml",precio_kg:35}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Frijoles Rancheros":{region:"Mexico",carnico:"Verdura",tipo:"guisado",ingredientes:[{nombre:"Frijol",cantidad:70,unidad:"g",precio_kg:35},{nombre:"Jitomate",cantidad:15,unidad:"g",precio_kg:25},{nombre:"Cebolla",cantidad:10,unidad:"g",precio_kg:18},{nombre:"Chile",cantidad:3,unidad:"g",precio_kg:45},{nombre:"Manteca",cantidad:5,unidad:"g",precio_kg:45}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Arroz Rojo":{region:"Mexico",carnico:"Verdura",tipo:"guisado",ingredientes:[{nombre:"Arroz",cantidad:60,unidad:"g",precio_kg:24},{nombre:"Jitomate",cantidad:25,unidad:"g",precio_kg:25},{nombre:"Zanahoria",cantidad:10,unidad:"g",precio_kg:18},{nombre:"Chicharos",cantidad:10,unidad:"g",precio_kg:22},{nombre:"Aceite",cantidad:5,unidad:"ml",precio_kg:35}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Arroz Poblano":{region:"Mexico",carnico:"Verdura",tipo:"guisado",ingredientes:[{nombre:"Arroz",cantidad:60,unidad:"g",precio_kg:24},{nombre:"Chile poblano",cantidad:20,unidad:"g",precio_kg:35},{nombre:"Elote",cantidad:15,unidad:"g",precio_kg:22},{nombre:"Crema",cantidad:10,unidad:"ml",precio_kg:65}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Papas con Chorizo":{region:"Mexico",carnico:"Cerdo",tipo:"guisado",ingredientes:[{nombre:"Papa",cantidad:80,unidad:"g",precio_kg:22},{nombre:"Chorizo",cantidad:30,unidad:"g",precio_kg:85},{nombre:"Cebolla",cantidad:10,unidad:"g",precio_kg:18},{nombre:"Aceite",cantidad:5,unidad:"ml",precio_kg:35}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Papas a la Mexicana":{region:"Mexico",carnico:"Verdura",tipo:"guisado",ingredientes:[{nombre:"Papa",cantidad:80,unidad:"g",precio_kg:22},{nombre:"Jitomate",cantidad:20,unidad:"g",precio_kg:25},{nombre:"Cebolla",cantidad:15,unidad:"g",precio_kg:18},{nombre:"Chile verde",cantidad:5,unidad:"g",precio_kg:45},{nombre:"Aceite",cantidad:5,unidad:"ml",precio_kg:35}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Nopales con Calabacitas":{region:"Mexico",carnico:"Verdura",tipo:"guisado",ingredientes:[{nombre:"Nopal",cantidad:60,unidad:"g",precio_kg:18},{nombre:"Calabacita",cantidad:40,unidad:"g",precio_kg:22},{nombre:"Jitomate",cantidad:20,unidad:"g",precio_kg:25},{nombre:"Cebolla",cantidad:10,unidad:"g",precio_kg:18}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Garbanzos con Espinazo":{region:"Mexico",carnico:"Cerdo",tipo:"guisado",ingredientes:[{nombre:"Garbanzo",cantidad:50,unidad:"g",precio_kg:35},{nombre:"Espinazo de cerdo",cantidad:60,unidad:"g",precio_kg:75},{nombre:"Zanahoria",cantidad:15,unidad:"g",precio_kg:18},{nombre:"Papa",cantidad:15,unidad:"g",precio_kg:22}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Tacos Dorados":{region:"Mexico",carnico:"Pollo",tipo:"garnacha",ingredientes:[{nombre:"Tortilla de maiz",cantidad:50,unidad:"g",precio_kg:18},{nombre:"Pollo deshebrado",cantidad:40,unidad:"g",precio_kg:99},{nombre:"Lechuga",cantidad:10,unidad:"g",precio_kg:22},{nombre:"Crema",cantidad:10,unidad:"ml",precio_kg:65},{nombre:"Aceite",cantidad:8,unidad:"ml",precio_kg:35}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Quesadillas":{region:"Mexico",carnico:"Queso",tipo:"garnacha",ingredientes:[{nombre:"Tortilla de maiz",cantidad:60,unidad:"g",precio_kg:18},{nombre:"Queso Oaxaca",cantidad:40,unidad:"g",precio_kg:136},{nombre:"Aceite",cantidad:3,unidad:"ml",precio_kg:35}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Sope de Pollo":{region:"Mexico",carnico:"Pollo",tipo:"garnacha",ingredientes:[{nombre:"Masa de maiz",cantidad:60,unidad:"g",precio_kg:18},{nombre:"Pollo deshebrado",cantidad:40,unidad:"g",precio_kg:99},{nombre:"Frijoles",cantidad:20,unidad:"g",precio_kg:35},{nombre:"Crema",cantidad:10,unidad:"ml",precio_kg:65},{nombre:"Queso fresco",cantidad:10,unidad:"g",precio_kg:136}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Gorditas":{region:"Mexico",carnico:"Mixto",tipo:"garnacha",ingredientes:[{nombre:"Masa de maiz",cantidad:70,unidad:"g",precio_kg:18},{nombre:"Frijoles",cantidad:25,unidad:"g",precio_kg:35},{nombre:"Chicharron",cantidad:15,unidad:"g",precio_kg:75},{nombre:"Aceite",cantidad:8,unidad:"ml",precio_kg:35}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Tostada de Pollo":{region:"Mexico",carnico:"Pollo",tipo:"garnacha",ingredientes:[{nombre:"Tostada",cantidad:30,unidad:"g",precio_kg:25},{nombre:"Pollo deshebrado",cantidad:50,unidad:"g",precio_kg:99},{nombre:"Lechuga",cantidad:15,unidad:"g",precio_kg:22},{nombre:"Crema",cantidad:10,unidad:"ml",precio_kg:65},{nombre:"Queso fresco",cantidad:10,unidad:"g",precio_kg:136}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Pambazos":{region:"Mexico",carnico:"Cerdo",tipo:"garnacha",ingredientes:[{nombre:"Pan pambazo",cantidad:60,unidad:"g",precio_kg:20},{nombre:"Papa",cantidad:40,unidad:"g",precio_kg:22},{nombre:"Chorizo",cantidad:25,unidad:"g",precio_kg:85},{nombre:"Chile guajillo",cantidad:8,unidad:"g",precio_kg:95},{nombre:"Lechuga",cantidad:10,unidad:"g",precio_kg:22}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Huaraches":{region:"Mexico",carnico:"Mixto",tipo:"garnacha",ingredientes:[{nombre:"Masa de maiz",cantidad:80,unidad:"g",precio_kg:18},{nombre:"Frijoles",cantidad:25,unidad:"g",precio_kg:35},{nombre:"Carne asada",cantidad:40,unidad:"g",precio_kg:142},{nombre:"Nopales",cantidad:15,unidad:"g",precio_kg:18},{nombre:"Queso fresco",cantidad:10,unidad:"g",precio_kg:136}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Molletes":{region:"Mexico",carnico:"Queso",tipo:"garnacha",ingredientes:[{nombre:"Pan bolillo",cantidad:60,unidad:"g",precio_kg:12},{nombre:"Frijoles refritos",cantidad:30,unidad:"g",precio_kg:35},{nombre:"Queso Oaxaca",cantidad:20,unidad:"g",precio_kg:136},{nombre:"Jitomate",cantidad:10,unidad:"g",precio_kg:25}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Enchiladas Verdes":{region:"Mexico",carnico:"Pollo",tipo:"garnacha",ingredientes:[{nombre:"Tortilla de maiz",cantidad:50,unidad:"g",precio_kg:18},{nombre:"Pollo deshebrado",cantidad:40,unidad:"g",precio_kg:99},{nombre:"Tomatillo",cantidad:30,unidad:"g",precio_kg:20},{nombre:"Chile serrano",cantidad:5,unidad:"g",precio_kg:45},{nombre:"Crema",cantidad:10,unidad:"ml",precio_kg:65}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Bowl de Taco":{region:"Mexico",carnico:"Res",tipo:"garnacha",ingredientes:[{nombre:"Tortilla frita",cantidad:40,unidad:"g",precio_kg:25},{nombre:"Carne molida",cantidad:50,unidad:"g",precio_kg:120},{nombre:"Frijoles",cantidad:20,unidad:"g",precio_kg:35},{nombre:"Lechuga",cantidad:10,unidad:"g",precio_kg:22},{nombre:"Queso",cantidad:10,unidad:"g",precio_kg:136}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Chimichangas":{region:"Mexico",carnico:"Pollo",tipo:"garnacha",ingredientes:[{nombre:"Tortilla de harina",cantidad:60,unidad:"g",precio_kg:25},{nombre:"Pechuga de pollo",cantidad:50,unidad:"g",precio_kg:99},{nombre:"Queso Oaxaca",cantidad:20,unidad:"g",precio_kg:136},{nombre:"Frijoles",cantidad:15,unidad:"g",precio_kg:35},{nombre:"Aceite",cantidad:10,unidad:"ml",precio_kg:35}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Empanadas Fritas":{region:"Mexico",carnico:"Mixto",tipo:"garnacha",ingredientes:[{nombre:"Harina de trigo",cantidad:50,unidad:"g",precio_kg:18},{nombre:"Queso fresco",cantidad:30,unidad:"g",precio_kg:136},{nombre:"Frijoles",cantidad:20,unidad:"g",precio_kg:35},{nombre:"Aceite",cantidad:10,unidad:"ml",precio_kg:35}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
+"Pastel Azteca":{region:"Mexico",carnico:"Pollo",tipo:"garnacha",ingredientes:[{nombre:"Tortilla de maiz",cantidad:50,unidad:"g",precio_kg:18},{nombre:"Pollo deshebrado",cantidad:40,unidad:"g",precio_kg:99},{nombre:"Salsa verde",cantidad:20,unidad:"g",precio_kg:15},{nombre:"Queso Oaxaca",cantidad:20,unidad:"g",precio_kg:136},{nombre:"Crema",cantidad:10,unidad:"ml",precio_kg:65}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60}
+};
+
+var DB_EXTRA = {};
+var recetas = [];
+var precios = {};
+var diasMenu = 30;
+var filtCat = 'todos';
+
+window.addEventListener('load', function() {
+    try { var s = localStorage.getItem('r_cicsa'); if(s) { recetas = JSON.parse(s); updCnt(); } } catch(e) {}
+    try { var p = localStorage.getItem('p_cicsa'); if(p) precios = JSON.parse(p); else initPrecios(); } catch(e) { initPrecios(); }
+    genMenu();
+    document.getElementById('stat-plat').textContent = Object.keys(DB).length;
+    // Sync from Firebase on load
+    setTimeout(sincronizarDesdeFirebase, 1000);
+});
+
+function initPrecios() {
+    var h = hoy();
+    precios = {
+        'Pollo pechuga':{precio:99,fecha:h},'Res':{precio:142,fecha:h},'Cerdo':{precio:85,fecha:h},
+        'Pescado':{precio:185,fecha:h},'Queso fresco':{precio:136,fecha:h},'Crema':{precio:65,fecha:h},
+        'Leche':{precio:18,fecha:h},'Papa':{precio:22,fecha:h},'Zanahoria':{precio:18,fecha:h},
+        'Cebolla':{precio:18,fecha:h},'Jitomate':{precio:25,fecha:h},'Ajo':{precio:25,fecha:h},
+        'Chile':{precio:45,fecha:h},'Frijol':{precio:35,fecha:h},'Arroz':{precio:24,fecha:h},
+        'Aceite':{precio:35,fecha:h},'Tortilla':{precio:18,fecha:h},'Harina':{precio:18,fecha:h}
+    };
+    savePrecios();
+}
+function hoy() { return new Date().toLocaleDateString('es-MX'); }
+// ============================================================
+// FIREBASE REST API
+// ============================================================
+var FB_KEY = 'AIzaSyC1QeFfDIgZPhqTs4zh7VpkB8cua93gCo0';
+var FB_BASE = 'https://firestore.googleapis.com/v1/projects/sistema-menu-cicsa/databases/(default)/documents';
+
+async function fbSet(col, docId, data) {
+    try {
+        var fields = {};
+        fields['json'] = {stringValue: JSON.stringify(data)};
+        fields['ts'] = {stringValue: new Date().toISOString()};
+        await fetch(FB_BASE + '/' + col + '/' + docId + '?key=' + FB_KEY, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({fields: fields})
+        });
+    } catch(e) { console.log('fbSet error:', e); }
+}
+
+async function fbGet(col, docId) {
+    try {
+        var r = await fetch(FB_BASE + '/' + col + '/' + docId + '?key=' + FB_KEY);
+        if(!r.ok) return null;
+        var d = await r.json();
+        if(d.fields && d.fields.json) return JSON.parse(d.fields.json.stringValue);
+        return null;
+    } catch(e) { return null; }
+}
+
+function saveRecetas() {
+    try { localStorage.setItem('r_cicsa', JSON.stringify(recetas)); } catch(e) {}
+    fbSet('datos', 'recetas', recetas);
+}
+function savePrecios() {
+    try { localStorage.setItem('p_cicsa', JSON.stringify(precios)); } catch(e) {}
+    fbSet('datos', 'precios', precios);
+}
+
+async function sincronizarDesdeFirebase() {
+    var p = await fbGet('datos', 'precios');
+    if(p && Object.keys(p).length > 0) {
+        precios = p;
+        try { localStorage.setItem('p_cicsa', JSON.stringify(precios)); } catch(e) {}
+        if(document.getElementById('tpre')) { renderPrecios(); updPStats(); }
+        toast('☁️ Precios sincronizados');
+    }
+    var r = await fbGet('datos', 'recetas');
+    if(r && r.length > 0) {
+        recetas = r;
+        try { localStorage.setItem('r_cicsa', JSON.stringify(recetas)); } catch(e) {}
+        updCnt();
+        toast('☁️ Recetas sincronizadas');
+    }
+}
+function updCnt() { var e = document.getElementById('cnt'); if(e) e.textContent = recetas.length; }
+
+// NAV
+function go(btn, id) {
+    document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('on'); });
+    document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('on'); });
+    btn.classList.add('on');
+    var d = document.getElementById(id);
+    if(d) d.classList.add('on');
+    if(id === 'cat') renderCat();
+    if(id === 'precios') { renderPrecios(); updPStats(); }
+}
+function closeModal() { document.getElementById('modal').style.display = 'none'; }
+function openModal(t, b) {
+    document.getElementById('mt').innerHTML = t;
+    document.getElementById('mb').innerHTML = b;
+    document.getElementById('modal').style.display = 'flex';
+}
+function toast(m) {
+    var e = document.getElementById('toast');
+    e.textContent = m; e.classList.add('on');
+    setTimeout(function() { e.classList.remove('on'); }, 3000);
+}
+
+// COST
+function getCost(rec) {
+    var c = 0;
+    (rec.ingredientes || []).forEach(function(i) {
+        c += (i.unidad === 'g' || i.unidad === 'ml') ? (i.cantidad / 1000) * i.precio_kg : i.cantidad * i.precio_kg;
+    });
+    return c;
+}
+function pickFrom(list, used, V, excl) {
+    if(!list || !list.length) return null;
+    var no = (excl || []).concat(used.slice(Math.max(0, used.length - V)));
+    var av = list.filter(function(x) { return no.indexOf(x) < 0; });
+    var pool = av.length ? av : list.filter(function(x) { return (excl || []).indexOf(x) < 0; });
+    return pool.length ? pool[Math.floor(Math.random() * pool.length)] : list[0];
+}
+
+// MENU GEN
+function genMenu() {
+    var grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    var allDB = Object.assign({}, DB, DB_EXTRA);
+    var G = Object.keys(allDB).filter(function(n) { var t = allDB[n].tipo; return !t || t === 'guisado'; });
+    var Ga = Object.keys(allDB).filter(function(n) { return allDB[n].tipo === 'garnacha'; });
+    if(!G.length && !Ga.length) {
+        grid.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--bl);grid-column:1/-1"><div style="font-size:4rem">&#128466;</div><h3 style="margin-top:1rem">Catalogo vacio</h3></div>';
+        return;
+    }
+    var uG = [], uGa = [], V = Math.max(diasMenu, 14), domN = 0;
+    var dias = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
+    for(var i = 1; i <= diasMenu; i++) {
+        var dia = dias[(i-1) % 7];
+        var g1, g2, ga, lk1 = false, lkG = false;
+        if(dia === 'Jueves') {
+            g1 = G.find(function(n) { return n.toLowerCase().indexOf('pozole') >= 0; }) || G[0] || null;
+            g2 = pickFrom(G, uG, V, [g1]);
+            ga = Ga.find(function(n) { return n.toLowerCase().indexOf('taco') >= 0; }) || Ga[0] || null;
+            lk1 = true; lkG = true;
+        } else if(dia === 'Domingo') {
+            domN++;
+            g1 = domN % 2 === 1
+                ? (G.find(function(n) { return n.toLowerCase().indexOf('barbacoa') >= 0; }) || G[0])
+                : (G.find(function(n) { return n.toLowerCase().indexOf('menudo') >= 0; }) || G[0]);
+            g2 = pickFrom(G, uG, V, [g1]);
+            ga = pickFrom(Ga, uGa, V, []);
+            lk1 = true;
+        } else {
+            g1 = pickFrom(G, uG, V, []);
+            g2 = pickFrom(G, uG, V, [g1]);
+            ga = pickFrom(Ga, uGa, V, []);
+        }
+        if(g1) uG.push(g1); if(g2) uG.push(g2); if(ga) uGa.push(ga);
+        if(uG.length > V * 2) { uG.shift(); uG.shift(); }
+        if(uGa.length > V) uGa.shift();
+        var r1 = g1 ? allDB[g1] : null, r2 = g2 ? allDB[g2] : null, rg = ga ? allDB[ga] : null;
+        var c1 = r1 ? getCost(r1) : 0, c2 = r2 ? getCost(r2) : 0, cg = rg ? getCost(rg) : 0;
+        var ct = c1 + c2 + cg;
+        var cat = ct < 50 ? 'economico' : ct < 80 ? 'medio' : 'premium';
+        var badge = lk1 ? '<div style="background:var(--gold);color:var(--bd);padding:.15rem .5rem;border-radius:4px;font-size:.62rem;display:inline-block;margin-top:.2rem">&#11088; Especial</div>' : '';
+        function pBox(lbl, nom, rec, c, lk, di, po) {
+            if(!nom) return '<div class="pl"><div class="plt">' + lbl + '</div><div style="font-size:.8rem;color:var(--bl)">Sin platillos</div></div>';
+            return '<div class="pl"><div class="plt">' + lbl + (lk ? ' &#128274;' : '') + '</div>'
+                + '<div class="pln">' + nom + '</div>'
+                + '<div class="plm"><span>&#128205; ' + (rec ? rec.region || 'Mexico' : 'Mexico') + '</span><span>$' + c.toFixed(2) + '/pax</span></div>'
+                + (lk ? '' : '<button class="btn bsec bsm" style="margin-top:.4rem;width:100%;padding:.35rem" onclick="cambiar(' + di + ',' + po + ',event)">&#128260; Cambiar</button>')
+                + '</div>';
+        }
+        var div = document.createElement('div');
+        div.className = 'day'; div.dataset.cat = cat; div.dataset.cost = ct;
+        div.innerHTML = '<div class="dh"><div><div class="dn">Dia ' + String(i).padStart(2,'0') + '</div><div class="dw">' + dia + '</div>' + badge + '</div><div class="dc">$' + ct.toFixed(2) + '/pax</div></div>'
+            + pBox('GUISADO 1', g1, r1, c1, lk1, i, 1)
+            + pBox('GUISADO 2', g2, r2, c2, false, i, 2)
+            + pBox('GARNACHA', ga, rg, cg, lkG, i, 3);
+        grid.appendChild(div);
+    }
+}
+
+function setDias(n, btn) {
+    diasMenu = n;
+    document.querySelectorAll('[data-dias]').forEach(function(b) { b.classList.remove('on'); });
+    btn.classList.add('on');
+    document.getElementById('dcustom').value = n;
+    genMenu(); toast('Menu ' + n + ' dias generado');
+}
+function setDiasC() {
+    var n = parseInt(document.getElementById('dcustom').value) || 30;
+    if(n < 1) n = 1; diasMenu = n;
+    document.querySelectorAll('[data-dias]').forEach(function(b) { b.classList.remove('on'); });
+    genMenu(); toast('Menu ' + n + ' dias generado');
+}
+function filtCosto(t, btn) {
+    document.querySelectorAll('[data-fc]').forEach(function(b) { b.classList.remove('on'); });
+    btn.classList.add('on');
+    document.querySelectorAll('.day').forEach(function(d) { d.style.display = (t === 'todos' || d.dataset.cat === t) ? '' : 'none'; });
+}
+
+// CAMBIAR PLATILLO
+function cambiar(dia, pos, ev) {
+    ev.stopPropagation();
+    var allDB = Object.assign({}, DB, DB_EXTRA);
+    var esGa = pos === 3;
+    var lista = esGa
+        ? Object.keys(allDB).filter(function(n) { return allDB[n].tipo === 'garnacha'; })
+        : Object.keys(allDB).filter(function(n) { var t = allDB[n].tipo; return !t || t === 'guisado'; });
+    if(!lista.length) { toast('No hay ' + (esGa ? 'garnachas' : 'guisados') + ' disponibles'); return; }
+    var html = '<div style="margin-bottom:1rem"><input class="fi" id="sbp" placeholder="Buscar..." oninput="filtModal(this.value)"></div>'
+        + '<div id="lp" style="max-height:55vh;overflow-y:auto;display:grid;gap:.5rem">';
+    lista.forEach(function(n) {
+        var r = allDB[n], c = getCost(r);
+        html += '<div class="pl" style="cursor:pointer;border:1.5px solid rgba(212,175,55,.2);border-radius:8px;margin:0" data-pn="' + encodeURIComponent(n) + '">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center">'
+            + '<div><div style="font-weight:700">' + n + '</div><div style="font-size:.78rem;color:var(--bl)">' + (r.carnico||'') + '</div></div>'
+            + '<div style="font-weight:700;color:var(--tc)">$' + c.toFixed(2) + '</div></div></div>';
+    });
+    html += '</div>';
+    openModal((esGa ? '&#129362; Cambiar Garnacha' : '&#127858; Cambiar Guisado') + ' - Dia ' + dia, html);
+    setTimeout(function() {
+        document.querySelectorAll('#lp [data-pn]').forEach(function(el) {
+            el.addEventListener('click', function() { aplicar(dia, pos, decodeURIComponent(this.getAttribute('data-pn'))); });
+        });
+    }, 50);
+}
+function filtModal(v) {
+    v = v.toLowerCase();
+    document.querySelectorAll('#lp [data-pn]').forEach(function(el) {
+        el.style.display = el.textContent.toLowerCase().indexOf(v) >= 0 ? '' : 'none';
+    });
+}
+function aplicar(dia, pos, nom) {
+    var allDB = Object.assign({}, DB, DB_EXTRA);
+    var cards = document.querySelectorAll('.day');
+    var card = cards[dia-1]; if(!card) return;
+    var r = allDB[nom]; if(!r) return;
+    var c = getCost(r);
+    var pls = card.querySelectorAll('.pl');
+    var pd = pls[pos-1];
+    if(pd) {
+        pd.querySelector('.pln').textContent = nom;
+        var sp = pd.querySelectorAll('.plm span');
+        if(sp[0]) sp[0].textContent = '&#128205; ' + (r.region||'Mexico');
+        if(sp[1]) sp[1].textContent = '$' + c.toFixed(2) + '/pax';
+        var tot = 0;
+        card.querySelectorAll('.pl').forEach(function(p) {
+            var s = p.querySelector('.plm span:last-child');
+            if(s) tot += parseFloat(s.textContent.replace('$','').replace('/pax','')) || 0;
+        });
+        card.querySelector('.dc').textContent = '$' + tot.toFixed(2) + '/pax';
+        card.dataset.cost = tot;
+        card.dataset.cat = tot < 50 ? 'economico' : tot < 80 ? 'medio' : 'premium';
+    }
+    closeModal(); toast('Dia ' + dia + ' actualizado');
+}
+
+// LISTA DE COMPRAS
+function listaCompras() {
+    var semanas = Math.ceil(document.querySelectorAll('.day').length / 7);
+    var opts = '';
+    for(var s = 1; s <= semanas; s++) {
+        var ini = (s-1)*7+1, fin = Math.min(s*7, document.querySelectorAll('.day').length);
+        opts += '<option value="' + s + '">Semana ' + s + ' (Dias ' + ini + '-' + fin + ')</option>';
+    }
+    opts += '<option value="todas">Todas las semanas</option>';
+    openModal('&#128722; Lista de Compras',
+        '<div class="fg"><label class="fl2">Selecciona el periodo</label>'
+        + '<select id="ssel" class="fs">' + opts + '</select></div>'
+        + '<button class="btn bgold bfull" id="bgl" style="margin-top:1rem">&#128722; Generar Lista</button>');
+    setTimeout(function() {
+        var b = document.getElementById('bgl');
+        if(b) b.addEventListener('click', function() { genLista(document.getElementById('ssel').value); });
+    }, 50);
+}
+function genLista(sem) {
+    var cards = document.querySelectorAll('.day');
+    var allDB = Object.assign({}, DB, DB_EXTRA);
+    var dias = sem === 'todas' ? Array.from(cards) : Array.from(cards).slice((parseInt(sem)-1)*7, Math.min(parseInt(sem)*7, cards.length));
+    var con = {};
+    dias.forEach(function(d) {
+        d.querySelectorAll('.pln').forEach(function(pd) {
+            var r = allDB[pd.textContent.trim()];
+            if(r) (r.ingredientes||[]).forEach(function(ing) {
+                if(!con[ing.nombre]) con[ing.nombre] = {cantidad:0, unidad:ing.unidad, precio_kg:ing.precio_kg};
+                con[ing.nombre].cantidad += ing.cantidad * 500;
+            });
+        });
+    });
+    var tot = 0, rows = '';
+    Object.keys(con).sort().forEach(function(n) {
+        var i = con[n], cant = i.cantidad, u = i.unidad;
+        if(u==='g' && cant>=1000) { cant/=1000; u='kg'; }
+        if(u==='ml' && cant>=1000) { cant/=1000; u='l'; }
+        var c = (i.unidad==='g'||i.unidad==='ml') ? (i.cantidad/1000)*i.precio_kg : i.cantidad*i.precio_kg;
+        tot += c;
+        rows += '<tr><td>' + n + '</td><td style="text-align:center">' + (cant<10?cant.toFixed(1):Math.round(cant)) + ' ' + u + '</td><td style="text-align:right">$' + c.toFixed(2) + '</td></tr>';
+    });
+    var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Lista Compras CICSA</title>'
+        + '<style>body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:2rem;color:#2C1810}'
+        + '.h{background:#2C1810;color:#D4AF37;padding:1.5rem 2rem;border-radius:8px;margin-bottom:2rem}'
+        + 'table{width:100%;border-collapse:collapse}th{background:#2C1810;color:#D4AF37;padding:.75rem;text-align:left}'
+        + 'td{padding:.6rem .75rem;border-bottom:1px solid #E8DCC8}.tot{background:#D4AF37;color:#2C1810;padding:1rem;border-radius:6px;display:flex;justify-content:space-between;font-weight:700;font-size:1.1rem;margin-top:.5rem}'
+        + '@media print{body{padding:0}}</style></head><body>'
+        + '<div class="h"><h2 style="margin:0">Lista de Compras - CICSA</h2><p style="color:#F5F1E8;margin:.25rem 0 0">' + dias.length + ' dias - 500 comensales/dia</p></div>'
+        + '<table><thead><tr><th>Ingrediente</th><th style="text-align:center">Cantidad</th><th style="text-align:right">Costo</th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table>'
+        + '<div class="tot"><span>Costo Total</span><span>$' + tot.toFixed(2) + '</span></div>'
+        + '</body></html>';
+    dl(html, 'Lista_Compras_CICSA.html', 'text/html');
+    closeModal(); toast('Lista descargada');
+}
+
+// IMPRIMIR MENU
+function imprimirMenu() {
+    var cards = document.querySelectorAll('.day');
+    if(!cards.length) { toast('Genera un menu primero'); return; }
+    var dias = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
+    var items = '';
+    cards.forEach(function(card, i) {
+        var pls = card.querySelectorAll('.pln');
+        var ct = parseFloat(card.dataset.cost||0).toFixed(2);
+        var d = dias[i%7];
+        items += '<div style="border:2px solid #D4AF37;border-radius:8px;overflow:hidden;break-inside:avoid">'
+            + '<div style="background:#2C1810;color:#D4AF37;padding:.5rem .75rem;display:flex;justify-content:space-between">'
+            + '<div><div style="font-size:1rem;font-weight:700">Dia ' + String(i+1).padStart(2,'0') + '</div><div style="font-size:.62rem;color:rgba(255,255,255,.6)">' + d + '</div></div>'
+            + '<div style="background:#D4AF37;color:#2C1810;padding:.2rem .5rem;border-radius:4px;font-size:.75rem;font-weight:700">$' + ct + '/pax</div></div>';
+        ['GUISADO 1','GUISADO 2','GARNACHA'].forEach(function(lbl, pi) {
+            items += '<div style="padding:.35rem .75rem;border-bottom:1px solid #F5F1E8">'
+                + '<div style="font-size:.58rem;text-transform:uppercase;letter-spacing:1px;color:#8B6F47">' + lbl + '</div>'
+                + '<div style="font-size:.82rem;font-weight:700;color:#2C1810">' + (pls[pi] ? pls[pi].textContent : '-') + '</div></div>';
+        });
+        items += '</div>';
+    });
+    var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Menu CICSA</title>'
+        + '<style>body{font-family:Arial,sans-serif;margin:0;padding:0;color:#2C1810}'
+        + '.h{background:#2C1810;color:#D4AF37;padding:1.5rem 2rem;text-align:center}'
+        + '.g{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;padding:1rem}'
+        + '@media print{.g{grid-template-columns:repeat(3,1fr)}}</style></head><body>'
+        + '<div class="h"><h1 style="margin:0;font-size:1.75rem">Menu ' + diasMenu + ' Dias - CICSA</h1>'
+        + '<p style="color:#F5F1E8;margin:.2rem 0 0;font-size:.85rem">' + new Date().toLocaleDateString("es-MX") + '</p></div>'
+        + '<div class="g">' + items + '</div></body></html>';
+    dl(html, 'Menu_' + diasMenu + '_dias_CICSA.html', 'text/html');
+    toast('Menu descargado');
+}
+
+// EXCEL
+function exportExcel() {
+    var cards = document.querySelectorAll('.day');
+    var data = [];
+    cards.forEach(function(card, i) {
+        var pls = card.querySelectorAll('.pln');
+        data.push({'Dia':i+1,'Guisado 1':pls[0]?pls[0].textContent:'','Guisado 2':pls[1]?pls[1].textContent:'','Garnacha':pls[2]?pls[2].textContent:'','Costo_pax':parseFloat(card.dataset.cost||0).toFixed(2)});
+    });
+    var wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.json_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Menu');
+    XLSX.writeFile(wb, 'Menu_CICSA_' + diasMenu + 'dias.xlsx');
+    toast('Excel generado');
+}
+
+// AGREGAR RECETA
+function agregarReceta() {
+    var txt = document.getElementById('rtxt').value.trim();
+    if(!txt) { alert('Pega una receta primero'); return; }
+    var pax = parseInt(document.getElementById('rpax').value) || 4;
+    var tipo = document.getElementById('rtipo').value;
+    var region = document.getElementById('rregion').value;
+    var nomMan = document.getElementById('rnombre').value.trim();
+    var p = parsearReceta(txt, pax);
+    if(nomMan) p.nombre = nomMan;
+    if(region !== 'Mexico') p.region = region;
+    p.tipo = tipo;
+    DB_EXTRA[p.nombre] = {region:p.region, carnico:p.carnico, tipo:tipo, ingredientes:p.ingredientes, procedimiento:p.procedimiento, tiempo:p.tiempo};
+    document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
+    mostrarPreview(p, pax, 500);
+    toast('"' + p.nombre + '" agregada');
+    document.getElementById('rtxt').value = '';
+}
+
+function parsearReceta(txt, pax) {
+    txt = txt.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    var lineas = txt.split('\n').map(function(l){return l.trim();}).filter(function(l){return l;});
+    var nombre = 'Receta sin nombre';
+    for(var i = 0; i < Math.min(5, lineas.length); i++) {
+        var l = lineas[i];
+        if(l.length > 3 && l.length < 80 && !l.match(/^\d/) && !l.toLowerCase().match(/^ingredientes?:?\s*$/) && !l.toLowerCase().match(/^preparaci/)) {
+            nombre = l.split(/\s+/).slice(0,5).join(' '); break;
+        }
+    }
+    var tl = txt.toLowerCase(), carnico = 'Mixto', region = 'Mexico', tiempo = 60;
+    if(tl.indexOf('pollo') >= 0) carnico = 'Pollo';
+    else if(tl.indexOf('res') >= 0 || tl.indexOf('bistec') >= 0) carnico = 'Res';
+    else if(tl.indexOf('cerdo') >= 0 || tl.indexOf('puerco') >= 0) carnico = 'Cerdo';
+    else if(tl.indexOf('pescado') >= 0) carnico = 'Pescado';
+    var tm = txt.match(/(\d+)\s*(minutos?|min|horas?)/i);
+    if(tm) { tiempo = parseInt(tm[1]); if(tm[2].toLowerCase().charAt(0) === 'h') tiempo *= 60; }
+    var ings = [], proc = [], sec = '';
+    lineas.forEach(function(li) {
+        var ll = li.toLowerCase().trim();
+        if(ll.match(/^ingredientes?\s*:?\s*$/)) { sec = 'ing'; return; }
+        if(ll.match(/^(preparacion|procedimiento|instrucciones?|elaboracion)\s*:?\s*$/)) { sec = 'proc'; return; }
+        if(sec === 'ing') { var ing = parseIng(li); if(ing && ing.nombre.length > 2) ings.push(ing); }
+        else if(sec === 'proc') { var p = li.replace(/^[\d\.\)\-\*]+\s*/,'').trim(); if(p.length > 8) proc.push(p); }
+    });
+    if(!ings.length) {
+        lineas.forEach(function(li) {
+            if(li.match(/^[\-\*]?\s*[\d]+\s*(kg|g|gr|ml|l|tazas?|cdas?|piezas?)/i)) {
+                var ing = parseIng(li.replace(/^[\-\*]\s*/,''));
+                if(ing && ing.nombre.length > 2) ings.push(ing);
+            }
+        });
+    }
+    if(!ings.length) ings.push({nombre:'Ver receta original',cantidad:100/pax,unidad:'g',precio_kg:50});
+    return {nombre:nombre, region:region, carnico:carnico, tiempo:tiempo,
+        ingredientes:ings.map(function(i){return Object.assign({},i,{cantidad:i.cantidad/pax});}),
+        procedimiento:proc};
+}
+
+function parseIng(li) {
+    var txt = li.trim().replace(/^[\u2022\-\*\d\.\)]+\s*/,'');
+    if(!txt || txt.length < 3) return null;
+    var m = txt.match(/^(\d+(?:[.,]\d+)?)\s*(kg|g|gr|ml|l|tazas?|cdas?|piezas?|pzs?)?/i);
+    var cantidad = 100, unidad = 'g', nombre = txt;
+    if(m) {
+        cantidad = parseFloat(m[1].replace(',','.'));
+        if(m[2]) {
+            var u = m[2].toLowerCase();
+            if(u.indexOf('kg') >= 0) { cantidad *= 1000; unidad = 'g'; }
+            else if(u.indexOf('g') >= 0) unidad = 'g';
+            else if(u.indexOf('ml') >= 0) unidad = 'ml';
+            else if(u.charAt(0) === 'l') { cantidad *= 1000; unidad = 'ml'; }
+            else if(u.indexOf('pz') >= 0 || u.indexOf('pieza') >= 0) unidad = 'pz';
+        }
+        nombre = txt.replace(m[0],'').trim().replace(/^de\s+/i,'');
+    }
+    return {nombre:nombre||txt, cantidad:cantidad, unidad:unidad, precio_kg:getPrecio(nombre||txt)};
+}
+
+function getPrecio(n) {
+    var nl = n.toLowerCase();
+    for(var k in precios) { if(k.toLowerCase() === nl || nl.indexOf(k.toLowerCase()) >= 0) return precios[k].precio; }
+    if(nl.indexOf('res') >= 0 || nl.indexOf('bistec') >= 0 || nl.indexOf('carne de res') >= 0) return 142;
+    if(nl.indexOf('pollo') >= 0 || nl.indexOf('pechuga') >= 0) return 99;
+    if(nl.indexOf('cerdo') >= 0 || nl.indexOf('puerco') >= 0) return 85;
+    if(nl.indexOf('pescado') >= 0) return 185;
+    if(nl.indexOf('queso') >= 0) return 136;
+    if(nl.indexOf('crema') >= 0) return 65;
+    if(nl.indexOf('papa') >= 0) return 22;
+    if(nl.indexOf('cebolla') >= 0) return 18;
+    if(nl.indexOf('jitomate') >= 0 || nl.indexOf('tomate') >= 0) return 25;
+    if(nl.indexOf('frijol') >= 0) return 35;
+    if(nl.indexOf('arroz') >= 0) return 24;
+    if(nl.indexOf('aceite') >= 0) return 35;
+    return 50;
+}
+
+function mostrarPreview(rec, paxO, paxD) {
+    var el = document.getElementById('prev');
+    el.style.display = 'block';
+    window._ra = {rec:rec, paxO:paxO, paxD:paxD};
+    var rows = '', tot = 0;
+    (rec.ingredientes||[]).forEach(function(ing) {
+        var cO = ing.cantidad*paxO, cE = ing.cantidad*paxD, uO = ing.unidad, uE = ing.unidad;
+        if(uO==='g'&&cO>=1000){cO/=1000;uO='kg';} if(uO==='ml'&&cO>=1000){cO/=1000;uO='l';}
+        if(uE==='g'&&cE>=1000){cE/=1000;uE='kg';} if(uE==='ml'&&cE>=1000){cE/=1000;uE='l';}
+        var c = (ing.unidad==='g'||ing.unidad==='ml') ? (ing.cantidad*paxD/1000)*ing.precio_kg : (ing.cantidad*paxD)*ing.precio_kg;
+        tot += c;
+        rows += '<tr style="border-bottom:1px solid #E8DCC8"><td style="padding:.5rem .75rem">' + ing.nombre + '</td>'
+            + '<td style="padding:.5rem;text-align:center">' + (cO<10?cO.toFixed(1):Math.round(cO)) + ' ' + uO + '</td>'
+            + '<td style="padding:.5rem;text-align:center;font-weight:700">' + (cE<10?cE.toFixed(1):Math.round(cE)) + ' ' + uE + '</td>'
+            + '<td style="padding:.5rem;text-align:right;color:var(--tc)">$' + c.toFixed(2) + '</td></tr>';
+    });
+    var pasos = '';
+    if(rec.procedimiento && rec.procedimiento.length) {
+        pasos = '<h4 style="margin:1.5rem 0 1rem">Procedimiento:</h4><ol style="margin-left:1.5rem;line-height:2">';
+        rec.procedimiento.forEach(function(p) { pasos += '<li>' + p + '</li>'; });
+        pasos += '</ol>';
+    }
+    el.innerHTML = '<div class="card" style="border:2px solid var(--gold)">'
+        + '<div style="background:var(--green);color:#fff;padding:1rem;border-radius:6px;margin-bottom:1.5rem;text-align:center"><strong>Receta procesada y escalada</strong></div>'
+        + '<div style="background:var(--cream);padding:1.25rem;border-radius:8px;margin-bottom:1.5rem">'
+        + '<h2 style="color:var(--gold);margin-bottom:.4rem">' + rec.nombre + '</h2>'
+        + '<div style="color:var(--bm);font-size:.9rem">Region: ' + rec.region + ' - Carnico: ' + rec.carnico + ' - Tiempo: ' + rec.tiempo + ' min</div>'
+        + '<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:1rem;align-items:center;margin-top:1rem">'
+        + '<div style="text-align:center"><div style="font-size:.75rem;color:var(--bl)">Original</div><div style="font-size:1.75rem;font-weight:700;color:var(--gold)">' + paxO + ' pax</div></div>'
+        + '<div style="font-size:1.5rem">&#8594;</div>'
+        + '<div style="text-align:center"><div style="font-size:.75rem;color:var(--bl);margin-bottom:.25rem">Escalar a:</div>'
+        + '<div style="display:flex;gap:.5rem;align-items:center;justify-content:center">'
+        + '<input type="number" id="epax" value="' + paxD + '" min="1" max="5000" style="width:80px;padding:.5rem;border:2px solid var(--gold);border-radius:6px;font-size:1rem;font-weight:700;text-align:center">'
+        + '<button class="btn bgold bsm" id="bree">&#8635; Actualizar</button>'
+        + '</div></div></div></div>'
+        + '<h4 style="margin-bottom:1rem">Ingredientes:</h4>'
+        + '<table style="width:100%;border-collapse:collapse;margin-bottom:1.5rem">'
+        + '<thead><tr style="background:var(--gold);color:var(--bd)"><th style="padding:.75rem;text-align:left">Ingrediente</th><th style="padding:.75rem;text-align:center">Original</th><th style="padding:.75rem;text-align:center">Para ' + paxD + ' pax</th><th style="padding:.75rem;text-align:right">Costo</th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table>'
+        + '<div class="csum"><div class="crow"><span>Costo Total (' + paxD + ' pax)</span><span>$' + tot.toFixed(2) + '</span></div>'
+        + '<div class="crow"><span>Por Comensal</span><span>$' + (tot/paxD).toFixed(2) + '</span></div></div>'
+        + pasos
+        + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-top:1.5rem">'
+        + '<button class="btn bgold" id="bguardar">&#128190; Guardar</button>'
+        + '<button class="btn bsec" id="bimprimir">&#128424; Imprimir</button>'
+        + '<button class="btn" id="bexportar">&#128196; .TXT</button>'
+        + '</div></div>';
+    setTimeout(function() {
+        var bre = document.getElementById('bree');
+        if(bre) bre.addEventListener('click', function() {
+            var n = parseInt(document.getElementById('epax').value) || 500;
+            mostrarPreview(window._ra.rec, window._ra.paxO, n);
+        });
+        var bg = document.getElementById('bguardar'); if(bg) bg.addEventListener('click', guardarRA);
+        var bi = document.getElementById('bimprimir'); if(bi) bi.addEventListener('click', imprimirRA);
+        var be = document.getElementById('bexportar'); if(be) be.addEventListener('click', exportTxtRA);
+    }, 50);
+    el.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function guardarRA() {
+    if(!window._ra) { toast('No hay receta'); return; }
+    var r = window._ra.rec;
+    recetas.push({id:Date.now(), nombre:r.nombre, region:r.region, carnico:r.carnico, tipo:r.tipo||'guisado', ingredientes:r.ingredientes, procedimiento:r.procedimiento, tiempo:r.tiempo, paxO:window._ra.paxO, paxD:window._ra.paxD, fecha:new Date().toLocaleString('es-MX')});
+    saveRecetas(); updCnt(); toast('"' + r.nombre + '" guardada');
+}
+
+function imprimirRA() {
+    if(!window._ra) { toast('No hay receta'); return; }
+    var r = window._ra.rec, paxO = window._ra.paxO, paxD = window._ra.paxD;
+    var rows = '', tot = 0;
+    (r.ingredientes||[]).forEach(function(ing) {
+        var cE = ing.cantidad*paxD, u = ing.unidad;
+        if(u==='g'&&cE>=1000){cE/=1000;u='kg';} if(u==='ml'&&cE>=1000){cE/=1000;u='l';}
+        var c = (ing.unidad==='g'||ing.unidad==='ml')?(ing.cantidad*paxD/1000)*ing.precio_kg:(ing.cantidad*paxD)*ing.precio_kg;
+        tot += c;
+        rows += '<tr><td>' + ing.nombre + '</td><td style="text-align:center">' + (cE<10?cE.toFixed(1):Math.round(cE)) + ' ' + u + '</td><td style="text-align:right">$' + c.toFixed(2) + '</td></tr>';
+    });
+    var pasos = (r.procedimiento||[]).map(function(p,i) { return '<div style="margin-bottom:.75rem;padding:.75rem;background:#F5F1E8;border-radius:6px"><strong style="color:#D4AF37">Paso ' + (i+1) + ':</strong> ' + p + '</div>'; }).join('');
+    var nombre3 = r.nombre.trim().split(/\s+/).slice(0,3).join('_').replace(/[^a-zA-Z0-9_]/g,'');
+    var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>' + r.nombre + '</title>'
+        + '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;color:#2C1810;max-width:800px;margin:0 auto;padding:2rem}'
+        + '.h{border-bottom:4px solid #D4AF37;padding-bottom:1rem;margin-bottom:2rem}'
+        + 'table{width:100%;border-collapse:collapse}th{background:#2C1810;color:#D4AF37;padding:.75rem;text-align:left}'
+        + 'td{padding:.6rem .75rem;border-bottom:1px solid #E8DCC8}.tot{background:#2C1810;color:#D4AF37;padding:.75rem 1rem;border-radius:6px;display:flex;justify-content:space-between;margin-top:.5rem;font-weight:700}'
+        + '@media print{body{padding:.5rem}}</style></head><body>'
+        + '<div class="h"><div style="font-size:.68rem;letter-spacing:2px;text-transform:uppercase;color:#8B6F47">CICSA - Sistema Menu</div>'
+        + '<h1 style="font-size:1.75rem;margin:.25rem 0">' + r.nombre + '</h1>'
+        + '<div style="color:#5C3D2E">Region: ' + r.region + ' - Carnico: ' + r.carnico + ' - Tiempo: ' + r.tiempo + ' min</div>'
+        + '<div style="background:#F5F1E8;padding:.6rem 1rem;border-radius:6px;margin-top:.75rem">Receta original: <strong>' + paxO + ' personas</strong> &#8594; Escalada: <strong>' + paxD + ' comensales</strong></div></div>'
+        + '<h2 style="margin-bottom:1rem">Ingredientes para ' + paxD + ' comensales</h2>'
+        + '<table><thead><tr><th>Ingrediente</th><th style="text-align:center">Cantidad</th><th style="text-align:right">Costo</th></tr></thead><tbody>' + rows + '</tbody></table>'
+        + '<div class="tot"><span>Costo Total</span><span>$' + tot.toFixed(2) + '</span></div>'
+        + '<div class="tot" style="margin-top:.4rem"><span>Por Comensal</span><span>$' + (tot/paxD).toFixed(2) + '</span></div>'
+        + (pasos ? '<h2 style="margin:2rem 0 1rem">Procedimiento</h2>' + pasos : '')
+        + '</body></html>';
+    dl(html, nombre3 + '_' + paxD + 'pax.html', 'text/html');
+    toast('Receta descargada');
+}
+
+function exportTxtRA() {
+    if(!window._ra) { toast('No hay receta'); return; }
+    var r = window._ra.rec, paxO = window._ra.paxO, paxD = window._ra.paxD;
+    var txt = '===================================\n' + r.nombre.toUpperCase() + '\nCICSA - Sistema Menu\n===================================\n\n';
+    txt += 'Region: ' + r.region + '\nCarnico: ' + r.carnico + '\nTiempo: ' + r.tiempo + ' min\n';
+    txt += 'Original: ' + paxO + ' pax -> Escalado: ' + paxD + ' comensales\n\nINGREDIENTES:\n';
+    (r.ingredientes||[]).forEach(function(ing) {
+        var cE = ing.cantidad*paxD, u = ing.unidad;
+        if(u==='g'&&cE>=1000){cE/=1000;u='kg';} if(u==='ml'&&cE>=1000){cE/=1000;u='l';}
+        txt += '- ' + ing.nombre + ': ' + (cE<10?cE.toFixed(1):Math.round(cE)) + ' ' + u + '\n';
+    });
+    if(r.procedimiento && r.procedimiento.length) {
+        txt += '\nPROCEDIMIENTO:\n';
+        r.procedimiento.forEach(function(p,i) { txt += (i+1) + '. ' + p + '\n'; });
+    }
+    var n3 = r.nombre.trim().split(/\s+/).slice(0,3).join('_').replace(/[^a-zA-Z0-9_]/g,'');
+    dl(txt, n3 + '_' + paxD + 'pax.txt', 'text/plain');
+    toast('TXT exportado');
+}
+
+// CATALOGO
+function renderCat() {
+    var el = document.getElementById('catcon');
+    var allDB = Object.assign({}, DB, DB_EXTRA);
+    var prec = Object.keys(allDB).map(function(n) {
+        return {nombre:n, origen:'precargado', tipoPl:allDB[n].tipo||'guisado', region:allDB[n].region, carnico:allDB[n].carnico, ingredientes:allDB[n].ingredientes, tiempo:allDB[n].tiempo};
+    });
+    var mis = recetas.map(function(r) { return Object.assign({},r,{origen:'mia',tipoPl:r.tipo||'guisado'}); });
+    var todos = filtCat==='precargados' ? prec : filtCat==='misrecetas' ? mis : [].concat(prec, mis);
+    if(!todos.length) { el.innerHTML='<div style="text-align:center;padding:3rem;color:var(--bl)"><div style="font-size:3rem">&#128466;</div><h3 style="margin-top:.75rem">No hay platillos aqui</h3></div>'; return; }
+    var html = '<div style="display:grid;gap:.75rem">';
+    todos.forEach(function(p) {
+        var esMia = p.origen === 'mia';
+        var b1 = esMia ? '<span style="background:var(--gold);color:var(--bd);padding:.15rem .5rem;border-radius:99px;font-size:.7rem;font-weight:700">&#11088; Mi Receta</span>'
+            : '<span style="background:var(--bl);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem">&#127869;&#65039; Precargado</span>';
+        var b2 = p.tipoPl==='garnacha' ? '<span style="background:var(--tc);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">&#129362; Garnacha</span>'
+            : '<span style="background:var(--green);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">&#127858; Guisado</span>';
+        var ingP = p.ingredientes ? p.ingredientes.slice(0,3).map(function(i){return i.nombre;}).join(' · ') + (p.ingredientes.length>3?' +mas':'') : '';
+        html += '<div style="background:#fff;border:1.5px solid rgba(212,175,55,.2);border-radius:8px;overflow:hidden">'
+            + '<div style="background:linear-gradient(135deg,var(--bd),var(--bm));padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center">'
+            + '<div><div style="color:var(--gold);font-weight:700">' + p.nombre + '</div><div style="margin-top:.2rem">' + b1 + b2 + '</div></div>'
+            + '<div style="display:flex;gap:.4rem">'
+            + '<button class="btn bgold bsm" data-ae="' + encodeURIComponent(p.nombre) + '">&#9998;&#65039; Editar</button>'
+            + '<button class="btn bsm" style="background:var(--tc)" data-ad="' + encodeURIComponent(p.nombre) + '" data-ot="' + p.origen + '">&#128465;&#65039;</button>'
+            + '</div></div>'
+            + '<div style="padding:.5rem 1rem;font-size:.8rem;color:var(--bm)">' + ingP + '</div></div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+    el.onclick = function(e) {
+        var ae = e.target.closest('[data-ae]');
+        var ad = e.target.closest('[data-ad]');
+        if(ae) editarPl(decodeURIComponent(ae.getAttribute('data-ae')));
+        else if(ad) delPl(decodeURIComponent(ad.getAttribute('data-ad')), ad.getAttribute('data-ot'));
+    };
+}
+
+function setFiltCat(f, btn) {
+    filtCat = f;
+    document.querySelectorAll('[data-fcat]').forEach(function(b){b.classList.remove('on');});
+    btn.classList.add('on');
+    renderCat();
+}
+
+function editarPl(nombre) {
+    var allDB = Object.assign({}, DB, DB_EXTRA);
+    var r = allDB[nombre];
+    if(!r) {
+        // Try finding by partial match in case of encoding issues
+        var key = Object.keys(allDB).find(function(k){ return k === nombre || k.toLowerCase() === nombre.toLowerCase(); });
+        if(key) r = allDB[key];
+    }
+    if(!r) { toast('No encontrado: ' + nombre.substring(0,20)); return; }
+    window._editando = nombre;
+    var ingsHTML = (r.ingredientes||[]).map(function(ing) {
+        return '<div class="ing-row" style="margin-bottom:.4rem">'
+            + '<input class="fi ing-n" value="' + ing.nombre + '" style="padding:.4rem .6rem">'
+            + '<input class="fi ing-c" type="number" value="' + ing.cantidad.toFixed(3) + '" style="padding:.4rem .6rem">'
+            + '<select class="fs ing-u" style="padding:.4rem">'
+            + '<option value="g"' + (ing.unidad==='g'?' selected':'') + '>g</option>'
+            + '<option value="kg"' + (ing.unidad==='kg'?' selected':'') + '>kg</option>'
+            + '<option value="ml"' + (ing.unidad==='ml'?' selected':'') + '>ml</option>'
+            + '<option value="l"' + (ing.unidad==='l'?' selected':'') + '>l</option>'
+            + '<option value="pz"' + (ing.unidad==='pz'?' selected':'') + '>pz</option>'
+            + '</select>'
+            + '<button class="btn bsm rmi" style="background:var(--tc);padding:.4rem">&#10005;</button>'
+            + '</div>';
+    }).join('');
+    openModal('&#9998;&#65039; Editar: ' + nombre,
+        '<div class="fg"><label class="fl2">Nombre</label><input id="en" class="fi" value="' + nombre + '"></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">'
+        + '<div class="fg"><label class="fl2">Region</label><input id="er" class="fi" value="' + (r.region||'Mexico') + '"></div>'
+        + '<div class="fg"><label class="fl2">Tipo</label><select id="et" class="fs"><option value="guisado"' + (r.tipo!=='garnacha'?' selected':'') + '>Guisado</option><option value="garnacha"' + (r.tipo==='garnacha'?' selected':'') + '>Garnacha</option></select></div>'
+        + '<div class="fg"><label class="fl2">Tiempo (min)</label><input id="eti" class="fi" type="number" value="' + (r.tiempo||60) + '"></div></div>'
+        + '<h4 style="margin:1rem 0 .5rem">Ingredientes <small style="font-weight:400;color:var(--bl)">(por porcion)</small></h4>'
+        + '<div id="ei">' + ingsHTML + '</div>'
+        + '<button class="btn bsec bsm" id="bai" style="margin:.5rem 0">&#10133; Agregar</button>'
+        + '<div style="display:flex;gap:1rem;margin-top:1rem">'
+        + '<button class="btn bgold" id="bsave" style="flex:1">&#128190; Guardar</button>'
+        + '<button class="btn bsec" style="flex:1" onclick="closeModal()">Cancelar</button></div>');
+    setTimeout(function() {
+        var ei = document.getElementById('ei');
+        if(ei) ei.addEventListener('click', function(e){ if(e.target.classList.contains('rmi')) e.target.closest('.ing-row').remove(); });
+        var bai = document.getElementById('bai');
+        if(bai) bai.addEventListener('click', function() {
+            var c = document.getElementById('ei'), d = document.createElement('div');
+            d.className = 'ing-row'; d.style.marginBottom = '.4rem';
+            d.innerHTML = '<input class="fi ing-n" placeholder="Ingrediente" style="padding:.4rem .6rem"><input class="fi ing-c" type="number" value="0.1" style="padding:.4rem .6rem"><select class="fs ing-u" style="padding:.4rem"><option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="l">l</option><option value="pz">pz</option></select><button class="btn bsm rmi" style="background:var(--tc);padding:.4rem">&#10005;</button>';
+            c.appendChild(d);
+        });
+        var bs = document.getElementById('bsave');
+        if(bs) bs.addEventListener('click', function() {
+            var nn = document.getElementById('en').value.trim();
+            var reg = document.getElementById('er').value.trim();
+            var tipo = document.getElementById('et').value;
+            var tpo = parseInt(document.getElementById('eti').value)||60;
+            var ings = [];
+            document.querySelectorAll('#ei .ing-row').forEach(function(row) {
+                var n = row.querySelector('.ing-n'), c = row.querySelector('.ing-c'), u = row.querySelector('.ing-u');
+                if(n && n.value.trim()) ings.push({nombre:n.value.trim(), cantidad:parseFloat(c.value)||0.1, unidad:u?u.value:'g', precio_kg:getPrecio(n.value.trim())});
+            });
+            if(!ings.length) { alert('Agrega al menos un ingrediente'); return; }
+            var updated = Object.assign({}, allDB[window._editando], {region:reg, tipo:tipo, tiempo:tpo, ingredientes:ings});
+            if(DB[window._editando]) { DB[window._editando] = updated; }
+            else { if(nn !== window._editando) delete DB_EXTRA[window._editando]; DB_EXTRA[nn] = updated; }
+            if(nn !== window._editando && DB[window._editando]) { delete DB[window._editando]; DB[nn] = updated; }
+            closeModal(); renderCat();
+            document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
+            toast('"' + nn + '" actualizado');
+        });
+    }, 50);
+}
+
+function delPl(nombre, origen) {
+    window._dn = nombre; window._do = origen;
+    openModal('Eliminar Platillo',
+        '<div style="text-align:center;padding:1.5rem">'
+        + '<p style="font-size:1.1rem;margin-bottom:2rem">Eliminar <strong>"' + nombre + '"</strong>?</p>'
+        + '<div style="display:flex;gap:1rem;justify-content:center">'
+        + '<button class="btn bgold" id="bcd">Si, eliminar</button>'
+        + '<button class="btn bsec" onclick="closeModal()">Cancelar</button></div></div>');
+    setTimeout(function() {
+        var b = document.getElementById('bcd');
+        if(b) b.addEventListener('click', function() {
+            if(DB[window._dn]) delete DB[window._dn];
+            if(DB_EXTRA[window._dn]) delete DB_EXTRA[window._dn];
+            if(window._do === 'mia') {
+                recetas = recetas.filter(function(r) { return r.nombre !== window._dn; });
+                saveRecetas(); updCnt();
+            }
+            closeModal(); renderCat();
+            document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
+            toast('"' + window._dn + '" eliminado');
+        });
+    }, 50);
+}
+
+function exportarTxt() {
+    var allDB = Object.assign({}, DB, DB_EXTRA);
+    var todos = Object.keys(allDB).map(function(n) { return Object.assign({nombre:n}, allDB[n]); });
+    todos = todos.concat(recetas);
+    var txt = 'CATALOGO DE PLATILLOS CICSA\n' + hoy() + '\n' + '='.repeat(40) + '\n\n';
+    todos.forEach(function(r, i) {
+        txt += (i+1) + '. ' + (r.nombre||'').toUpperCase() + '\n' + '--'.repeat(20) + '\n';
+        txt += 'Tipo: ' + (r.tipo==='garnacha'?'Garnacha':'Guisado') + ' | Carnico: ' + (r.carnico||'-') + ' | Tiempo: ' + (r.tiempo||60) + ' min\n';
+        txt += 'Ingredientes:\n';
+        (r.ingredientes||[]).forEach(function(i) { txt += '  - ' + i.nombre + ': ' + i.cantidad + ' ' + i.unidad + '\n'; });
+        txt += '\n';
+    });
+    dl(txt, 'Catalogo_CICSA.txt', 'text/plain');
+    toast('Catalogo exportado');
+}
+
+function exportarLibro() {
+    var toExport = recetas.length ? recetas : Object.keys(DB).slice(0,10).map(function(n) { return Object.assign({nombre:n,paxO:1,paxD:500}, DB[n]); });
+    if(!toExport.length) { toast('No hay recetas guardadas'); return; }
+    var body = '';
+    toExport.forEach(function(r, idx) {
+        var rows = '', tot = 0;
+        var paxD = r.paxD || 500;
+        (r.ingredientes||[]).forEach(function(ing) {
+            var cE = ing.cantidad*paxD, u = ing.unidad;
+            if(u==='g'&&cE>=1000){cE/=1000;u='kg';} if(u==='ml'&&cE>=1000){cE/=1000;u='l';}
+            var c = (ing.unidad==='g'||ing.unidad==='ml')?(ing.cantidad*paxD/1000)*ing.precio_kg:(ing.cantidad*paxD)*ing.precio_kg;
+            tot += c;
+            rows += '<tr><td>' + ing.nombre + '</td><td style="text-align:center">' + (cE<10?cE.toFixed(1):Math.round(cE)) + ' ' + u + '</td><td style="text-align:right">$' + c.toFixed(2) + '</td></tr>';
+        });
+        var pasos = (r.procedimiento||[]).map(function(p,i){return '<div style="margin-bottom:.5rem;padding:.5rem;background:#F5F1E8;border-radius:4px"><strong style="color:#D4AF37">'+(i+1)+'.</strong> '+p+'</div>';}).join('');
+        body += (idx>0?'<div style="page-break-before:always"></div>':'')
+            + '<div style="max-width:800px;margin:0 auto;padding:2rem">'
+            + '<div style="border-bottom:4px solid #D4AF37;padding-bottom:1rem;margin-bottom:1.5rem"><h2 style="font-size:1.5rem">' + r.nombre + '</h2>'
+            + '<div style="color:#5C3D2E;font-size:.88rem">' + (r.region||'Mexico') + ' - ' + (r.carnico||'') + ' - ' + (r.tiempo||60) + ' min</div></div>'
+            + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem">'
+            + '<div><h3 style="color:#D4AF37;margin-bottom:.75rem">Ingredientes (' + paxD + ' pax)</h3>'
+            + '<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#2C1810;color:#D4AF37"><th style="padding:.5rem">Ingrediente</th><th style="padding:.5rem">Cantidad</th><th style="padding:.5rem">Costo</th></tr></thead>'
+            + '<tbody>' + rows + '</tbody></table>'
+            + '<div style="background:#2C1810;color:#D4AF37;padding:.6rem;border-radius:4px;margin-top:.4rem;display:flex;justify-content:space-between"><span>Total</span><strong>$' + tot.toFixed(2) + '</strong></div></div>'
+            + '<div><h3 style="color:#D4AF37;margin-bottom:.75rem">Procedimiento</h3>' + (pasos||'<p style="color:#8B6F47">Sin procedimiento</p>') + '</div></div></div>';
+    });
+    var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Libro Recetas CICSA</title>'
+        + '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;color:#2C1810}table td{padding:.35rem .5rem;border-bottom:1px solid #E8DCC8;font-size:.82rem}</style></head><body>'
+        + '<div style="background:#2C1810;color:#D4AF37;padding:3rem;text-align:center"><h1>Libro de Recetas CICSA</h1><p style="margin-top:.5rem;color:#F5F1E8;font-size:.9rem">Comedores Industriales de Cuauhtemoc</p></div>'
+        + body + '</body></html>';
+    dl(html, 'Libro_Recetas_CICSA.html', 'text/html');
+    toast('Libro descargado');
+}
+
+// PRECIOS
+function renderPrecios() {
+    var tbody = document.getElementById('tpre');
+    if(!tbody) return;
+    var html = '';
+    Object.keys(precios).sort().forEach(function(n) {
+        var i = precios[n];
+        html += '<tr style="border-bottom:1px solid #E8DCC8" data-pn="' + n.toLowerCase() + '">'
+            + '<td style="padding:.75rem"><strong>' + n + '</strong></td>'
+            + '<td style="padding:.75rem;text-align:center">$' + i.precio.toFixed(2) + '</td>'
+            + '<td style="padding:.75rem;text-align:center">' + i.fecha + '</td>'
+            + '<td style="padding:.75rem;text-align:center">'
+            + '<button class="btn bsm" style="padding:.3rem .6rem;margin:.1rem" data-ep="' + encodeURIComponent(n) + '">&#9998;&#65039;</button>'
+            + '<button class="btn bsm" style="padding:.3rem .6rem;margin:.1rem;background:var(--tc)" data-dp="' + encodeURIComponent(n) + '">&#128465;&#65039;</button>'
+            + '</td></tr>';
+    });
+    tbody.innerHTML = html;
+    updPStats();
+    tbody.querySelectorAll('[data-ep]').forEach(function(b){ b.addEventListener('click', function(){ editPrecio(decodeURIComponent(this.getAttribute('data-ep'))); }); });
+    tbody.querySelectorAll('[data-dp]').forEach(function(b){ b.addEventListener('click', function(){ delPrecio(decodeURIComponent(this.getAttribute('data-dp'))); }); });
+}
+function filtrarPrecios(v) {
+    v = v.toLowerCase();
+    document.querySelectorAll('#tpre tr').forEach(function(r) { r.style.display = r.dataset.pn && r.dataset.pn.indexOf(v) >= 0 ? '' : 'none'; });
+}
+function updPStats() {
+    var ks = Object.keys(precios);
+    var sum = ks.reduce(function(s,k){ return s + precios[k].precio; }, 0);
+    var h = hoy();
+    var hc = ks.filter(function(k){ return precios[k].fecha === h; }).length;
+    var t = document.getElementById('pst'); if(t) t.textContent = ks.length;
+    var p = document.getElementById('psp'); if(p) p.textContent = '$' + (ks.length ? (sum/ks.length).toFixed(0) : '0');
+    var hh = document.getElementById('psh'); if(hh) hh.textContent = hc;
+}
+function importarCSV() {
+    var csv = document.getElementById('csvtxt').value.trim();
+    var res = document.getElementById('csvres');
+    if(!csv) { res.style.display='block'; res.innerHTML='<div style="background:#FFE5E5;padding:1rem;border-radius:6px">Pega el CSV primero</div>'; return; }
+    var count = 0, h = hoy();
+    var lineas = csv.split('\n').filter(function(l){ return l.trim(); });
+    var primera = lineas[0].toUpperCase();
+    var esF = primera.indexOf('CLAVE') >= 0 || primera.indexOf('UNIDAD') >= 0 || primera.indexOf('DESCRIPCION') >= 0 || primera.indexOf('IMPORTE') >= 0;
+    if(esF) {
+        lineas.forEach(function(linea, idx) {
+            if(idx===0) return; linea=linea.trim(); if(!linea) return;
+            var partes = linea.split(/\s{2,}/).filter(function(p){ return p.trim(); });
+            if(partes.length < 4) return;
+            var nP = [], nums = [];
+            partes.forEach(function(p, i) {
+                if(i===0) return;
+                if(i===1 && /^(KG|PZA|LT|GR)$/i.test(p.trim())) return;
+                if(/^\d+\.?\d*$/.test(p.trim())) nums.push(parseFloat(p.trim()));
+                else nP.push(p.trim());
+            });
+            var nombre = nP.join(' ').replace(/^(KG|PZA|LT|GR)\s+/i,'').trim();
+            nombre = nombre.charAt(0).toUpperCase() + nombre.slice(1).toLowerCase();
+            var precio = nums.length >= 2 ? nums[1] : (nums[0]||0);
+            if(nombre && precio > 0 && precio < 50000) { precios[nombre]={precio:precio,fecha:h}; count++; }
+        });
+    } else {
+        lineas.slice(1).forEach(function(l) {
+            var p = l.trim().split(',');
+            if(p.length>=2 && p[0].trim() && !isNaN(parseFloat(p[1]))) { precios[p[0].trim()]={precio:parseFloat(p[1].trim()),fecha:p[2]?p[2].trim():h}; count++; }
+        });
+    }
+    savePrecios(); renderPrecios();
+    res.style.display = 'block';
+    res.innerHTML = count > 0
+        ? '<div style="background:#d4edda;padding:1rem;border-radius:6px;border-left:4px solid #28a745"><strong style="color:#155724">&#10003; ' + count + ' precios importados' + (esF?' desde factura':'') + '</strong></div>'
+        : '<div style="background:#FFE5E5;padding:1rem;border-radius:6px;border-left:4px solid #C8553D">No se pudieron importar precios</div>';
+    if(count > 0) { document.getElementById('csvtxt').value=''; toast(count + ' precios actualizados'); }
+}
+function agregarPrecio() {
+    var n = document.getElementById('pnombre').value.trim();
+    var p = parseFloat(document.getElementById('pprecio').value);
+    if(!n||!p||p<=0) { alert('Ingresa ingrediente y precio valido'); return; }
+    precios[n] = {precio:p, fecha:hoy()};
+    savePrecios(); renderPrecios();
+    document.getElementById('pnombre').value=''; document.getElementById('pprecio').value='';
+    toast('Precio de "' + n + '" actualizado');
+}
+function editPrecio(n) {
+    var np = prompt('Nuevo precio por kg/l para "' + n + '":', precios[n].precio);
+    if(np && parseFloat(np) > 0) { precios[n]={precio:parseFloat(np),fecha:hoy()}; savePrecios(); renderPrecios(); toast('Precio actualizado'); }
+}
+function delPrecio(n) {
+    if(confirm('Eliminar precio de "' + n + '"?')) { delete precios[n]; savePrecios(); renderPrecios(); toast('Precio eliminado'); }
+}
+function exportarPrecios() {
+    var csv = 'Ingrediente,Precio por Kg/L,Ultima Actualizacion\n';
+    Object.keys(precios).sort().forEach(function(n){ csv += n + ',' + precios[n].precio + ',' + precios[n].fecha + '\n'; });
+    dl(csv, 'Precios_CICSA.csv', 'text/csv');
+    toast('Precios exportados');
+}
+
+// GENERAR RECETA
+async function generarReceta() {
+    var nombre = document.getElementById('gnombre').value.trim();
+    var pax = parseInt(document.getElementById('gpax').value) || 500;
+    var tipo = document.getElementById('gtipo').value;
+    if(!nombre) { alert('Ingresa el nombre del platillo'); return; }
+
+    document.getElementById('gloader').classList.add('on');
+    document.getElementById('gres').style.display = 'none';
+
+    var prompt = 'Busca en internet la receta tradicional mexicana de "' + nombre + '" para comedor industrial.\n\n'
+        + 'Responde SOLO con JSON valido, sin texto adicional, sin backticks:\n'
+        + '{"nombre":"' + nombre + '","region":"region de Mexico","carnico":"tipo de proteina","tiempo":60,"porciones_base":10,'
+        + '"ingredientes":[{"nombre":"ingrediente","cantidad":500,"unidad":"g"}],'
+        + '"procedimiento":["paso 1 detallado","paso 2 detallado","paso 3 detallado","paso 4 detallado","paso 5 detallado"]}\n\n'
+        + 'Reglas:\n'
+        + '- ingredientes para ' + Math.min(pax, 20) + ' porciones como base\n'
+        + '- cantidades en g o ml (nunca tazas/cdas)\n'
+        + '- minimo 6 ingredientes reales de la receta original\n'
+        + '- minimo 5 pasos de procedimiento detallados\n'
+        + '- region: estado o region de Mexico donde es tipico\n'
+        + '- carnico: Pollo, Res, Cerdo, Pescado, Mixto o Vegetariano';
+
+    try {
+        var resp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: 1000,
+                tools: [{"type": "web_search_20250305", "name": "web_search"}],
+                messages: [{role: 'user', content: prompt}]
+            })
+        });
+
+        var data = await resp.json();
+
+        // Extract text from response blocks
+        var textBlocks = (data.content || []).filter(function(b){ return b.type === 'text'; });
+        var rawText = textBlocks.map(function(b){ return b.text; }).join('');
+
+        // Clean and parse JSON
+        var jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if(!jsonMatch) throw new Error('No JSON in response');
+        var receta = JSON.parse(jsonMatch[0]);
+
+        // Scale ingredients from base portions to target pax
+        var base = receta.porciones_base || 10;
+        var factor = pax / base;
+        var tot = 0;
+
+        var ingsScaled = (receta.ingredientes || []).map(function(ing) {
+            var precio = getPrecio(ing.nombre);
+            var cantScaled = ing.cantidad * factor;
+            var u = ing.unidad;
+            var cantDisplay = cantScaled;
+            if(u === 'g' && cantDisplay >= 1000){ cantDisplay /= 1000; u = 'kg'; }
+            if(u === 'ml' && cantDisplay >= 1000){ cantDisplay /= 1000; u = 'l'; }
+            var c = (ing.unidad==='g'||ing.unidad==='ml') ? (cantScaled/1000)*precio : cantScaled*precio;
+            tot += c;
+            return {nombre: ing.nombre, cantidad: ing.cantidad/base, unidad: ing.unidad, precio_kg: precio,
+                    _display: (cantDisplay<10?cantDisplay.toFixed(1):Math.round(cantDisplay)) + ' ' + u, _costo: c};
+        });
+
+        // Build result HTML
+        var ingsHTML = ingsScaled.map(function(i){
+            return '<div class="ibox"><span>' + i.nombre + ' — ' + i._display + '</span><span style="font-weight:700">$' + i._costo.toFixed(2) + '</span></div>';
+        }).join('');
+
+        var pasosHTML = (receta.procedimiento || []).map(function(p, i){
+            return '<div style="margin-bottom:.75rem;padding:.875rem;background:var(--cream);border-radius:6px;border-left:3px solid var(--gold)">'
+                + '<strong style="color:var(--gold)">Paso ' + (i+1) + ':</strong> ' + p + '</div>';
+        }).join('');
+
+        // Save to window._ra for guardar/imprimir
+        window._ra = {
+            rec: {
+                nombre: receta.nombre,
+                region: receta.region || 'Mexico',
+                carnico: receta.carnico || 'Mixto',
+                tipo: tipo,
+                tiempo: receta.tiempo || 60,
+                ingredientes: ingsScaled.map(function(i){ return {nombre:i.nombre, cantidad:i.cantidad, unidad:i.unidad, precio_kg:i.precio_kg}; }),
+                procedimiento: receta.procedimiento || []
+            },
+            paxO: base,
+            paxD: pax
+        };
+
+        var res = document.getElementById('gres');
+        res.style.display = 'block';
+        res.innerHTML = '<div class="card">'
+            + '<div class="ch">' + receta.nombre + '</div>'
+            + '<div style="margin-bottom:1rem;color:var(--bm);font-size:.9rem">'
+            + '<strong>Region:</strong> ' + (receta.region||'Mexico') + ' &nbsp;|&nbsp; '
+            + '<strong>Carnico:</strong> ' + (receta.carnico||'Mixto') + ' &nbsp;|&nbsp; '
+            + '<strong>Tiempo:</strong> ' + (receta.tiempo||60) + ' min</div>'
+            + '<div style="background:var(--cream);padding:.75rem 1rem;border-radius:6px;margin-bottom:1.5rem;font-size:.88rem">'
+            + 'Receta base: <strong>' + base + ' porciones</strong> &rarr; Escalada a <strong>' + pax + ' comensales</strong></div>'
+            + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem">'
+            + '<div><h3 style="margin-bottom:1rem">Ingredientes (' + pax + ' porciones)</h3>' + ingsHTML + '</div>'
+            + '<div><h3 style="margin-bottom:1rem">Procedimiento</h3>' + pasosHTML + '</div></div>'
+            + '<div class="csum"><div class="crow"><span>Costo Total (' + pax + ' pax)</span><span>$' + tot.toFixed(2) + '</span></div>'
+            + '<div class="crow"><span>Por Comensal</span><span>$' + (tot/pax).toFixed(2) + '</span></div></div>'
+            + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-top:1.5rem">'
+            + '<button class="btn bgold" id="gg">&#128190; Guardar</button>'
+            + '<button class="btn bsec" id="gi">&#128424; Imprimir</button>'
+            + '<button class="btn" id="ge">&#128196; .TXT</button>'
+            + '</div></div>';
+
+        setTimeout(function(){
+            var g=document.getElementById('gg'); if(g) g.addEventListener('click', guardarRA);
+            var gi=document.getElementById('gi'); if(gi) gi.addEventListener('click', imprimirRA);
+            var ge=document.getElementById('ge'); if(ge) ge.addEventListener('click', exportTxtRA);
+        }, 50);
+        toast('Receta generada desde internet');
+
+    } catch(e) {
+        document.getElementById('gres').style.display = 'block';
+        document.getElementById('gres').innerHTML = '<div style="background:#FFE5E5;padding:1.5rem;border-radius:8px;border-left:4px solid var(--tc)">'
+            + '<strong>Error generando receta:</strong> ' + e.message + '<br><br>'
+            + '<span style="font-size:.88rem;color:var(--bm)">Verifica tu conexion a internet e intenta de nuevo.</span></div>';
+    } finally {
+        document.getElementById('gloader').classList.remove('on');
+    }
+}
+
+// ============================================================
+// API KEY
+// ============================================================
+function getApiKey() { try { return localStorage.getItem('cicsa_apikey') || ''; } catch(e) { return ''; } }
+function guardarApiKey() {
+    var k = document.getElementById('apikey-input').value.trim();
+    if(!k) { toast('Ingresa una API key'); return; }
+    try { localStorage.setItem('cicsa_apikey', k); } catch(e) {}
+    document.getElementById('apikey-input').value = '';
+    mostrarApiKeyStatus();
+    toast('API key guardada');
+}
+function borrarApiKey() {
+    try { localStorage.removeItem('cicsa_apikey'); } catch(e) {}
+    mostrarApiKeyStatus();
+    toast('API key eliminada');
+}
+function mostrarApiKeyStatus() {
+    var el = document.getElementById('apikey-status');
+    if(!el) return;
+    var k = getApiKey();
+    el.innerHTML = k
+        ? '<span style="color:var(--green)">&#10003; API key configurada (' + k.substring(0,12) + '...)</span>'
+        : '<span style="color:var(--bl)">Sin API key — Generar Receta no disponible</span>';
+}
+window.addEventListener('load', function() { mostrarApiKeyStatus(); }, true);
+
+// ============================================================
+// GENERAR RECETA CON API
+// ============================================================
+async function generarReceta() {
+    var nombre = document.getElementById('gnombre').value.trim();
+    var pax = parseInt(document.getElementById('gpax').value) || 500;
+    var tipo = document.getElementById('gtipo').value;
+    if(!nombre) { alert('Ingresa el nombre del platillo'); return; }
+    var apiKey = getApiKey();
+    if(!apiKey) {
+        document.getElementById('gres').style.display = 'block';
+        document.getElementById('gres').innerHTML = '<div style="background:#FFF3CD;padding:1.5rem;border-radius:8px;border-left:4px solid var(--gold)">'
+            + '<strong>&#128272; Se requiere API key</strong><br><br>'
+            + 'El administrador debe configurar la API key de Anthropic en el tab <strong>Exportar > Configuracion Admin</strong>.<br><br>'
+            + '<span style="font-size:.88rem;color:var(--bm)">Los usuarios sin API key pueden agregar recetas manualmente en el tab "Agregar Receta".</span></div>';
+        return;
+    }
+    document.getElementById('gloader').classList.add('on');
+    document.getElementById('gres').style.display = 'none';
+    var prompt = 'Busca en internet la receta de "' + nombre + '" para comedor industrial mexicano.\n\n'
+        + 'Responde SOLO con JSON valido sin texto adicional ni backticks:\n'
+        + '{"nombre":"nombre del platillo","region":"estado de Mexico","carnico":"Pollo/Res/Cerdo/Pescado/Mixto/Vegetariano","tiempo":60,"porciones_base":10,'
+        + '"ingredientes":[{"nombre":"ingrediente","cantidad":500,"unidad":"g","sustitucion":"ingrediente alternativo opcional"}],'
+        + '"procedimiento":["paso 1 detallado","paso 2","paso 3","paso 4","paso 5"]}\n\n'
+        + 'Reglas: cantidades en g o ml para ' + Math.min(pax,20) + ' porciones, minimo 6 ingredientes, minimo 5 pasos detallados.';
+    try {
+        var resp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+            body: JSON.stringify({
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: 1500,
+                tools: [{"type":"web_search_20250305","name":"web_search"}],
+                messages: [{role:'user', content:prompt}]
+            })
+        });
+        var data = await resp.json();
+        if(data.error) throw new Error(data.error.message);
+        var txt = (data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('');
+        var m = txt.match(/\{[\s\S]*\}/);
+        if(!m) throw new Error('No se pudo parsear la receta');
+        var rec = JSON.parse(m[0]);
+        mostrarRecetaGenerada(rec, pax, tipo);
+        toast('Receta generada desde internet');
+    } catch(e) {
+        document.getElementById('gres').style.display = 'block';
+        document.getElementById('gres').innerHTML = '<div style="background:#FFE5E5;padding:1.5rem;border-radius:8px;border-left:4px solid var(--tc)">'
+            + '<strong>Error:</strong> ' + e.message + '</div>';
+    } finally {
+        document.getElementById('gloader').classList.remove('on');
+    }
+}
+
+function mostrarRecetaGenerada(rec, pax, tipo) {
+    var base = rec.porciones_base || 10;
+    var factor = pax / base;
+    // Store editable ingredients in window
+    window._recIngredientes = (rec.ingredientes||[]).map(function(ing) {
+        return {nombre:ing.nombre, cantidad:ing.cantidad, unidad:ing.unidad,
+                sustitucion:ing.sustitucion||'', precio_kg:getPrecio(ing.nombre)};
+    });
+    window._recProcedimiento = rec.procedimiento || [];
+    window._recMeta = {nombre:rec.nombre, region:rec.region||'Mexico', carnico:rec.carnico||'Mixto', tiempo:rec.tiempo||60, tipo:tipo, base:base, pax:pax};
+    renderRecetaGenerada();
+}
+
+function renderRecetaGenerada() {
+    var m = window._recMeta, ings = window._recIngredientes, proc = window._recProcedimiento;
+    var factor = m.pax / m.base;
+    var tot = 0;
+    var ingsHTML = ings.map(function(ing, idx) {
+        var cantE = ing.cantidad * factor, u = ing.unidad;
+        if(u==='g'&&cantE>=1000){cantE/=1000;u='kg';} if(u==='ml'&&cantE>=1000){cantE/=1000;u='l';}
+        var c = (ing.unidad==='g'||ing.unidad==='ml')?(ing.cantidad*factor/1000)*ing.precio_kg:(ing.cantidad*factor)*ing.precio_kg;
+        tot += c;
+        return '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:.5rem;align-items:center;padding:.6rem .75rem;background:var(--cream);border-radius:6px;margin-bottom:.4rem">'
+            + '<div><div style="font-weight:700;font-size:.9rem">' + ing.nombre + '</div>'
+            + '<div style="font-size:.78rem;color:var(--bl)">' + (cantE<10?cantE.toFixed(1):Math.round(cantE)) + ' ' + u + ' &nbsp;|&nbsp; $' + c.toFixed(2)
+            + (ing.sustitucion ? ' &nbsp;|&nbsp; <em>Alt: ' + ing.sustitucion + '</em>' : '') + '</div></div>'
+            + '<button class="btn bgold bsm" onclick="editarIngRec(' + idx + ')" style="padding:.3rem .6rem">&#9998;&#65039;</button>'
+            + '<button class="btn bsm" style="background:var(--tc);padding:.3rem .6rem" onclick="sustituirIngRec(' + idx + ')">&#8646; Sust.</button>'
+            + '<button class="btn bsm" style="background:var(--bm);padding:.3rem .6rem" onclick="eliminarIngRec(' + idx + ')">&#10005;</button>'
+            + '</div>';
+    }).join('');
+    // Recalc total
+    tot = 0;
+    ings.forEach(function(ing){
+        var c = (ing.unidad==='g'||ing.unidad==='ml')?(ing.cantidad*factor/1000)*ing.precio_kg:(ing.cantidad*factor)*ing.precio_kg;
+        tot += c;
+    });
+    var pasosHTML = proc.map(function(p,i){
+        return '<div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:start;margin-bottom:.6rem;padding:.75rem;background:var(--cream);border-radius:6px">'
+            + '<div><strong style="color:var(--gold)">Paso ' + (i+1) + ':</strong> ' + p + '</div>'
+            + '<button class="btn bsm" style="background:var(--bm);padding:.3rem .5rem;white-space:nowrap" onclick="editarPasoRec(' + i + ')">&#9998;&#65039;</button>'
+            + '</div>';
+    }).join('');
+    // Save to _ra for guardar/imprimir
+    window._ra = {
+        rec:{nombre:m.nombre, region:m.region, carnico:m.carnico, tipo:m.tipo, tiempo:m.tiempo,
+             ingredientes:ings.map(function(i){return {nombre:i.nombre,cantidad:i.cantidad/m.base,unidad:i.unidad,precio_kg:i.precio_kg};}),
+             procedimiento:proc},
+        paxO:m.base, paxD:m.pax
+    };
+    var res = document.getElementById('gres');
+    res.style.display = 'block';
+    res.innerHTML = '<div class="card">'
+        + '<div class="ch">' + m.nombre + '</div>'
+        + '<div style="color:var(--bm);font-size:.88rem;margin-bottom:1rem"><strong>Region:</strong> ' + m.region + ' &nbsp;|&nbsp; <strong>Carnico:</strong> ' + m.carnico + ' &nbsp;|&nbsp; <strong>Tiempo:</strong> ' + m.tiempo + ' min</div>'
+        + '<div style="background:var(--cream);padding:.6rem 1rem;border-radius:6px;margin-bottom:1.5rem;font-size:.85rem">Base: <strong>' + m.base + ' porciones</strong> &rarr; Escalada a <strong>' + m.pax + ' comensales</strong></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem">'
+        + '<div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">'
+        + '<h3>Ingredientes (' + m.pax + ' pax)</h3>'
+        + '<button class="btn bgold bsm" onclick="agregarIngRec()">&#10133; Agregar</button></div>'
+        + '<div id="ings-gen">' + ingsHTML + '</div></div>'
+        + '<div><h3 style="margin-bottom:1rem">Procedimiento</h3>' + pasosHTML + '</div></div>'
+        + '<div class="csum" style="margin-top:1.5rem"><div class="crow"><span>Costo Total (' + m.pax + ' pax)</span><span>$' + tot.toFixed(2) + '</span></div>'
+        + '<div class="crow"><span>Por Comensal</span><span>$' + (tot/m.pax).toFixed(2) + '</span></div></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-top:1.5rem">'
+        + '<button class="btn bgold" id="gg">&#128190; Guardar en Catalogo</button>'
+        + '<button class="btn bsec" id="gi">&#128424; Imprimir</button>'
+        + '<button class="btn" id="ge">&#128196; .TXT</button>'
+        + '</div></div>';
+    setTimeout(function(){
+        var g=document.getElementById('gg');if(g)g.addEventListener('click',guardarRA);
+        var gi=document.getElementById('gi');if(gi)gi.addEventListener('click',imprimirRA);
+        var ge=document.getElementById('ge');if(ge)ge.addEventListener('click',exportTxtRA);
+    },50);
+}
+
+function editarIngRec(idx) {
+    var ing = window._recIngredientes[idx];
+    openModal('&#9998;&#65039; Editar Ingrediente',
+        '<div class="fg"><label class="fl2">Nombre</label><input id="ei-n" class="fi" value="' + ing.nombre + '"></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">'
+        + '<div class="fg"><label class="fl2">Cantidad (base ' + window._recMeta.base + ' pax)</label><input id="ei-c" class="fi" type="number" value="' + ing.cantidad + '"></div>'
+        + '<div class="fg"><label class="fl2">Unidad</label><select id="ei-u" class="fs"><option value="g"'+(ing.unidad==='g'?' selected':'')+'>g</option><option value="kg"'+(ing.unidad==='kg'?' selected':'')+'>kg</option><option value="ml"'+(ing.unidad==='ml'?' selected':'')+'>ml</option><option value="l"'+(ing.unidad==='l'?' selected':'')+'>l</option><option value="pz"'+(ing.unidad==='pz'?' selected':'')+'>pz</option></select></div>'
+        + '<div class="fg"><label class="fl2">Precio/kg ($)</label><input id="ei-p" class="fi" type="number" value="' + ing.precio_kg + '"></div></div>'
+        + '<div class="fg"><label class="fl2">Sustitucion (opcional)</label><input id="ei-s" class="fi" value="' + (ing.sustitucion||'') + '" placeholder="Ej: pechuga por muslo de pollo"></div>'
+        + '<div style="display:flex;gap:1rem;margin-top:1rem">'
+        + '<button class="btn bgold" id="bsave-ing" style="flex:1">&#128190; Guardar</button>'
+        + '<button class="btn bsec" style="flex:1" onclick="closeModal()">Cancelar</button></div>');
+    setTimeout(function(){
+        var b = document.getElementById('bsave-ing');
+        if(b) b.addEventListener('click', function(){
+            window._recIngredientes[idx] = {
+                nombre: document.getElementById('ei-n').value.trim(),
+                cantidad: parseFloat(document.getElementById('ei-c').value)||100,
+                unidad: document.getElementById('ei-u').value,
+                precio_kg: parseFloat(document.getElementById('ei-p').value)||50,
+                sustitucion: document.getElementById('ei-s').value.trim()
+            };
+            closeModal(); renderRecetaGenerada(); toast('Ingrediente actualizado');
+        });
+    },50);
+}
+
+function sustituirIngRec(idx) {
+    var ing = window._recIngredientes[idx];
+    var sug = ing.sustitucion ? ' (sugerido: ' + ing.sustitucion + ')' : '';
+    openModal('&#8646; Sustituir: ' + ing.nombre,
+        '<div class="fg"><label class="fl2">Reemplazar con' + sug + '</label><input id="sust-n" class="fi" placeholder="Ej: ' + (ing.sustitucion||'Otro ingrediente') + '"></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">'
+        + '<div class="fg"><label class="fl2">Cantidad (base ' + window._recMeta.base + ' pax)</label><input id="sust-c" class="fi" type="number" value="' + ing.cantidad + '"></div>'
+        + '<div class="fg"><label class="fl2">Unidad</label><select id="sust-u" class="fs"><option value="g"'+(ing.unidad==='g'?' selected':'')+'>g</option><option value="kg"'+(ing.unidad==='kg'?' selected':'')+'>kg</option><option value="ml"'+(ing.unidad==='ml'?' selected':'')+'>ml</option><option value="l"'+(ing.unidad==='l'?' selected':'')+'>l</option><option value="pz"'+(ing.unidad==='pz'?' selected':'')+'>pz</option></select></div></div>'
+        + '<div style="display:flex;gap:1rem;margin-top:1rem">'
+        + '<button class="btn bgold" id="bsust" style="flex:1">&#8646; Sustituir</button>'
+        + '<button class="btn bsec" style="flex:1" onclick="closeModal()">Cancelar</button></div>');
+    setTimeout(function(){
+        var b = document.getElementById('bsust');
+        if(b) b.addEventListener('click', function(){
+            var nn = document.getElementById('sust-n').value.trim();
+            if(!nn){alert('Ingresa el ingrediente sustituto');return;}
+            window._recIngredientes[idx] = {
+                nombre: nn,
+                cantidad: parseFloat(document.getElementById('sust-c').value)||ing.cantidad,
+                unidad: document.getElementById('sust-u').value,
+                precio_kg: getPrecio(nn),
+                sustitucion: ''
+            };
+            closeModal(); renderRecetaGenerada(); toast('"' + ing.nombre + '" sustituido por "' + nn + '"');
+        });
+    },50);
+}
+
+function eliminarIngRec(idx) {
+    window._recIngredientes.splice(idx,1);
+    renderRecetaGenerada();
+    toast('Ingrediente eliminado');
+}
+
+function agregarIngRec() {
+    openModal('&#10133; Agregar Ingrediente',
+        '<div class="fg"><label class="fl2">Nombre</label><input id="ai-n" class="fi" placeholder="Ej: Chile ancho"></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">'
+        + '<div class="fg"><label class="fl2">Cantidad (base ' + window._recMeta.base + ' pax)</label><input id="ai-c" class="fi" type="number" value="100"></div>'
+        + '<div class="fg"><label class="fl2">Unidad</label><select id="ai-u" class="fs"><option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="l">l</option><option value="pz">pz</option></select></div>'
+        + '<div class="fg"><label class="fl2">Precio/kg ($)</label><input id="ai-p" class="fi" type="number" value="50"></div></div>'
+        + '<div style="display:flex;gap:1rem;margin-top:1rem">'
+        + '<button class="btn bgold" id="bai-save" style="flex:1">&#10133; Agregar</button>'
+        + '<button class="btn bsec" style="flex:1" onclick="closeModal()">Cancelar</button></div>');
+    setTimeout(function(){
+        var b = document.getElementById('bai-save');
+        if(b) b.addEventListener('click', function(){
+            var n = document.getElementById('ai-n').value.trim();
+            if(!n){alert('Ingresa el nombre');return;}
+            window._recIngredientes.push({nombre:n, cantidad:parseFloat(document.getElementById('ai-c').value)||100, unidad:document.getElementById('ai-u').value, precio_kg:parseFloat(document.getElementById('ai-p').value)||getPrecio(n), sustitucion:''});
+            closeModal(); renderRecetaGenerada(); toast('Ingrediente agregado');
+        });
+    },50);
+}
+
+function editarPasoRec(idx) {
+    openModal('&#9998;&#65039; Editar Paso ' + (idx+1),
+        '<div class="fg"><label class="fl2">Paso ' + (idx+1) + '</label>'
+        + '<textarea id="ep-txt" class="ft" style="min-height:120px">' + window._recProcedimiento[idx] + '</textarea></div>'
+        + '<div style="display:flex;gap:1rem;margin-top:1rem">'
+        + '<button class="btn bgold" id="bep" style="flex:1">&#128190; Guardar</button>'
+        + '<button class="btn bsec" style="flex:1" onclick="closeModal()">Cancelar</button></div>');
+    setTimeout(function(){
+        var b = document.getElementById('bep');
+        if(b) b.addEventListener('click', function(){
+            window._recProcedimiento[idx] = document.getElementById('ep-txt').value.trim();
+            closeModal(); renderRecetaGenerada(); toast('Paso actualizado');
+        });
+    },50);
+}
+
+// UTILS
+function dl(content, filename, type) {
+    var blob = new Blob([content], {type: type});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+}
+
+</script>
+</body>
+</html>
