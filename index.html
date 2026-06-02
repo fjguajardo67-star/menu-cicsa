@@ -224,20 +224,7 @@ h1 em{font-style:italic;color:var(--gold)}
 <div id="precios" class="page">
   <div class="card">
     <div class="ch">&#128176; Precios de Ingredientes</div>
-    <div class="infobox">
-      <h3>&#128203; Actualizar desde factura</h3>
-      <ol style="margin-left:1.5rem;line-height:2.2;color:var(--bd)">
-        <li>Env&iacute;a tu factura PDF a Claude</li>
-        <li>Claude te genera el CSV</li>
-        <li>Pega el CSV abajo &#11015;&#65039;</li>
-      </ol>
-    </div>
-    <div style="padding:1.5rem;background:var(--cream);border-radius:8px;border:2px dashed rgba(212,175,55,.4);margin-bottom:1.5rem">
-      <h3 style="margin-bottom:1rem">&#128202; Pega el CSV aqu&iacute;:</h3>
-      <textarea id="csvtxt" class="ft" style="min-height:150px;font-family:monospace;font-size:.875rem" placeholder="Ingrediente,Precio por Kg/L,Fecha&#10;Papa,44.00,21/04/2026&#10;&#10;O pega el contenido de tu factura directamente."></textarea>
-      <button class="btn bgold bfull" onclick="importarCSV()" style="margin-top:1rem">&#9989; Importar Precios</button>
-      <div id="csvres" style="display:none;margin-top:1rem"></div>
-    </div>
+
     <div style="padding:1.5rem;background:#fff;border-radius:8px;border:1px solid rgba(212,175,55,.2)">
       <h3 style="margin-bottom:1rem">&#128202; Tabla de Precios</h3>
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-bottom:1rem">
@@ -480,11 +467,39 @@ function toast(m) {
     setTimeout(function() { e.classList.remove('on'); }, 3000);
 }
 
+// TABLA DE CONVERSIÓN PIEZAS/KG (datos reales CICSA)
+var CONV_PZ = {
+    'tortilla de maiz':    {pz_por_kg: 45,  g_por_pz: 22.2},
+    'tortilla maiz':       {pz_por_kg: 45,  g_por_pz: 22.2},
+    'tortilla':            {pz_por_kg: 45,  g_por_pz: 22.2},
+    'tortilla de harina':  {pz_por_kg: 39,  g_por_pz: 25.5},
+    'tortilla harina':     {pz_por_kg: 39,  g_por_pz: 25.5},
+    'tortillina':          {pz_por_kg: 39,  g_por_pz: 25.5},
+    'tia rosa':            {pz_por_kg: 39,  g_por_pz: 25.5},
+    'bolillo':             {pz_por_kg: null, g_por_pz: 60},
+    'pan bolillo':         {pz_por_kg: null, g_por_pz: 60},
+};
+
+function getPzGramos(nombre) {
+    var n = (nombre || '').toLowerCase().trim();
+    for (var key in CONV_PZ) {
+        if (n.indexOf(key) !== -1) return CONV_PZ[key].g_por_pz;
+    }
+    return 30; // default: 30g por pieza si no se reconoce
+}
+
 // COST
 function getCost(rec) {
     var c = 0;
     (rec.ingredientes || []).forEach(function(i) {
-        c += (i.unidad === 'g' || i.unidad === 'ml') ? (i.cantidad / 1000) * i.precio_kg : i.cantidad * i.precio_kg;
+        if (i.unidad === 'g' || i.unidad === 'ml') {
+            c += (i.cantidad / 1000) * i.precio_kg;
+        } else if (i.unidad === 'pz') {
+            var g = getPzGramos(i.nombre);
+            c += (i.cantidad * g / 1000) * i.precio_kg;
+        } else {
+            c += i.cantidad * i.precio_kg;
+        }
     });
     return c;
 }
@@ -671,16 +686,16 @@ function genLista(sem) {
         if(u==='ml' && cant>=1000) { cant/=1000; u='l'; }
         var c = (i.unidad==='g'||i.unidad==='ml') ? (i.cantidad/1000)*i.precio_kg : i.cantidad*i.precio_kg;
         tot += c;
-        rows += '<tr><td>' + n + '</td><td style="text-align:center">' + (cant<10?cant.toFixed(1):Math.round(cant)) + ' ' + u + '</td><td style="text-align:right">$' + c.toFixed(2) + '</td></tr>';
+        rows += '<tr><td>' + n + '</td><td style="text-align:center">' + (cant<10?cant.toFixed(1):Math.round(cant)) + ' ' + u + '</td><td style="text-align:center">$' + i.precio_kg.toFixed(2) + '/kg</td><td style="text-align:right">$' + c.toFixed(2) + '</td></tr>';
     });
     var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Lista Compras CICSA</title>'
-        + '<style>body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:2rem;color:#2C1810}'
+        + '<style>body{font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:2rem;color:#2C1810}'
         + '.h{background:#2C1810;color:#D4AF37;padding:1.5rem 2rem;border-radius:8px;margin-bottom:2rem}'
         + 'table{width:100%;border-collapse:collapse}th{background:#2C1810;color:#D4AF37;padding:.75rem;text-align:left}'
         + 'td{padding:.6rem .75rem;border-bottom:1px solid #E8DCC8}.tot{background:#D4AF37;color:#2C1810;padding:1rem;border-radius:6px;display:flex;justify-content:space-between;font-weight:700;font-size:1.1rem;margin-top:.5rem}'
         + '@media print{body{padding:0}}</style></head><body>'
         + '<div class="h"><h2 style="margin:0">Lista de Compras - CICSA</h2><p style="color:#F5F1E8;margin:.25rem 0 0">' + dias.length + ' dias - 500 comensales/dia</p></div>'
-        + '<table><thead><tr><th>Ingrediente</th><th style="text-align:center">Cantidad</th><th style="text-align:right">Costo</th></tr></thead>'
+        + '<table><thead><tr><th>Ingrediente</th><th style="text-align:center">Cantidad</th><th style="text-align:center">Precio Unitario</th><th style="text-align:right">Costo</th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table>'
         + '<div class="tot"><span>Costo Total</span><span>$' + tot.toFixed(2) + '</span></div>'
         + '</body></html>';
@@ -981,6 +996,8 @@ function renderCat() {
     });
     html += '</div>';
     el.innerHTML = html;
+    // Actualizar contador en header
+    document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
     el.onclick = function(e) {
         var ae = e.target.closest('[data-ae]');
         var ad = e.target.closest('[data-ad]');
