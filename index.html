@@ -368,7 +368,7 @@ var diasMenu = 30;
 var filtCat = 'todos';
 
 window.addEventListener('load', function() {
-    try { var s = localStorage.getItem('r_cicsa'); if(s) { recetas = JSON.parse(s); updCnt(); } } catch(e) {}
+    try { var s = localStorage.getItem('r_cicsa'); if(s) { recetas = JSON.parse(s); updCnt(); recetas.forEach(function(r){ DB_EXTRA[r.nombre] = {region:r.region,carnico:r.carnico,tipo:r.tipo||'guisado',ingredientes:r.ingredientes,procedimiento:r.procedimiento,tiempo:r.tiempo}; }); } } catch(e) {}
     try { var p = localStorage.getItem('p_cicsa'); if(p) precios = JSON.parse(p); else initPrecios(); } catch(e) { initPrecios(); }
     genMenu();
     document.getElementById('stat-plat').textContent = Object.keys(DB).length;
@@ -420,6 +420,8 @@ async function fbGet(col, docId) {
 
 function saveRecetas() {
     try { localStorage.setItem('r_cicsa', JSON.stringify(recetas)); } catch(e) {}
+    // Mantener DB_EXTRA sincronizado con recetas guardadas
+    recetas.forEach(function(r){ DB_EXTRA[r.nombre] = {region:r.region,carnico:r.carnico,tipo:r.tipo||'guisado',ingredientes:r.ingredientes,procedimiento:r.procedimiento,tiempo:r.tiempo}; });
     fbSet('datos', 'recetas', recetas);
 }
 function savePrecios() {
@@ -439,6 +441,7 @@ async function sincronizarDesdeFirebase() {
     if(r && r.length > 0) {
         recetas = r;
         try { localStorage.setItem('r_cicsa', JSON.stringify(recetas)); } catch(e) {}
+        recetas.forEach(function(r){ DB_EXTRA[r.nombre] = {region:r.region,carnico:r.carnico,tipo:r.tipo||'guisado',ingredientes:r.ingredientes,procedimiento:r.procedimiento,tiempo:r.tiempo}; });
         updCnt();
         toast('☁️ Recetas sincronizadas');
     }
@@ -779,6 +782,10 @@ function agregarReceta() {
     if(region !== 'Mexico') p.region = region;
     p.tipo = tipo;
     DB_EXTRA[p.nombre] = {region:p.region, carnico:p.carnico, tipo:tipo, ingredientes:p.ingredientes, procedimiento:p.procedimiento, tiempo:p.tiempo};
+    // Guardar también en recetas para persistencia
+    recetas = recetas.filter(function(r){ return r.nombre !== p.nombre; });
+    recetas.push({id:Date.now(), nombre:p.nombre, region:p.region, carnico:p.carnico, tipo:tipo, ingredientes:p.ingredientes, procedimiento:p.procedimiento, tiempo:p.tiempo, paxO:pax, paxD:500, fecha:new Date().toLocaleString('es-MX')});
+    saveRecetas(); updCnt();
     document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
     mostrarPreview(p, pax, 500);
     toast('"' + p.nombre + '" agregada');
