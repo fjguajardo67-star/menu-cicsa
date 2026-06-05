@@ -834,9 +834,14 @@ function parseIng(li) {
         if(m[2]) {
             var u = m[2].toLowerCase();
             if(u.indexOf('kg') >= 0) { cantidad *= 1000; unidad = 'g'; }
-            else if(u.indexOf('g') >= 0) unidad = 'g';
+            else if(u.indexOf('gr') >= 0 || u.indexOf('g') >= 0) unidad = 'g';
             else if(u.indexOf('ml') >= 0) unidad = 'ml';
-            else if(u.charAt(0) === 'l') { cantidad *= 1000; unidad = 'ml'; }
+            else if(u.charAt(0) === 'l' && u.indexOf('lb') < 0) { cantidad *= 1000; unidad = 'ml'; }
+            else if(u.indexOf('lb') >= 0) { cantidad *= 453.6; unidad = 'g'; }
+            else if(u.indexOf('oz') >= 0) { cantidad *= 28.35; unidad = 'g'; }
+            else if(u.indexOf('taza') >= 0 || u.indexOf('cup') >= 0) { cantidad *= 240; unidad = 'ml'; }
+            else if(u.indexOf('cda') >= 0 || u.indexOf('tbsp') >= 0) { cantidad *= 15; unidad = 'ml'; }
+            else if(u.indexOf('cdita') >= 0 || u.indexOf('tsp') >= 0) { cantidad *= 5; unidad = 'ml'; }
             else if(u.indexOf('pz') >= 0 || u.indexOf('pieza') >= 0) unidad = 'pz';
         }
         nombre = txt.replace(m[0],'').trim().replace(/^de\s+/i,'');
@@ -1292,133 +1297,6 @@ function exportarPrecios() {
     toast('Precios exportados');
 }
 
-// GENERAR RECETA
-async function generarReceta() {
-    var nombre = document.getElementById('gnombre').value.trim();
-    var pax = parseInt(document.getElementById('gpax').value) || 500;
-    var tipo = document.getElementById('gtipo').value;
-    if(!nombre) { alert('Ingresa el nombre del platillo'); return; }
-
-    document.getElementById('gloader').classList.add('on');
-    document.getElementById('gres').style.display = 'none';
-
-    var prompt = 'Busca en internet la receta tradicional mexicana de "' + nombre + '" para comedor industrial.\n\n'
-        + 'Responde SOLO con JSON valido, sin texto adicional, sin backticks:\n'
-        + '{"nombre":"' + nombre + '","region":"region de Mexico","carnico":"tipo de proteina","tiempo":60,"porciones_base":10,'
-        + '"ingredientes":[{"nombre":"ingrediente","cantidad":500,"unidad":"g"}],'
-        + '"procedimiento":["paso 1 detallado","paso 2 detallado","paso 3 detallado","paso 4 detallado","paso 5 detallado"]}\n\n'
-        + 'Reglas:\n'
-        + '- ingredientes para ' + Math.min(pax, 20) + ' porciones como base\n'
-        + '- cantidades en g o ml (nunca tazas/cdas)\n'
-        + '- minimo 6 ingredientes reales de la receta original\n'
-        + '- minimo 5 pasos de procedimiento detallados\n'
-        + '- region: estado o region de Mexico donde es tipico\n'
-        + '- carnico: Pollo, Res, Cerdo, Pescado, Mixto o Vegetariano';
-
-    try {
-        var resp = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                model: 'claude-sonnet-4-20250514',
-                max_tokens: 1000,
-                tools: [{"type": "web_search_20250305", "name": "web_search"}],
-                messages: [{role: 'user', content: prompt}]
-            })
-        });
-
-        var data = await resp.json();
-
-        // Extract text from response blocks
-        var textBlocks = (data.content || []).filter(function(b){ return b.type === 'text'; });
-        var rawText = textBlocks.map(function(b){ return b.text; }).join('');
-
-        // Clean and parse JSON
-        var jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if(!jsonMatch) throw new Error('No JSON in response');
-        var receta = JSON.parse(jsonMatch[0]);
-
-        // Scale ingredients from base portions to target pax
-        var base = receta.porciones_base || 10;
-        var factor = pax / base;
-        var tot = 0;
-
-        var ingsScaled = (receta.ingredientes || []).map(function(ing) {
-            var precio = getPrecio(ing.nombre);
-            var cantScaled = ing.cantidad * factor;
-            var u = ing.unidad;
-            var cantDisplay = cantScaled;
-            if(u === 'g' && cantDisplay >= 1000){ cantDisplay /= 1000; u = 'kg'; }
-            if(u === 'ml' && cantDisplay >= 1000){ cantDisplay /= 1000; u = 'l'; }
-            var c = (ing.unidad==='g'||ing.unidad==='ml') ? (cantScaled/1000)*precio : cantScaled*precio;
-            tot += c;
-            return {nombre: ing.nombre, cantidad: ing.cantidad/base, unidad: ing.unidad, precio_kg: precio,
-                    _display: (cantDisplay<10?cantDisplay.toFixed(1):Math.round(cantDisplay)) + ' ' + u, _costo: c};
-        });
-
-        // Build result HTML
-        var ingsHTML = ingsScaled.map(function(i){
-            return '<div class="ibox"><span>' + i.nombre + ' — ' + i._display + '</span><span style="font-weight:700">$' + i._costo.toFixed(2) + '</span></div>';
-        }).join('');
-
-        var pasosHTML = (receta.procedimiento || []).map(function(p, i){
-            return '<div style="margin-bottom:.75rem;padding:.875rem;background:var(--cream);border-radius:6px;border-left:3px solid var(--gold)">'
-                + '<strong style="color:var(--gold)">Paso ' + (i+1) + ':</strong> ' + p + '</div>';
-        }).join('');
-
-        // Save to window._ra for guardar/imprimir
-        window._ra = {
-            rec: {
-                nombre: receta.nombre,
-                region: receta.region || 'Mexico',
-                carnico: receta.carnico || 'Mixto',
-                tipo: tipo,
-                tiempo: receta.tiempo || 60,
-                ingredientes: ingsScaled.map(function(i){ return {nombre:i.nombre, cantidad:i.cantidad, unidad:i.unidad, precio_kg:i.precio_kg}; }),
-                procedimiento: receta.procedimiento || []
-            },
-            paxO: base,
-            paxD: pax
-        };
-
-        var res = document.getElementById('gres');
-        res.style.display = 'block';
-        res.innerHTML = '<div class="card">'
-            + '<div class="ch">' + receta.nombre + '</div>'
-            + '<div style="margin-bottom:1rem;color:var(--bm);font-size:.9rem">'
-            + '<strong>Region:</strong> ' + (receta.region||'Mexico') + ' &nbsp;|&nbsp; '
-            + '<strong>Carnico:</strong> ' + (receta.carnico||'Mixto') + ' &nbsp;|&nbsp; '
-            + '<strong>Tiempo:</strong> ' + (receta.tiempo||60) + ' min</div>'
-            + '<div style="background:var(--cream);padding:.75rem 1rem;border-radius:6px;margin-bottom:1.5rem;font-size:.88rem">'
-            + 'Receta base: <strong>' + base + ' porciones</strong> &rarr; Escalada a <strong>' + pax + ' comensales</strong></div>'
-            + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem">'
-            + '<div><h3 style="margin-bottom:1rem">Ingredientes (' + pax + ' porciones)</h3>' + ingsHTML + '</div>'
-            + '<div><h3 style="margin-bottom:1rem">Procedimiento</h3>' + pasosHTML + '</div></div>'
-            + '<div class="csum"><div class="crow"><span>Costo Total (' + pax + ' pax)</span><span>$' + tot.toFixed(2) + '</span></div>'
-            + '<div class="crow"><span>Por Comensal</span><span>$' + (tot/pax).toFixed(2) + '</span></div></div>'
-            + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-top:1.5rem">'
-            + '<button class="btn bgold" id="gg">&#128190; Guardar</button>'
-            + '<button class="btn bsec" id="gi">&#128424; Imprimir</button>'
-            + '<button class="btn" id="ge">&#128196; .TXT</button>'
-            + '</div></div>';
-
-        setTimeout(function(){
-            var g=document.getElementById('gg'); if(g) g.addEventListener('click', guardarRA);
-            var gi=document.getElementById('gi'); if(gi) gi.addEventListener('click', imprimirRA);
-            var ge=document.getElementById('ge'); if(ge) ge.addEventListener('click', exportTxtRA);
-        }, 50);
-        toast('Receta generada desde internet');
-
-    } catch(e) {
-        document.getElementById('gres').style.display = 'block';
-        document.getElementById('gres').innerHTML = '<div style="background:#FFE5E5;padding:1.5rem;border-radius:8px;border-left:4px solid var(--tc)">'
-            + '<strong>Error generando receta:</strong> ' + e.message + '<br><br>'
-            + '<span style="font-size:.88rem;color:var(--bm)">Verifica tu conexion a internet e intenta de nuevo.</span></div>';
-    } finally {
-        document.getElementById('gloader').classList.remove('on');
-    }
-}
-
 // ============================================================
 // API KEY
 // ============================================================
@@ -1465,12 +1343,19 @@ async function generarReceta() {
     }
     document.getElementById('gloader').classList.add('on');
     document.getElementById('gres').style.display = 'none';
-    var prompt = 'Busca en internet la receta de "' + nombre + '" para comedor industrial mexicano.\n\n'
-        + 'Responde SOLO con JSON valido sin texto adicional ni backticks:\n'
-        + '{"nombre":"nombre del platillo","region":"estado de Mexico","carnico":"Pollo/Res/Cerdo/Pescado/Mixto/Vegetariano","tiempo":60,"porciones_base":10,'
-        + '"ingredientes":[{"nombre":"ingrediente","cantidad":500,"unidad":"g","sustitucion":"ingrediente alternativo opcional"}],'
-        + '"procedimiento":["paso 1 detallado","paso 2","paso 3","paso 4","paso 5"]}\n\n'
-        + 'Reglas: cantidades en g o ml para ' + Math.min(pax,20) + ' porciones, minimo 6 ingredientes, minimo 5 pasos detallados.';
+    // Base SIEMPRE fija en 10 porciones para escalado correcto
+    var BASE_PORCIONES = 10;
+    var prompt = 'Eres chef de comedor industrial mexicano. Dame la receta de "' + nombre + '".\n\n'
+        + 'REGLA CRITICA: Las cantidades EXACTAMENTE para ' + BASE_PORCIONES + ' porciones.\n\n'
+        + 'Responde SOLO JSON valido sin texto ni backticks:\n'
+        + '{"nombre":"' + nombre + '","region":"estado Mexico","carnico":"Pollo/Res/Cerdo/Pescado/Mixto/Vegetariano","tiempo":60,"porciones_base":' + BASE_PORCIONES + ','
+        + '"ingredientes":[{"nombre":"ingrediente","cantidad":500,"unidad":"g","sustitucion":"alternativa"}],'
+        + '"procedimiento":["paso 1","paso 2","paso 3","paso 4","paso 5"]}\n\n'
+        + 'Reglas:\n- porciones_base SIEMPRE = ' + BASE_PORCIONES + '\n'
+        + '- cantidades en g o ml UNICAMENTE (NUNCA tazas, cdas, piezas)\n'
+        + '- minimo 6 ingredientes con gramos precisos para ' + BASE_PORCIONES + ' porciones\n'
+        + '- minimo 5 pasos detallados\n'
+        + '- carnico: Pollo, Res, Cerdo, Pescado, Mixto o Vegetariano';
     try {
         var resp = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -1502,9 +1387,9 @@ async function generarReceta() {
 function mostrarRecetaGenerada(rec, pax, tipo) {
     var base = rec.porciones_base || 10;
     var factor = pax / base;
-    // Store editable ingredients in window
+    // Guardar cantidad POR PORCION (dividida entre base) para escalado correcto
     window._recIngredientes = (rec.ingredientes||[]).map(function(ing) {
-        return {nombre:ing.nombre, cantidad:ing.cantidad, unidad:ing.unidad,
+        return {nombre:ing.nombre, cantidad:ing.cantidad/base, unidad:ing.unidad,
                 sustitucion:ing.sustitucion||'', precio_kg:getPrecio(ing.nombre)};
     });
     window._recProcedimiento = rec.procedimiento || [];
@@ -1543,9 +1428,10 @@ function renderRecetaGenerada() {
             + '</div>';
     }).join('');
     // Save to _ra for guardar/imprimir
+    // ingredientes ya estan en cantidad/porcion — no dividir de nuevo
     window._ra = {
         rec:{nombre:m.nombre, region:m.region, carnico:m.carnico, tipo:m.tipo, tiempo:m.tiempo,
-             ingredientes:ings.map(function(i){return {nombre:i.nombre,cantidad:i.cantidad/m.base,unidad:i.unidad,precio_kg:i.precio_kg};}),
+             ingredientes:ings.map(function(i){return {nombre:i.nombre,cantidad:i.cantidad,unidad:i.unidad,precio_kg:i.precio_kg};}),
              procedimiento:proc},
         paxO:m.base, paxD:m.pax
     };
