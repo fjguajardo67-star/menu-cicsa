@@ -505,10 +505,24 @@ function getCost(rec) {
     });
     return c;
 }
-function pickFrom(list, used, V, excl) {
+function pickFrom(list, used, V, excl, exclCarnico, allDB) {
     if(!list || !list.length) return null;
-    var no = (excl || []).concat(used.slice(Math.max(0, used.length - V)));
-    var av = list.filter(function(x) { return no.indexOf(x) < 0; });
+    // Ventana de no-repetición: últimos V platillos usados
+    var noRepeat = (excl || []).concat(used.slice(Math.max(0, used.length - V)));
+    var av = list.filter(function(x) {
+        if(noRepeat.indexOf(x) >= 0) return false;
+        // Evitar misma proteína (carnico) en el mismo día
+        if(exclCarnico && allDB && allDB[x]) {
+            var c = allDB[x].carnico || '';
+            if(exclCarnico.indexOf(c) >= 0 && c !== 'Verdura' && c !== 'Mixto' && c !== '') return false;
+        }
+        return true;
+    });
+    // Si no hay opciones con proteína diferente, relajar solo el carnico (mantener no-repeat de 15 días)
+    if(!av.length) {
+        av = list.filter(function(x) { return noRepeat.indexOf(x) < 0; });
+    }
+    // Último recurso: ignorar ventana pero no excluidos fijos
     var pool = av.length ? av : list.filter(function(x) { return (excl || []).indexOf(x) < 0; });
     return pool.length ? pool[Math.floor(Math.random() * pool.length)] : list[0];
 }
@@ -524,14 +538,15 @@ function genMenu() {
         grid.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--bl);grid-column:1/-1"><div style="font-size:4rem">&#128466;</div><h3 style="margin-top:1rem">Catalogo vacio</h3></div>';
         return;
     }
-    var uG = [], uGa = [], V = Math.max(diasMenu, 14), domN = 0;
+    var uG = [], uGa = [], V = Math.max(diasMenu, 15), domN = 0;
     var dias = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
     for(var i = 1; i <= diasMenu; i++) {
         var dia = dias[(i-1) % 7];
         var g1, g2, ga, lk1 = false, lkG = false;
         if(dia === 'Jueves') {
             g1 = G.find(function(n) { return n.toLowerCase().indexOf('pozole') >= 0; }) || G[0] || null;
-            g2 = pickFrom(G, uG, V, [g1]);
+            var c1 = g1 && allDB[g1] ? allDB[g1].carnico : '';
+            g2 = pickFrom(G, uG, V, [g1], [c1], allDB);
             ga = Ga.find(function(n) { return n.toLowerCase().indexOf('taco') >= 0; }) || Ga[0] || null;
             lk1 = true; lkG = true;
         } else if(dia === 'Domingo') {
@@ -539,13 +554,15 @@ function genMenu() {
             g1 = domN % 2 === 1
                 ? (G.find(function(n) { return n.toLowerCase().indexOf('barbacoa') >= 0; }) || G[0])
                 : (G.find(function(n) { return n.toLowerCase().indexOf('menudo') >= 0; }) || G[0]);
-            g2 = pickFrom(G, uG, V, [g1]);
-            ga = pickFrom(Ga, uGa, V, []);
+            var c1 = g1 && allDB[g1] ? allDB[g1].carnico : '';
+            g2 = pickFrom(G, uG, V, [g1], [c1], allDB);
+            ga = pickFrom(Ga, uGa, V, [], null, allDB);
             lk1 = true;
         } else {
-            g1 = pickFrom(G, uG, V, []);
-            g2 = pickFrom(G, uG, V, [g1]);
-            ga = pickFrom(Ga, uGa, V, []);
+            g1 = pickFrom(G, uG, V, [], null, allDB);
+            var c1 = g1 && allDB[g1] ? allDB[g1].carnico : '';
+            g2 = pickFrom(G, uG, V, [g1], [c1], allDB);
+            ga = pickFrom(Ga, uGa, V, [], null, allDB);
         }
         if(g1) uG.push(g1); if(g2) uG.push(g2); if(ga) uGa.push(ga);
         if(uG.length > V * 2) { uG.shift(); uG.shift(); }
@@ -603,11 +620,39 @@ function cambiar(dia, pos, ev) {
     if(!lista.length) { toast('No hay ' + (esGa ? 'garnachas' : 'guisados') + ' disponibles'); return; }
     var html = '<div style="margin-bottom:1rem"><input class="fi" id="sbp" placeholder="Buscar..." oninput="filtModal(this.value)"></div>'
         + '<div id="lp" style="max-height:55vh;overflow-y:auto;display:grid;gap:.5rem">';
+    // Recopilar platillos ya usados en ventana ±7 días del día actual
+    var cards = document.querySelectorAll('.day');
+    var windowStart = Math.max(0, dia - 8), windowEnd = Math.min(cards.length - 1, dia + 6);
+    var usadosVentana = [], carnicosMismoDia = [];
+    cards.forEach(function(card, idx) {
+        if(idx >= windowStart && idx <= windowEnd && idx !== dia - 1) {
+            card.querySelectorAll('.pln').forEach(function(p) { usadosVentana.push(p.textContent.trim()); });
+        }
+        if(idx === dia - 1) {
+            card.querySelectorAll('.pln').forEach(function(p) {
+                var nm = p.textContent.trim();
+                if(allDB[nm]) carnicosMismoDia.push(allDB[nm].carnico || '');
+            });
+        }
+    });
+    lista.sort(function(a, b) {
+        var wa = usadosVentana.indexOf(a) >= 0 ? 1 : 0;
+        var wb = usadosVentana.indexOf(b) >= 0 ? 1 : 0;
+        return wa - wb;
+    });
     lista.forEach(function(n) {
         var r = allDB[n], c = getCost(r);
-        html += '<div class="pl" style="cursor:pointer;border:1.5px solid rgba(212,175,55,.2);border-radius:8px;margin:0" data-pn="' + encodeURIComponent(n) + '">'
+        var yaUsado = usadosVentana.indexOf(n) >= 0;
+        var mismaProteina = r.carnico && carnicosMismoDia.indexOf(r.carnico) >= 0
+            && r.carnico !== 'Verdura' && r.carnico !== 'Mixto';
+        var warn = yaUsado ? ' &#9888;&#65039; en ventana 15d' : '';
+        var warnP = mismaProteina ? ' &#128994; misma proteína' : '';
+        var borderColor = (yaUsado || mismaProteina) ? 'rgba(200,85,61,.35)' : 'rgba(212,175,55,.2)';
+        html += '<div class="pl" style="cursor:pointer;border:1.5px solid ' + borderColor + ';border-radius:8px;margin:0" data-pn="' + encodeURIComponent(n) + '">'
             + '<div style="display:flex;justify-content:space-between;align-items:center">'
-            + '<div><div style="font-weight:700">' + n + '</div><div style="font-size:.78rem;color:var(--bl)">' + (r.carnico||'') + '</div></div>'
+            + '<div><div style="font-weight:700">' + n + '</div>'
+            + '<div style="font-size:.75rem;color:var(--bl)">' + (r.carnico||'')
+            + '<span style="color:var(--tc);font-size:.7rem">' + warn + warnP + '</span></div></div>'
             + '<div style="font-weight:700;color:var(--tc)">$' + c.toFixed(2) + '</div></div></div>';
     });
     html += '</div>';
