@@ -842,37 +842,109 @@ function agregarReceta() {
 
 function parsearReceta(txt, pax) {
     txt = txt.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    // ── Detectar nombre ───────────────────────────────────────────────────
     var lineas = txt.split('\n').map(function(l){return l.trim();}).filter(function(l){return l;});
     var nombre = 'Receta sin nombre';
     for(var i = 0; i < Math.min(5, lineas.length); i++) {
         var l = lineas[i];
-        if(l.length > 3 && l.length < 80 && !l.match(/^\d/) && !l.toLowerCase().match(/^ingredientes?:?\s*$/) && !l.toLowerCase().match(/^preparaci/)) {
-            nombre = l.split(/\s+/).slice(0,5).join(' '); break;
+        if(l.length > 3 && l.length < 80 && !l.match(/^\d/) &&
+           !l.toLowerCase().match(/^ingredientes?/) && !l.toLowerCase().match(/^preparaci/)) {
+            nombre = l.split(/\s+/).slice(0,6).join(' ').replace(/[:\-]+$/,'').trim(); break;
         }
     }
+
+    // ── Detectar cárnico, región y tiempo ─────────────────────────────────
     var tl = txt.toLowerCase(), carnico = 'Mixto', region = 'Mexico', tiempo = 60;
     if(tl.indexOf('pollo') >= 0) carnico = 'Pollo';
-    else if(tl.indexOf('res') >= 0 || tl.indexOf('bistec') >= 0) carnico = 'Res';
-    else if(tl.indexOf('cerdo') >= 0 || tl.indexOf('puerco') >= 0) carnico = 'Cerdo';
-    else if(tl.indexOf('pescado') >= 0) carnico = 'Pescado';
+    else if(tl.indexOf('carne molida') >= 0 || tl.indexOf('res') >= 0 || tl.indexOf('bistec') >= 0) carnico = 'Res';
+    else if(tl.indexOf('cerdo') >= 0 || tl.indexOf('puerco') >= 0 || tl.indexOf('costilla') >= 0) carnico = 'Cerdo';
+    else if(tl.indexOf('pescado') >= 0 || tl.indexOf('salmon') >= 0 || tl.indexOf('atun') >= 0) carnico = 'Pescado';
     var tm = txt.match(/(\d+)\s*(minutos?|min|horas?)/i);
     if(tm) { tiempo = parseInt(tm[1]); if(tm[2].toLowerCase().charAt(0) === 'h') tiempo *= 60; }
-    var ings = [], proc = [], sec = '';
+
+    var ings = [], proc = [];
+
+    // ── ESTRATEGIA 1: secciones separadas por líneas ──────────────────────
+    var sec = '';
     lineas.forEach(function(li) {
         var ll = li.toLowerCase().trim();
-        if(ll.match(/^ingredientes?\s*:?\s*$/)) { sec = 'ing'; return; }
-        if(ll.match(/^(preparacion|procedimiento|instrucciones?|elaboracion)\s*:?\s*$/)) { sec = 'proc'; return; }
+        if(ll.match(/^ingredientes?\s*[:\(]/)) { sec = 'ing'; return; }
+        if(ll.match(/^(preparacion|procedimiento|instrucciones?|elaboracion|pasos?)\s*[:\(]?/)) { sec = 'proc'; return; }
         if(sec === 'ing') { var ing = parseIng(li); if(ing && ing.nombre.length > 2) ings.push(ing); }
         else if(sec === 'proc') { var p = li.replace(/^[\d\.\)\-\*]+\s*/,'').trim(); if(p.length > 8) proc.push(p); }
     });
-    if(!ings.length) {
+
+    // ── ESTRATEGIA 2: párrafo corrido — buscar patrones cantidad+ingrediente ─
+    if(ings.length < 2) {
+        ings = [];
+        // Separar por puntos, comas, puntos seguidos de mayúscula, o palabras clave
+        var segmentos = txt
+            .replace(/\(de preferencia[^\)]*\)/gi, '')  // quitar aclaraciones
+            .replace(/\([^\)]{0,60}\)/g, '')
+            .split(/\.(?=[A-ZÁÉÍÓÚ])|(?<=\d)\.|,(?=\s*\d)|(?=\d+\s*(?:g\b|kg\b|ml\b|l\b|taza|cda|cdita|huevo|diente|rebanada))/i);
+
+        segmentos.forEach(function(seg) {
+            seg = seg.trim();
+            // Buscar patrón: cantidad + unidad + descripción  
+            // Ej: "500 g de carne molida", "3 cucharadas de pan", "1 huevo", "¼ de cebolla"
+            var m = seg.match(/^[\s\-\*•]*([\d\/¼½¾⅓⅔¼]+(?:[.,]\d+)?)\s*(kg|g|gr|grs|gramos?|ml|l|litros?|tazas?|cdas?|cucharadas?|cditas?|cucharaditas?|piezas?|pzs?|dientes?|rebanadas?|huevos?)?\s*(?:de\s+)?(.{3,60}?)(?:\s*[,\.\(]|$)/i);
+            if(m) {
+                var cantRaw = m[1].replace(',','.').replace('¼','0.25').replace('½','0.5').replace('¾','0.75').replace('⅓','0.33').replace('⅔','0.67');
+                // manejar fracciones tipo "1/4"
+                if(cantRaw.indexOf('/') >= 0) { var p2=cantRaw.split('/'); cantRaw=parseFloat(p2[0])/parseFloat(p2[1]); }
+                var cantidad = parseFloat(cantRaw) || 1;
+                var unidadRaw = (m[2]||'').toLowerCase();
+                var nombreIng = (m[3]||'').trim().replace(/[,\.]+$/,'').replace(/^(de|del|la|el|los|las)\s+/i,'').trim();
+                if(!nombreIng || nombreIng.length < 2) return;
+                // Ignorar líneas de procedimiento disfrazadas de ingrediente
+                if(/(mezcla|coloca|agrega|calienta|cocina|unta|arma|divide|forma|integra)\b/i.test(nombreIng)) return;
+                var unidad = 'g', cant2 = cantidad;
+                if(unidadRaw.indexOf('kg')>=0){cant2*=1000;unidad='g';}
+                else if(unidadRaw.indexOf('gr')>=0||unidadRaw.indexOf('g')>=0) unidad='g';
+                else if(unidadRaw.indexOf('ml')>=0) unidad='ml';
+                else if(unidadRaw.charAt(0)==='l'&&unidadRaw.indexOf('lb')<0){cant2*=1000;unidad='ml';}
+                else if(unidadRaw.indexOf('taza')>=0||unidadRaw.indexOf('cup')>=0){cant2*=240;unidad='ml';}
+                else if(unidadRaw.indexOf('cdita')>=0||unidadRaw.indexOf('cucharadita')>=0){cant2*=5;unidad='ml';}
+                else if(unidadRaw.indexOf('cda')>=0||unidadRaw.indexOf('cucharada')>=0){cant2*=15;unidad='ml';}
+                else if(unidadRaw.indexOf('diente')>=0){cant2=cant2*5;unidad='g';} // ~5g por diente
+                else if(unidadRaw.indexOf('huevo')>=0||nombreIng.toLowerCase().indexOf('huevo')>=0){cant2=cant2*60;unidad='g';}
+                else { cant2 = cantidad * 50; unidad = 'g'; } // pieza genérica ~50g
+                ings.push({nombre:nombreIng, cantidad:cant2, unidad:unidad, precio_kg:getPrecio(nombreIng)});
+            }
+        });
+        // Deduplicar por nombre similar
+        var vistos = {};
+        ings = ings.filter(function(ing) {
+            var k = ing.nombre.toLowerCase().substring(0,10);
+            if(vistos[k]) return false;
+            vistos[k] = true; return true;
+        });
+    }
+
+    // ── ESTRATEGIA 3: buscar líneas con cantidad sin sección ─────────────
+    if(ings.length < 2) {
         lineas.forEach(function(li) {
-            if(li.match(/^[\-\*]?\s*[\d]+\s*(kg|g|gr|ml|l|tazas?|cdas?|piezas?)/i)) {
-                var ing = parseIng(li.replace(/^[\-\*]\s*/,''));
+            if(li.match(/[\-\*•]?\s*[\d¼½¾]+\s*(kg|g|gr|ml|l|tazas?|cdas?)/i)) {
+                var ing = parseIng(li.replace(/^[\-\*•]\s*/,''));
                 if(ing && ing.nombre.length > 2) ings.push(ing);
             }
         });
     }
+
+    // ── Extraer procedimiento de texto corrido ────────────────────────────
+    if(!proc.length) {
+        var prepMatch = txt.match(/(?:Preparaci[oó]n|Procedimiento|Instrucciones?)[:\s]+([\s\S]+)/i);
+        if(prepMatch) {
+            var prepTxt = prepMatch[1];
+            // Separar por números "1." o "Paso 1"
+            var pasos = prepTxt.split(/(?=\d+[\)\.]\s)|(?=Paso\s+\d)/i).map(function(p){
+                return p.replace(/^[\d\)\. Pp]+/,'').trim();
+            }).filter(function(p){ return p.length > 15; });
+            proc = pasos.slice(0, 8);
+        }
+    }
+
     if(!ings.length) ings.push({nombre:'Ver receta original',cantidad:100/pax,unidad:'g',precio_kg:50});
     return {nombre:nombre, region:region, carnico:carnico, tiempo:tiempo,
         ingredientes:ings.map(function(i){return Object.assign({},i,{cantidad:i.cantidad/pax});}),
