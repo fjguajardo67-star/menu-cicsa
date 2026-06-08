@@ -844,7 +844,8 @@ async function agregarReceta() {
         toast('"' + p.nombre + '" agregada');
         document.getElementById('rtxt').value = '';
     } catch(e) {
-        toast('Error procesando receta: ' + e.message);
+        toast('Error: ' + (e.message || 'desconocido'));
+        console.error('parsearRecetaIA error:', e);
     } finally {
         if(btn) { btn.disabled = false; btn.textContent = '✨ Agregar y Escalar'; }
     }
@@ -872,16 +873,25 @@ async function parsearRecetaIA(txt, pax) {
         + '- tiempo en minutos\n\n'
         + 'RECETA:\n' + txt;
 
+    var apiKey = getApiKey();
+    if(!apiKey) throw new Error('Sin API key — configúrala en Exportar > Admin');
     var resp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+        },
         body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',
             max_tokens: 1500,
             messages: [{role: 'user', content: prompt}]
         })
     });
+    if(!resp.ok) throw new Error('API error ' + resp.status);
     var data = await resp.json();
+    if(data.error) throw new Error(data.error.message || 'Error API');
     var raw = (data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('');
     raw = raw.replace(/```json|```/g,'').trim();
     var jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -1811,3 +1821,9 @@ function dl(content, filename, type) {
 </script>
 </body>
 </html>
+  
+
+
+
+
+  
