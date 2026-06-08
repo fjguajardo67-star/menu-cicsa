@@ -279,15 +279,31 @@ h1 em{font-style:italic;color:var(--gold)}
 <div id="exportar" class="page">
   <div class="card">
     <div class="ch">&#9881;&#65039; Configuraci&oacute;n Admin</div>
-    <div class="infobox">
-      <h3>&#128272; API Key de Anthropic</h3>
-      <p style="color:var(--bd);margin-bottom:1rem;font-size:.9rem">Solo el administrador necesita configurar esto. Permite generar recetas con inteligencia artificial. Los dem&aacute;s usuarios pueden usar la app sin API key.</p>
-      <div style="display:flex;gap:.75rem;align-items:center">
-        <input type="password" id="apikey-input" class="fi" style="flex:1" placeholder="sk-ant-api03-...">
-        <button class="btn bgold bsm" onclick="guardarApiKey()">&#128190; Guardar</button>
-        <button class="btn bsm" style="background:var(--tc)" onclick="borrarApiKey()">&#128465;&#65039;</button>
+    <!-- PIN LOCK -->
+    <div id="admin-locked" style="text-align:center;padding:1.5rem">
+      <div style="font-size:2rem;margin-bottom:.75rem">&#128272;</div>
+      <p style="color:var(--bm);margin-bottom:1rem;font-size:.9rem">Acceso restringido al administrador</p>
+      <div style="display:flex;gap:.75rem;justify-content:center;align-items:center;max-width:280px;margin:0 auto">
+        <input type="password" id="pin-input" class="fi" style="flex:1;letter-spacing:.25rem;font-size:1.1rem" placeholder="PIN" maxlength="6" onkeydown="if(event.key==='Enter')verificarPin()">
+        <button class="btn bgold bsm" onclick="verificarPin()">&#128275; Entrar</button>
       </div>
-      <div id="apikey-status" style="margin-top:.75rem;font-size:.85rem"></div>
+      <div id="pin-error" style="color:var(--tc);font-size:.8rem;margin-top:.5rem;min-height:1.2rem"></div>
+    </div>
+    <!-- CONTENIDO ADMIN (oculto hasta PIN correcto) -->
+    <div id="admin-content" style="display:none">
+      <div class="infobox">
+        <h3>&#128272; API Key de Anthropic</h3>
+        <p style="color:var(--bd);margin-bottom:1rem;font-size:.9rem">Solo el administrador necesita configurar esto. Permite generar recetas con inteligencia artificial.</p>
+        <div style="display:flex;gap:.75rem;align-items:center">
+          <input type="password" id="apikey-input" class="fi" style="flex:1" placeholder="sk-ant-api03-...">
+          <button class="btn bgold bsm" onclick="guardarApiKey()">&#128190; Guardar</button>
+          <button class="btn bsm" style="background:var(--tc)" onclick="borrarApiKey()">&#128465;&#65039;</button>
+        </div>
+        <div id="apikey-status" style="margin-top:.75rem;font-size:.85rem"></div>
+      </div>
+      <div style="margin-top:1rem;text-align:right">
+        <button class="btn bsm" style="background:var(--bl);color:#fff;font-size:.75rem" onclick="bloquearAdmin()">&#128274; Bloquear</button>
+      </div>
     </div>
   </div>
   <div class="card">
@@ -817,27 +833,92 @@ function exportExcel() {
 }
 
 // AGREGAR RECETA
-function agregarReceta() {
+async function agregarReceta() {
     var txt = document.getElementById('rtxt').value.trim();
     if(!txt) { alert('Pega una receta primero'); return; }
     var pax = parseInt(document.getElementById('rpax').value) || 4;
+    var paxDest = parseInt(document.getElementById('rdest').value) || 500;
     var tipo = document.getElementById('rtipo').value;
     var region = document.getElementById('rregion').value;
     var nomMan = document.getElementById('rnombre').value.trim();
-    var p = parsearReceta(txt, pax);
-    if(nomMan) p.nombre = nomMan;
-    if(region !== 'Mexico') p.region = region;
-    p.tipo = tipo;
-    DB_EXTRA[p.nombre] = {region:p.region, carnico:p.carnico, tipo:tipo, ingredientes:p.ingredientes, procedimiento:p.procedimiento, tiempo:p.tiempo};
-    // Guardar también en recetas para persistencia
-    recetas = recetas.filter(function(r){ return r.nombre !== p.nombre; });
-    recetas.push({id:Date.now(), nombre:p.nombre, region:p.region, carnico:p.carnico, tipo:tipo, ingredientes:p.ingredientes, procedimiento:p.procedimiento, tiempo:p.tiempo, paxO:pax, paxD:500, fecha:new Date().toLocaleString('es-MX')});
-    saveRecetas(); updCnt();
-    document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
-    var paxDest = parseInt(document.getElementById('rdest').value) || 500;
-    mostrarPreview(p, pax, paxDest);
-    toast('"' + p.nombre + '" agregada');
-    document.getElementById('rtxt').value = '';
+
+    // Mostrar spinner
+    var btn = document.querySelector('[onclick="agregarReceta()"]');
+    if(btn) { btn.disabled = true; btn.textContent = '⏳ Procesando con IA...'; }
+
+    try {
+        var p = await parsearRecetaIA(txt, pax);
+        if(nomMan) p.nombre = nomMan;
+        if(region !== 'Mexico') p.region = region;
+        p.tipo = tipo;
+        DB_EXTRA[p.nombre] = {region:p.region, carnico:p.carnico, tipo:tipo, ingredientes:p.ingredientes, procedimiento:p.procedimiento, tiempo:p.tiempo};
+        recetas = recetas.filter(function(r){ return r.nombre !== p.nombre; });
+        recetas.push({id:Date.now(), nombre:p.nombre, region:p.region, carnico:p.carnico, tipo:tipo, ingredientes:p.ingredientes, procedimiento:p.procedimiento, tiempo:p.tiempo, paxO:pax, paxD:paxDest, fecha:new Date().toLocaleString('es-MX')});
+        saveRecetas(); updCnt();
+        document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
+        mostrarPreview(p, pax, paxDest);
+        toast('"' + p.nombre + '" agregada');
+        document.getElementById('rtxt').value = '';
+    } catch(e) {
+        toast('Error procesando receta: ' + e.message);
+    } finally {
+        if(btn) { btn.disabled = false; btn.textContent = '✨ Agregar y Escalar'; }
+    }
+}
+
+// Parser con IA — extrae ingredientes correctamente de cualquier formato
+async function parsearRecetaIA(txt, pax) {
+    var prompt = 'Extrae los datos de esta receta. Responde SOLO JSON valido sin texto ni backticks:\n'
+        + '{\n'
+        + '  "nombre": "nombre del platillo",\n'
+        + '  "carnico": "Pollo/Res/Cerdo/Pescado/Mixto/Vegetariano",\n'
+        + '  "region": "estado o region de Mexico",\n'
+        + '  "tiempo": 30,\n'
+        + '  "ingredientes": [\n'
+        + '    {"nombre": "carne molida de res", "cantidad": 500, "unidad": "g"}\n'
+        + '  ],\n'
+        + '  "procedimiento": ["paso 1", "paso 2"]\n'
+        + '}\n\n'
+        + 'REGLAS CRITICAS:\n'
+        + '- ingredientes: SOLO los ingredientes de la lista, NO los pasos de preparacion\n'
+        + '- cantidad en numeros (sin fracciones: 1/4 = 0.25)\n'
+        + '- unidad SOLO: g, ml, pz (todo en g o ml preferentemente)\n'
+        + '- convierte: 1 taza=240ml, 1 cda=15ml, 1 cdita=5ml, 1 kg=1000g, 1 huevo=60g, 1 diente ajo=5g\n'
+        + '- la receta es para ' + pax + ' porciones\n'
+        + '- tiempo en minutos\n\n'
+        + 'RECETA:\n' + txt;
+
+    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1500,
+            messages: [{role: 'user', content: prompt}]
+        })
+    });
+    var data = await resp.json();
+    var raw = (data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('');
+    raw = raw.replace(/```json|```/g,'').trim();
+    var jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('No se pudo parsear la receta');
+    var rec = JSON.parse(jsonMatch[0]);
+
+    // Agregar precio_kg a cada ingrediente
+    (rec.ingredientes||[]).forEach(function(ing) {
+        ing.precio_kg = getPrecio(ing.nombre);
+        // Convertir a cantidad por porcion
+        ing.cantidad = ing.cantidad / pax;
+    });
+
+    return {
+        nombre: rec.nombre || 'Receta sin nombre',
+        carnico: rec.carnico || 'Mixto',
+        region: rec.region || 'Mexico',
+        tiempo: rec.tiempo || 60,
+        ingredientes: rec.ingredientes || [],
+        procedimiento: rec.procedimiento || []
+    };
 }
 
 function parsearReceta(txt, pax) {
@@ -1445,6 +1526,41 @@ function exportarPrecios() {
 // API KEY
 // ============================================================
 function getApiKey() { try { return localStorage.getItem('cicsa_apikey') || ''; } catch(e) { return ''; } }
+
+// ── PIN Admin ─────────────────────────────────────────────────────────────
+var ADMIN_PIN_DEFAULT = '2025';  // Cambia este PIN por el tuyo
+function getAdminPin() { return localStorage.getItem('cicsa_pin') || ADMIN_PIN_DEFAULT; }
+function setAdminPin(p) { try { localStorage.setItem('cicsa_pin', p); } catch(e) {} }
+
+function verificarPin() {
+    var ingresado = (document.getElementById('pin-input').value || '').trim();
+    if(ingresado === getAdminPin()) {
+        document.getElementById('admin-locked').style.display = 'none';
+        document.getElementById('admin-content').style.display = 'block';
+        document.getElementById('pin-input').value = '';
+        document.getElementById('pin-error').textContent = '';
+        mostrarApiKeyStatus();
+        // Auto-bloquear después de 5 minutos de inactividad
+        clearTimeout(window._adminTimer);
+        window._adminTimer = setTimeout(bloquearAdmin, 5 * 60 * 1000);
+    } else {
+        var err = document.getElementById('pin-error');
+        err.textContent = 'PIN incorrecto';
+        document.getElementById('pin-input').value = '';
+        setTimeout(function(){ err.textContent = ''; }, 2000);
+    }
+}
+
+function bloquearAdmin() {
+    document.getElementById('admin-locked').style.display = 'block';
+    document.getElementById('admin-content').style.display = 'none';
+    clearTimeout(window._adminTimer);
+}
+
+// Bloquear al cambiar de pestaña
+document.addEventListener('visibilitychange', function() {
+    if(document.hidden) bloquearAdmin();
+});
 function guardarApiKey() {
     var k = document.getElementById('apikey-input').value.trim();
     if(!k) { toast('Ingresa una API key'); return; }
