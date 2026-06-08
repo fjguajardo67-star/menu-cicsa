@@ -197,7 +197,10 @@ h1 em{font-style:italic;color:var(--gold)}
       </div>
       <div class="fg"><label class="fl2">Porciones originales</label><input type="number" id="rpax" class="fi" value="4" min="1"></div>
     </div>
-    <button class="btn bgold bfull" onclick="agregarReceta()">&#10024; Agregar y Escalar a 500 Comensales</button>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:end;margin-bottom:0">
+      <div class="fg" style="margin:0"><label class="fl2">&#127999; Escalar a (comensales)</label><input type="number" id="rdest" class="fi" value="500" min="1" max="9999" placeholder="500"></div>
+      <button class="btn bgold" style="height:42px" onclick="agregarReceta()">&#10024; Agregar y Escalar</button>
+    </div>
     <div id="prev" style="display:none;margin-top:2rem"></div>
   </div>
 </div>
@@ -831,7 +834,8 @@ function agregarReceta() {
     recetas.push({id:Date.now(), nombre:p.nombre, region:p.region, carnico:p.carnico, tipo:tipo, ingredientes:p.ingredientes, procedimiento:p.procedimiento, tiempo:p.tiempo, paxO:pax, paxD:500, fecha:new Date().toLocaleString('es-MX')});
     saveRecetas(); updCnt();
     document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
-    mostrarPreview(p, pax, 500);
+    var paxDest = parseInt(document.getElementById('rdest').value) || 500;
+    mostrarPreview(p, pax, paxDest);
     toast('"' + p.nombre + '" agregada');
     document.getElementById('rtxt').value = '';
 }
@@ -876,9 +880,11 @@ function parsearReceta(txt, pax) {
 }
 
 function parseIng(li) {
-    var txt = li.trim().replace(/^[\u2022\-\*\d\.\)]+\s*/,'');
+    var txt = li.trim().replace(/^[\u2022\-\*]+\s*/,'').replace(/^\d+[\)\.]\s*/,'');
     if(!txt || txt.length < 3) return null;
-    var m = txt.match(/^(\d+(?:[.,]\d+)?)\s*(kg|g|gr|ml|l|tazas?|cdas?|piezas?|pzs?)?/i);
+    // Mover cantidad al frente si viene después del nombre: "Tomate 100g" → manejado abajo
+    // Limpiar prefijos de unidad sueltos: "grs Tomate" → tratamos como ingrediente sin cantidad
+    var m = txt.match(/^(\d+(?:[.,]\d+)?)\s*(kg|g|gr|grs|gramos?|ml|l|litros?|tazas?|cdas?|cditas?|piezas?|pzs?)?\s*/i);
     var cantidad = 100, unidad = 'g', nombre = txt;
     if(m) {
         cantidad = parseFloat(m[1].replace(',','.'));
@@ -895,7 +901,22 @@ function parseIng(li) {
             else if(u.indexOf('cdita') >= 0 || u.indexOf('tsp') >= 0) { cantidad *= 5; unidad = 'ml'; }
             else if(u.indexOf('pz') >= 0 || u.indexOf('pieza') >= 0) unidad = 'pz';
         }
-        nombre = txt.replace(m[0],'').trim().replace(/^de\s+/i,'');
+        nombre = txt.replace(m[0],'').trim().replace(/^de\s+/i,'').replace(/^(grs?|gramos?|kg|ml|litros?)\s+/i,'');
+    }
+    // Si no se encontró cantidad al inicio, buscar al final: "Tomate rebanado 100g"
+    if(!m) {
+        var m2 = txt.match(/(.*?)\s+(\d+(?:[.,]\d+)?)\s*(kg|g|gr|grs|ml|l|tazas?|cdas?)\s*$/i);
+        if(m2) {
+            nombre = m2[1].trim();
+            cantidad = parseFloat(m2[2].replace(',','.'));
+            var u2 = m2[3].toLowerCase();
+            if(u2.indexOf('kg')>=0){cantidad*=1000;unidad='g';}
+            else if(u2.indexOf('g')>=0)unidad='g';
+            else if(u2.indexOf('ml')>=0)unidad='ml';
+            else if(u2.charAt(0)==='l'){cantidad*=1000;unidad='ml';}
+            else if(u2.indexOf('taza')>=0){cantidad*=240;unidad='ml';}
+            else if(u2.indexOf('cda')>=0){cantidad*=15;unidad='ml';}
+        }
     }
     return {nombre:nombre||txt, cantidad:cantidad, unidad:unidad, precio_kg:getPrecio(nombre||txt)};
 }
