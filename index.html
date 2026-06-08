@@ -279,31 +279,15 @@ h1 em{font-style:italic;color:var(--gold)}
 <div id="exportar" class="page">
   <div class="card">
     <div class="ch">&#9881;&#65039; Configuraci&oacute;n Admin</div>
-    <!-- PIN LOCK -->
-    <div id="admin-locked" style="text-align:center;padding:1.5rem">
-      <div style="font-size:2rem;margin-bottom:.75rem">&#128272;</div>
-      <p style="color:var(--bm);margin-bottom:1rem;font-size:.9rem">Acceso restringido al administrador</p>
-      <div style="display:flex;gap:.75rem;justify-content:center;align-items:center;max-width:280px;margin:0 auto">
-        <input type="password" id="pin-input" class="fi" style="flex:1;letter-spacing:.25rem;font-size:1.1rem" placeholder="PIN" maxlength="6" onkeydown="if(event.key==='Enter')verificarPin()">
-        <button class="btn bgold bsm" onclick="verificarPin()">&#128275; Entrar</button>
+    <div class="infobox">
+      <h3>&#128272; API Key de Anthropic</h3>
+      <p style="color:var(--bd);margin-bottom:1rem;font-size:.9rem">Solo el administrador necesita configurar esto. Permite generar recetas con inteligencia artificial. Los dem&aacute;s usuarios pueden usar la app sin API key.</p>
+      <div style="display:flex;gap:.75rem;align-items:center">
+        <input type="password" id="apikey-input" class="fi" style="flex:1" placeholder="sk-ant-api03-...">
+        <button class="btn bgold bsm" onclick="guardarApiKey()">&#128190; Guardar</button>
+        <button class="btn bsm" style="background:var(--tc)" onclick="borrarApiKey()">&#128465;&#65039;</button>
       </div>
-      <div id="pin-error" style="color:var(--tc);font-size:.8rem;margin-top:.5rem;min-height:1.2rem"></div>
-    </div>
-    <!-- CONTENIDO ADMIN (oculto hasta PIN correcto) -->
-    <div id="admin-content" style="display:none">
-      <div class="infobox">
-        <h3>&#128272; API Key de Anthropic</h3>
-        <p style="color:var(--bd);margin-bottom:1rem;font-size:.9rem">Solo el administrador necesita configurar esto. Permite generar recetas con inteligencia artificial.</p>
-        <div style="display:flex;gap:.75rem;align-items:center">
-          <input type="password" id="apikey-input" class="fi" style="flex:1" placeholder="sk-ant-api03-...">
-          <button class="btn bgold bsm" onclick="guardarApiKey()">&#128190; Guardar</button>
-          <button class="btn bsm" style="background:var(--tc)" onclick="borrarApiKey()">&#128465;&#65039;</button>
-        </div>
-        <div id="apikey-status" style="margin-top:.75rem;font-size:.85rem"></div>
-      </div>
-      <div style="margin-top:1rem;text-align:right">
-        <button class="btn bsm" style="background:var(--bl);color:#fff;font-size:.75rem" onclick="bloquearAdmin()">&#128274; Bloquear</button>
-      </div>
+      <div id="apikey-status" style="margin-top:.75rem;font-size:.85rem"></div>
     </div>
   </div>
   <div class="card">
@@ -888,16 +872,9 @@ async function parsearRecetaIA(txt, pax) {
         + '- tiempo en minutos\n\n'
         + 'RECETA:\n' + txt;
 
-    var apiKey = getApiKey();
-    if(!apiKey) throw new Error('Sin API key — configúrala en Exportar > Admin');
     var resp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true'
-        },
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',
             max_tokens: 1500,
@@ -1099,21 +1076,51 @@ function getPrecio(n) {
     return 50;
 }
 
+function recalcPreview() {
+    // Recalcular totales cuando cambia un precio en la tabla
+    var tot = 0;
+    var paxD = window._ra ? window._ra.paxD : 500;
+    document.querySelectorAll('#prev tbody tr').forEach(function(tr, idx) {
+        var ing = window._ra.rec.ingredientes[idx];
+        if(!ing) return;
+        var precioInput = tr.querySelector('.precio-edit');
+        if(precioInput) {
+            var nuevoPrecio = parseFloat(precioInput.value) || 0;
+            ing.precio_kg = nuevoPrecio;
+            var c = (ing.unidad==='g'||ing.unidad==='ml') ? (ing.cantidad*paxD/1000)*nuevoPrecio : (ing.cantidad*paxD)*nuevoPrecio;
+            tot += c;
+            var costoTd = tr.querySelector('.costo-cell');
+            if(costoTd) costoTd.textContent = '$' + c.toFixed(2);
+        }
+    });
+    var totalEl = document.getElementById('prev-total');
+    var paxEl = document.getElementById('prev-porcosto');
+    if(totalEl) totalEl.textContent = '$' + tot.toFixed(2);
+    if(paxEl) paxEl.textContent = '$' + (tot/paxD).toFixed(2);
+}
+
 function mostrarPreview(rec, paxO, paxD) {
     var el = document.getElementById('prev');
     el.style.display = 'block';
     window._ra = {rec:rec, paxO:paxO, paxD:paxD};
     var rows = '', tot = 0;
-    (rec.ingredientes||[]).forEach(function(ing) {
+    (rec.ingredientes||[]).forEach(function(ing, idx) {
         var cO = ing.cantidad*paxO, cE = ing.cantidad*paxD, uO = ing.unidad, uE = ing.unidad;
         if(uO==='g'&&cO>=1000){cO/=1000;uO='kg';} if(uO==='ml'&&cO>=1000){cO/=1000;uO='l';}
         if(uE==='g'&&cE>=1000){cE/=1000;uE='kg';} if(uE==='ml'&&cE>=1000){cE/=1000;uE='l';}
         var c = (ing.unidad==='g'||ing.unidad==='ml') ? (ing.cantidad*paxD/1000)*ing.precio_kg : (ing.cantidad*paxD)*ing.precio_kg;
         tot += c;
-        rows += '<tr style="border-bottom:1px solid #E8DCC8"><td style="padding:.5rem .75rem">' + ing.nombre + '</td>'
+        // Precio editable inline — fondo amarillo si es precio default (50)
+        var esPrecioDefault = ing.precio_kg === 50;
+        var precioStyle = 'width:70px;padding:.3rem .4rem;border:1.5px solid ' + (esPrecioDefault?'var(--tc)':'rgba(212,175,55,.4)') + ';border-radius:4px;font-size:.85rem;text-align:right;background:' + (esPrecioDefault?'#FFF3CD':'#fff');
+        rows += '<tr style="border-bottom:1px solid #E8DCC8">'
+            + '<td style="padding:.5rem .75rem">' + ing.nombre + '</td>'
             + '<td style="padding:.5rem;text-align:center">' + (cO<10?cO.toFixed(1):Math.round(cO)) + ' ' + uO + '</td>'
             + '<td style="padding:.5rem;text-align:center;font-weight:700">' + (cE<10?cE.toFixed(1):Math.round(cE)) + ' ' + uE + '</td>'
-            + '<td style="padding:.5rem;text-align:right;color:var(--tc)">$' + c.toFixed(2) + '</td></tr>';
+            + '<td style="padding:.5rem;text-align:center">'
+            + '<input type="number" class="precio-edit" value="' + ing.precio_kg.toFixed(2) + '" min="0" step="0.5" style="' + precioStyle + '" oninput="recalcPreview()" title="Precio por kg/l/pz">'
+            + '</td>'
+            + '<td style="padding:.5rem;text-align:right;color:var(--tc)" class="costo-cell">$' + c.toFixed(2) + '</td></tr>';
     });
     var pasos = '';
     if(rec.procedimiento && rec.procedimiento.length) {
@@ -1136,10 +1143,11 @@ function mostrarPreview(rec, paxO, paxD) {
         + '</div></div></div></div>'
         + '<h4 style="margin-bottom:1rem">Ingredientes:</h4>'
         + '<table style="width:100%;border-collapse:collapse;margin-bottom:1.5rem">'
-        + '<thead><tr style="background:var(--gold);color:var(--bd)"><th style="padding:.75rem;text-align:left">Ingrediente</th><th style="padding:.75rem;text-align:center">Original</th><th style="padding:.75rem;text-align:center">Para ' + paxD + ' pax</th><th style="padding:.75rem;text-align:right">Costo</th></tr></thead>'
+        + '<thead><tr style="background:var(--gold);color:var(--bd)"><th style="padding:.75rem;text-align:left">Ingrediente</th><th style="padding:.75rem;text-align:center">Original</th><th style="padding:.75rem;text-align:center">Para ' + paxD + ' pax</th><th style="padding:.75rem;text-align:center">$/kg·l·pz ✏️</th><th style="padding:.75rem;text-align:right">Costo</th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table>'
-        + '<div class="csum"><div class="crow"><span>Costo Total (' + paxD + ' pax)</span><span>$' + tot.toFixed(2) + '</span></div>'
-        + '<div class="crow"><span>Por Comensal</span><span>$' + (tot/paxD).toFixed(2) + '</span></div></div>'
+        + '<div style="font-size:.78rem;color:var(--bl);margin-bottom:.5rem;padding:.4rem .75rem;background:#FFF3CD;border-radius:4px;border-left:3px solid var(--tc)">⚠️ Precios en <strong>naranja</strong> son estimados — edítalos antes de guardar</div>'
+        + '<div class="csum"><div class="crow"><span>Costo Total (' + paxD + ' pax)</span><span id="prev-total">$' + tot.toFixed(2) + '</span></div>'
+        + '<div class="crow"><span>Por Comensal</span><span id="prev-porcosto">$' + (tot/paxD).toFixed(2) + '</span></div></div>'
         + pasos
         + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-top:1.5rem">'
         + '<button class="btn bgold" id="bguardar">&#128190; Guardar</button>'
@@ -1533,41 +1541,6 @@ function exportarPrecios() {
 // API KEY
 // ============================================================
 function getApiKey() { try { return localStorage.getItem('cicsa_apikey') || ''; } catch(e) { return ''; } }
-
-// ── PIN Admin ─────────────────────────────────────────────────────────────
-var ADMIN_PIN_DEFAULT = '2025';  // Cambia este PIN por el tuyo
-function getAdminPin() { return localStorage.getItem('cicsa_pin') || ADMIN_PIN_DEFAULT; }
-function setAdminPin(p) { try { localStorage.setItem('cicsa_pin', p); } catch(e) {} }
-
-function verificarPin() {
-    var ingresado = (document.getElementById('pin-input').value || '').trim();
-    if(ingresado === getAdminPin()) {
-        document.getElementById('admin-locked').style.display = 'none';
-        document.getElementById('admin-content').style.display = 'block';
-        document.getElementById('pin-input').value = '';
-        document.getElementById('pin-error').textContent = '';
-        mostrarApiKeyStatus();
-        // Auto-bloquear después de 5 minutos de inactividad
-        clearTimeout(window._adminTimer);
-        window._adminTimer = setTimeout(bloquearAdmin, 5 * 60 * 1000);
-    } else {
-        var err = document.getElementById('pin-error');
-        err.textContent = 'PIN incorrecto';
-        document.getElementById('pin-input').value = '';
-        setTimeout(function(){ err.textContent = ''; }, 2000);
-    }
-}
-
-function bloquearAdmin() {
-    document.getElementById('admin-locked').style.display = 'block';
-    document.getElementById('admin-content').style.display = 'none';
-    clearTimeout(window._adminTimer);
-}
-
-// Bloquear al cambiar de pestaña
-document.addEventListener('visibilitychange', function() {
-    if(document.hidden) bloquearAdmin();
-});
 function guardarApiKey() {
     var k = document.getElementById('apikey-input').value.trim();
     if(!k) { toast('Ingresa una API key'); return; }
