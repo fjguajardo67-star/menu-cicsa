@@ -844,8 +844,7 @@ async function agregarReceta() {
         toast('"' + p.nombre + '" agregada');
         document.getElementById('rtxt').value = '';
     } catch(e) {
-        toast('Error: ' + (e.message || 'desconocido'));
-        console.error('parsearRecetaIA error:', e);
+        toast('Error procesando receta: ' + e.message);
     } finally {
         if(btn) { btn.disabled = false; btn.textContent = '✨ Agregar y Escalar'; }
     }
@@ -873,25 +872,16 @@ async function parsearRecetaIA(txt, pax) {
         + '- tiempo en minutos\n\n'
         + 'RECETA:\n' + txt;
 
-    var apiKey = getApiKey();
-    if(!apiKey) throw new Error('Sin API key — configúrala en Exportar > Admin');
     var resp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true'
-        },
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',
             max_tokens: 1500,
             messages: [{role: 'user', content: prompt}]
         })
     });
-    if(!resp.ok) throw new Error('API error ' + resp.status);
     var data = await resp.json();
-    if(data.error) throw new Error(data.error.message || 'Error API');
     var raw = (data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('');
     raw = raw.replace(/```json|```/g,'').trim();
     var jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -1086,51 +1076,21 @@ function getPrecio(n) {
     return 50;
 }
 
-function recalcPreview() {
-    // Recalcular totales cuando cambia un precio en la tabla
-    var tot = 0;
-    var paxD = window._ra ? window._ra.paxD : 500;
-    document.querySelectorAll('#prev tbody tr').forEach(function(tr, idx) {
-        var ing = window._ra.rec.ingredientes[idx];
-        if(!ing) return;
-        var precioInput = tr.querySelector('.precio-edit');
-        if(precioInput) {
-            var nuevoPrecio = parseFloat(precioInput.value) || 0;
-            ing.precio_kg = nuevoPrecio;
-            var c = (ing.unidad==='g'||ing.unidad==='ml') ? (ing.cantidad*paxD/1000)*nuevoPrecio : (ing.cantidad*paxD)*nuevoPrecio;
-            tot += c;
-            var costoTd = tr.querySelector('.costo-cell');
-            if(costoTd) costoTd.textContent = '$' + c.toFixed(2);
-        }
-    });
-    var totalEl = document.getElementById('prev-total');
-    var paxEl = document.getElementById('prev-porcosto');
-    if(totalEl) totalEl.textContent = '$' + tot.toFixed(2);
-    if(paxEl) paxEl.textContent = '$' + (tot/paxD).toFixed(2);
-}
-
 function mostrarPreview(rec, paxO, paxD) {
     var el = document.getElementById('prev');
     el.style.display = 'block';
     window._ra = {rec:rec, paxO:paxO, paxD:paxD};
     var rows = '', tot = 0;
-    (rec.ingredientes||[]).forEach(function(ing, idx) {
+    (rec.ingredientes||[]).forEach(function(ing) {
         var cO = ing.cantidad*paxO, cE = ing.cantidad*paxD, uO = ing.unidad, uE = ing.unidad;
         if(uO==='g'&&cO>=1000){cO/=1000;uO='kg';} if(uO==='ml'&&cO>=1000){cO/=1000;uO='l';}
         if(uE==='g'&&cE>=1000){cE/=1000;uE='kg';} if(uE==='ml'&&cE>=1000){cE/=1000;uE='l';}
         var c = (ing.unidad==='g'||ing.unidad==='ml') ? (ing.cantidad*paxD/1000)*ing.precio_kg : (ing.cantidad*paxD)*ing.precio_kg;
         tot += c;
-        // Precio editable inline — fondo amarillo si es precio default (50)
-        var esPrecioDefault = ing.precio_kg === 50;
-        var precioStyle = 'width:70px;padding:.3rem .4rem;border:1.5px solid ' + (esPrecioDefault?'var(--tc)':'rgba(212,175,55,.4)') + ';border-radius:4px;font-size:.85rem;text-align:right;background:' + (esPrecioDefault?'#FFF3CD':'#fff');
-        rows += '<tr style="border-bottom:1px solid #E8DCC8">'
-            + '<td style="padding:.5rem .75rem">' + ing.nombre + '</td>'
+        rows += '<tr style="border-bottom:1px solid #E8DCC8"><td style="padding:.5rem .75rem">' + ing.nombre + '</td>'
             + '<td style="padding:.5rem;text-align:center">' + (cO<10?cO.toFixed(1):Math.round(cO)) + ' ' + uO + '</td>'
             + '<td style="padding:.5rem;text-align:center;font-weight:700">' + (cE<10?cE.toFixed(1):Math.round(cE)) + ' ' + uE + '</td>'
-            + '<td style="padding:.5rem;text-align:center">'
-            + '<input type="number" class="precio-edit" value="' + ing.precio_kg.toFixed(2) + '" min="0" step="0.5" style="' + precioStyle + '" oninput="recalcPreview()" title="Precio por kg/l/pz">'
-            + '</td>'
-            + '<td style="padding:.5rem;text-align:right;color:var(--tc)" class="costo-cell">$' + c.toFixed(2) + '</td></tr>';
+            + '<td style="padding:.5rem;text-align:right;color:var(--tc)">$' + c.toFixed(2) + '</td></tr>';
     });
     var pasos = '';
     if(rec.procedimiento && rec.procedimiento.length) {
@@ -1153,11 +1113,10 @@ function mostrarPreview(rec, paxO, paxD) {
         + '</div></div></div></div>'
         + '<h4 style="margin-bottom:1rem">Ingredientes:</h4>'
         + '<table style="width:100%;border-collapse:collapse;margin-bottom:1.5rem">'
-        + '<thead><tr style="background:var(--gold);color:var(--bd)"><th style="padding:.75rem;text-align:left">Ingrediente</th><th style="padding:.75rem;text-align:center">Original</th><th style="padding:.75rem;text-align:center">Para ' + paxD + ' pax</th><th style="padding:.75rem;text-align:center">$/kg·l·pz ✏️</th><th style="padding:.75rem;text-align:right">Costo</th></tr></thead>'
+        + '<thead><tr style="background:var(--gold);color:var(--bd)"><th style="padding:.75rem;text-align:left">Ingrediente</th><th style="padding:.75rem;text-align:center">Original</th><th style="padding:.75rem;text-align:center">Para ' + paxD + ' pax</th><th style="padding:.75rem;text-align:right">Costo</th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table>'
-        + '<div style="font-size:.78rem;color:var(--bl);margin-bottom:.5rem;padding:.4rem .75rem;background:#FFF3CD;border-radius:4px;border-left:3px solid var(--tc)">⚠️ Precios en <strong>naranja</strong> son estimados — edítalos antes de guardar</div>'
-        + '<div class="csum"><div class="crow"><span>Costo Total (' + paxD + ' pax)</span><span id="prev-total">$' + tot.toFixed(2) + '</span></div>'
-        + '<div class="crow"><span>Por Comensal</span><span id="prev-porcosto">$' + (tot/paxD).toFixed(2) + '</span></div></div>'
+        + '<div class="csum"><div class="crow"><span>Costo Total (' + paxD + ' pax)</span><span>$' + tot.toFixed(2) + '</span></div>'
+        + '<div class="crow"><span>Por Comensal</span><span>$' + (tot/paxD).toFixed(2) + '</span></div></div>'
         + pasos
         + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-top:1.5rem">'
         + '<button class="btn bgold" id="bguardar">&#128190; Guardar</button>'
@@ -1345,6 +1304,15 @@ function editarPl(nombre) {
             if(DB[window._editando]) { DB[window._editando] = updated; }
             else { if(nn !== window._editando) delete DB_EXTRA[window._editando]; DB_EXTRA[nn] = updated; }
             if(nn !== window._editando && DB[window._editando]) { delete DB[window._editando]; DB[nn] = updated; }
+            // Persistir cambios en recetas (localStorage + Firebase)
+            var idxR = recetas.findIndex(function(r){ return r.nombre === window._editando; });
+            if(idxR >= 0) {
+                recetas[idxR] = Object.assign(recetas[idxR], updated, {nombre: nn});
+            } else {
+                // Si no estaba en recetas (era de DB_EXTRA sin pasar por recetas), agregarlo
+                recetas.push(Object.assign({id:Date.now()}, updated, {nombre: nn}));
+            }
+            saveRecetas(); updCnt();
             closeModal(); renderCat();
             document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
             toast('"' + nn + '" actualizado');
@@ -1365,10 +1333,9 @@ function delPl(nombre, origen) {
         if(b) b.addEventListener('click', function() {
             if(DB[window._dn]) delete DB[window._dn];
             if(DB_EXTRA[window._dn]) delete DB_EXTRA[window._dn];
-            if(window._do === 'mia') {
-                recetas = recetas.filter(function(r) { return r.nombre !== window._dn; });
-                saveRecetas(); updCnt();
-            }
+            // Siempre eliminar de recetas sin importar origen
+            recetas = recetas.filter(function(r) { return r.nombre !== window._dn; });
+            saveRecetas(); updCnt();
             closeModal(); renderCat();
             document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
             toast('"' + window._dn + '" eliminado');
@@ -1821,9 +1788,3 @@ function dl(content, filename, type) {
 </script>
 </body>
 </html>
-  
-
-
-
-
-  
