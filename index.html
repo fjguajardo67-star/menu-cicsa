@@ -203,7 +203,29 @@ h1 em{font-style:italic;color:var(--gold)}
     </div>
     <div id="prev" style="display:none;margin-top:2rem"></div>
   </div>
-</div>
+
+  <!-- CARGA POR LOTES -->
+  <div class="card">
+    <div class="ch">&#128230; Carga por Lotes (varias recetas)</div>
+    <div class="infobox">
+      <h3>&#128203; Sube 10 o m&aacute;s recetas de una vez</h3>
+      <p style="color:var(--bd);font-size:.9rem;line-height:1.7">Pega varias recetas en el formato de la plantilla. Sep&aacute;ralas con una l&iacute;nea que tenga <strong>&#8259;</strong> o <strong>---</strong>, o simplemente deja que el sistema detecte cada bloque <strong>NOMBRE:</strong>. El sistema escala a 500 comensales, calcula costos y <strong>omite duplicados</strong> autom&aacute;ticamente.</p>
+    </div>
+    <div class="fg"><label class="fl2">Pega aqu&iacute; todas las recetas</label>
+      <textarea id="rbatch" class="ft" style="min-height:240px;font-family:monospace;font-size:.82rem" placeholder="NOMBRE: Pollo Ranchero&#10;REGION: Mexico&#10;CARNICO: Pollo&#10;TIPO: Guisado&#10;PORCIONES_BASE: 50&#10;INGREDIENTES:&#10;* Pollo: 7500 g&#10;...&#10;PROCEDIMIENTO:&#10;1. ...&#10;&#10;---&#10;&#10;NOMBRE: Pollo en Salsa Verde&#10;..."></textarea>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:1rem;align-items:end">
+      <div class="fg" style="margin:0"><label class="fl2">Escalar a (comensales)</label><input type="number" id="rbatch-dest" class="fi" value="500" min="1" max="9999"></div>
+      <div class="fg" style="margin:0"><label class="fl2">Si hay duplicado</label>
+        <select id="rbatch-dup" class="fs">
+          <option value="omitir">Omitir (no tocar el existente)</option>
+          <option value="reemplazar">Reemplazar con el nuevo</option>
+        </select>
+      </div>
+      <button class="btn bgold" style="height:42px" onclick="cargarLote()">&#128230; Procesar Lote</button>
+    </div>
+    <div id="batch-res" style="display:none;margin-top:1.5rem"></div>
+  </div>
 
 <!-- CATALOGO -->
 <div id="cat" class="page">
@@ -917,6 +939,143 @@ async function agregarReceta() {
     } finally {
         if(btn) { btn.disabled = false; btn.textContent = '✨ Agregar y Escalar'; }
     }
+}
+
+// ── CARGA POR LOTES ────────────────────────────────────────────────────
+// Parser directo del formato estructurado de plantilla (sin IA, gratis y offline)
+function parsearRecetaEstructurada(bloque) {
+    var lineas = bloque.split('\n');
+    var rec = {nombre:'', region:'Mexico', carnico:'Mixto', tipo:'guisado', tiempo:60, base:50, ingredientes:[], procedimiento:[]};
+    var seccion = '';
+    lineas.forEach(function(linea) {
+        var l = linea.trim();
+        if(!l) return;
+        var up = l.toUpperCase();
+        // Encabezados de campo
+        if(up.indexOf('NOMBRE:') === 0)      { rec.nombre = l.substring(l.indexOf(':')+1).trim(); seccion=''; return; }
+        if(up.indexOf('REGION:') === 0 || up.indexOf('REGIÓN:') === 0) { rec.region = l.substring(l.indexOf(':')+1).trim() || 'Mexico'; seccion=''; return; }
+        if(up.indexOf('CARNICO:') === 0 || up.indexOf('CÁRNICO:') === 0) { rec.carnico = l.substring(l.indexOf(':')+1).trim() || 'Mixto'; seccion=''; return; }
+        if(up.indexOf('TIPO:') === 0)        { var t = l.substring(l.indexOf(':')+1).trim().toLowerCase(); rec.tipo = (t.indexOf('garnacha')>=0?'garnacha':'guisado'); seccion=''; return; }
+        if(up.indexOf('TIEMPO:') === 0)      { rec.tiempo = parseInt(l.replace(/\D/g,'')) || 60; seccion=''; return; }
+        if(up.indexOf('PORCIONES_BASE:') === 0 || up.indexOf('PORCIONES BASE:') === 0) { rec.base = parseInt(l.replace(/\D/g,'')) || 50; seccion=''; return; }
+        if(up.indexOf('INGREDIENTES:') === 0){ seccion='ing'; return; }
+        if(up.indexOf('PROCEDIMIENTO:') === 0 || up.indexOf('PREPARACION:') === 0 || up.indexOf('PREPARACIÓN:') === 0) { seccion='proc'; return; }
+        // Contenido de secciones
+        if(seccion === 'ing') {
+            // formato: "* Nombre: 7500 g"  o  "- Nombre: 7500 g"
+            var ln = l.replace(/^[\*\-•]\s*/,'').trim();
+            var m = ln.match(/^(.+?):\s*([\d.]+)\s*(g|ml|kg|l|pz)?\s*$/i);
+            if(m) {
+                var nombre = m[1].trim();
+                var cant = parseFloat(m[2]) || 0;
+                var u = (m[3]||'g').toLowerCase();
+                if(u==='kg'){cant*=1000;u='g';} if(u==='l'){cant*=1000;u='ml';}
+                rec.ingredientes.push({nombre:nombre, cantidad:cant, unidad:u, precio_kg:getPrecio(nombre)});
+            }
+        } else if(seccion === 'proc') {
+            var paso = l.replace(/^\d+[\.\)]\s*/,'').replace(/^[\*\-•]\s*/,'').trim();
+            if(paso.length > 3) rec.procedimiento.push(paso);
+        }
+    });
+    return rec.nombre ? rec : null;
+}
+
+// Separa el texto en bloques de recetas individuales
+function separarBloques(txt) {
+    txt = txt.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+    // Quitar codigos tipo "POL-001" en linea sola
+    txt = txt.replace(/^\s*[A-Z]{2,4}-\d{2,4}\s*$/gm, '');
+    // Separar por lineas divisorias: ⸻  ---  ___  ===  o 3+ guiones
+    var partes = txt.split(/\n\s*(?:⸻+|[-_=]{3,})\s*\n/);
+    // Si no hubo separadores, separar por cada "NOMBRE:" (manteniendo el encabezado)
+    if(partes.length <= 1) {
+        partes = txt.split(/(?=^\s*NOMBRE:)/im);
+    }
+    return partes.map(function(p){ return p.trim(); }).filter(function(p){ return p && p.toUpperCase().indexOf('NOMBRE:') >= 0; });
+}
+
+function cargarLote() {
+    var txt = document.getElementById('rbatch').value.trim();
+    if(!txt) { alert('Pega al menos una receta'); return; }
+    var paxDest = parseInt(document.getElementById('rbatch-dest').value) || 500;
+    var modoDup = document.getElementById('rbatch-dup').value; // omitir | reemplazar
+    var res = document.getElementById('batch-res');
+
+    var bloques = separarBloques(txt);
+    if(!bloques.length) {
+        res.style.display='block';
+        res.innerHTML = '<div style="background:#FFE5E5;padding:1.25rem;border-radius:8px;border-left:4px solid var(--tc)"><strong>No se detectaron recetas.</strong> Verifica que cada una tenga una l&iacute;nea <strong>NOMBRE:</strong></div>';
+        return;
+    }
+
+    var nombresExistentes = {};
+    Object.keys(DB).forEach(function(n){ nombresExistentes[n.toLowerCase()] = true; });
+    Object.keys(DB_EXTRA).forEach(function(n){ nombresExistentes[n.toLowerCase()] = true; });
+
+    var agregadas = [], duplicadas = [], reemplazadas = [], errores = [];
+    var nombresLote = {}; // detectar duplicados dentro del mismo lote
+
+    bloques.forEach(function(bloque) {
+        var rec = parsearRecetaEstructurada(bloque);
+        if(!rec || !rec.ingredientes.length) { errores.push(rec ? rec.nombre : 'bloque sin nombre'); return; }
+        var key = rec.nombre.toLowerCase();
+        // Duplicado dentro del mismo lote pegado
+        if(nombresLote[key]) { duplicadas.push(rec.nombre + ' (repetida en el lote)'); return; }
+        nombresLote[key] = true;
+        // Duplicado contra el catalogo existente
+        var yaExiste = nombresExistentes[key];
+        if(yaExiste && modoDup === 'omitir') { duplicadas.push(rec.nombre); return; }
+
+        // Convertir cantidades a POR PORCION (dividir entre base) para escalado correcto
+        var ingPorPorcion = rec.ingredientes.map(function(ing){
+            return {nombre:ing.nombre, cantidad:ing.cantidad/rec.base, unidad:ing.unidad, precio_kg:ing.precio_kg};
+        });
+        var nuevaReceta = {
+            id: Date.now() + Math.floor(Math.random()*10000),
+            nombre: rec.nombre, region: rec.region, carnico: rec.carnico, tipo: rec.tipo,
+            ingredientes: ingPorPorcion, procedimiento: rec.procedimiento, tiempo: rec.tiempo,
+            paxO: rec.base, paxD: paxDest, fecha: new Date().toLocaleString('es-MX')
+        };
+        // Si reemplaza, quitar el anterior de recetas y de borradas
+        recetas = recetas.filter(function(r){ return r.nombre.toLowerCase() !== key; });
+        if(yaExiste && DB[rec.nombre]) { if(borradas.indexOf(rec.nombre)<0) borradas.push(rec.nombre); }
+        // Quitar de la lista de borradas si la estamos re-agregando
+        borradas = borradas.filter(function(b){ return b.toLowerCase() !== key; });
+
+        DB_EXTRA[rec.nombre] = {region:rec.region, carnico:rec.carnico, tipo:rec.tipo, ingredientes:ingPorPorcion, procedimiento:rec.procedimiento, tiempo:rec.tiempo};
+        recetas.push(nuevaReceta);
+        nombresExistentes[key] = true;
+
+        if(yaExiste) reemplazadas.push(rec.nombre);
+        else agregadas.push(rec.nombre);
+    });
+
+    saveBorradas();
+    saveRecetas();
+    updCnt();
+    genMenu();
+    document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
+
+    // Reporte de resultados
+    function lista(arr, color){ return arr.map(function(n){ return '<li style="color:'+color+'">'+n+'</li>'; }).join(''); }
+    var html = '<div class="card" style="border:2px solid var(--gold)">'
+        + '<div style="background:var(--green);color:#fff;padding:1rem;border-radius:6px;margin-bottom:1rem;text-align:center"><strong>Lote procesado: ' + (agregadas.length+reemplazadas.length) + ' receta(s) cargada(s)</strong></div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;text-align:center;margin-bottom:1rem">'
+        + '<div style="background:var(--cream);padding:1rem;border-radius:6px"><div style="font-size:1.8rem;font-weight:700;color:var(--green)">' + agregadas.length + '</div><div style="font-size:.8rem;color:var(--bl)">Agregadas</div></div>'
+        + '<div style="background:var(--cream);padding:1rem;border-radius:6px"><div style="font-size:1.8rem;font-weight:700;color:var(--gold)">' + reemplazadas.length + '</div><div style="font-size:.8rem;color:var(--bl)">Reemplazadas</div></div>'
+        + '<div style="background:var(--cream);padding:1rem;border-radius:6px"><div style="font-size:1.8rem;font-weight:700;color:var(--bl)">' + duplicadas.length + '</div><div style="font-size:.8rem;color:var(--bl)">Omitidas (dup)</div></div>'
+        + '<div style="background:var(--cream);padding:1rem;border-radius:6px"><div style="font-size:1.8rem;font-weight:700;color:var(--tc)">' + errores.length + '</div><div style="font-size:.8rem;color:var(--bl)">Con error</div></div>'
+        + '</div>';
+    if(agregadas.length) html += '<h4 style="color:var(--green);margin:.75rem 0 .25rem">✓ Agregadas</h4><ul style="margin-left:1.5rem">' + lista(agregadas,'var(--bd)') + '</ul>';
+    if(reemplazadas.length) html += '<h4 style="color:var(--gold);margin:.75rem 0 .25rem">↻ Reemplazadas</h4><ul style="margin-left:1.5rem">' + lista(reemplazadas,'var(--bd)') + '</ul>';
+    if(duplicadas.length) html += '<h4 style="color:var(--bl);margin:.75rem 0 .25rem">⊘ Omitidas (ya exist&iacute;an)</h4><ul style="margin-left:1.5rem">' + lista(duplicadas,'var(--bl)') + '</ul>';
+    if(errores.length) html += '<h4 style="color:var(--tc);margin:.75rem 0 .25rem">⚠ No se pudieron leer</h4><ul style="margin-left:1.5rem">' + lista(errores,'var(--tc)') + '</ul>';
+    html += '<button class="btn bgold bfull" style="margin-top:1rem" onclick="document.getElementById(\'rbatch\').value=\'\';document.getElementById(\'batch-res\').style.display=\'none\'">&#10003; Listo, limpiar</button>';
+    html += '</div>';
+    res.style.display = 'block';
+    res.innerHTML = html;
+    res.scrollIntoView({behavior:'smooth', block:'nearest'});
+    toast((agregadas.length+reemplazadas.length) + ' recetas cargadas');
 }
 
 // Parser con IA — extrae ingredientes correctamente de cualquier formato
