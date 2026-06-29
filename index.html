@@ -1466,6 +1466,7 @@ function exportTxtRA() {
 
 // CATALOGO
 function renderCat() {
+  try {
     var el = document.getElementById('catcon');
     var allDB = Object.assign({}, DB, DB_EXTRA);
     // Separar precargados (DB) de los extra (DB_EXTRA = pegados manualmente)
@@ -1473,6 +1474,9 @@ function renderCat() {
         return {nombre:n, origen:'precargado', tipoPl:DB[n].tipo||'guisado', region:DB[n].region, carnico:DB[n].carnico, ingredientes:DB[n].ingredientes, tiempo:DB[n].tiempo};
     });
     var mis = recetas.map(function(r) { return Object.assign({},r,{origen:'mia',tipoPl:r.tipo||'guisado'}); });
+    // Blindaje: descartar entradas sin nombre válido (evita que el catálogo quede en blanco)
+    prec = prec.filter(function(p){ return p && typeof p.nombre === 'string' && p.nombre.trim(); });
+    mis = mis.filter(function(p){ return p && typeof p.nombre === 'string' && p.nombre.trim(); });
     // Filtro por origen/tipo
     var todos;
     if(filtCat==='precargados') todos = prec;
@@ -1498,7 +1502,7 @@ function renderCat() {
         var b2 = p.tipoPl==='garnacha' ? '<span style="background:var(--tc);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">&#129362; Garnacha</span>'
             : '<span style="background:var(--green);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">&#127858; Guisado</span>';
         var b3 = p.carnico ? '<span style="background:var(--bm);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">' + p.carnico + '</span>' : '';
-        var ingP = p.ingredientes ? p.ingredientes.slice(0,3).map(function(i){return i.nombre;}).join(' · ') + (p.ingredientes.length>3?' +mas':'') : '';
+        var ingP = (p.ingredientes && p.ingredientes.length) ? p.ingredientes.slice(0,3).map(function(i){return (i && i.nombre) ? i.nombre : '';}).filter(function(x){return x;}).join(' · ') + (p.ingredientes.length>3?' +mas':'') : '';
         html += '<div style="background:#fff;border:1.5px solid rgba(212,175,55,.2);border-radius:8px;overflow:hidden">'
             + '<div style="background:linear-gradient(135deg,var(--bd),var(--bm));padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center">'
             + '<div><div style="color:var(--gold);font-weight:700">' + p.nombre + '</div><div style="margin-top:.2rem">' + b1 + b2 + b3 + '</div></div>'
@@ -1518,6 +1522,39 @@ function renderCat() {
         if(ae) editarPl(decodeURIComponent(ae.getAttribute('data-ae')));
         else if(ad) delPl(decodeURIComponent(ad.getAttribute('data-ad')), ad.getAttribute('data-ot'));
     };
+  } catch(err) {
+    console.error('renderCat error:', err);
+    var elc = document.getElementById('catcon');
+    if(elc) elc.innerHTML = '<div style="background:#FFE5E5;padding:1.5rem;border-radius:8px;border-left:4px solid var(--tc)">'
+        + '<strong>&#9888;&#65039; Error mostrando el cat&aacute;logo</strong><br><br>'
+        + 'Detalle: ' + (err.message || err) + '<br><br>'
+        + '<button class="btn bsm" onclick="repararCatalogo()">&#128295; Reparar recetas da&ntilde;adas</button></div>';
+  }
+}
+
+// Repara recetas con campos faltantes que rompen el catálogo
+function repararCatalogo() {
+    var antes = recetas.length;
+    recetas = recetas.filter(function(r){ return r && typeof r.nombre === 'string' && r.nombre.trim(); });
+    recetas.forEach(function(r){
+        if(!Array.isArray(r.ingredientes)) r.ingredientes = [];
+        r.ingredientes = r.ingredientes.filter(function(i){ return i && typeof i.nombre === 'string'; });
+        r.ingredientes.forEach(function(i){
+            if(typeof i.cantidad !== 'number' || isNaN(i.cantidad)) i.cantidad = 0;
+            if(!i.unidad) i.unidad = 'g';
+            if(typeof i.precio_kg !== 'number' || isNaN(i.precio_kg)) i.precio_kg = getPrecio(i.nombre);
+        });
+        if(!Array.isArray(r.procedimiento)) r.procedimiento = [];
+        if(!r.tipo) r.tipo = 'guisado';
+        if(!r.carnico) r.carnico = 'Mixto';
+        if(!r.region) r.region = 'Mexico';
+        if(!r.tiempo) r.tiempo = 60;
+        // Re-sincronizar DB_EXTRA
+        DB_EXTRA[r.nombre] = {region:r.region,carnico:r.carnico,tipo:r.tipo,ingredientes:r.ingredientes,procedimiento:r.procedimiento,tiempo:r.tiempo};
+    });
+    saveRecetas();
+    renderCat();
+    toast('Catálogo reparado (' + recetas.length + ' recetas, ' + (antes-recetas.length) + ' descartadas)');
 }
 
 function setFiltCat(f, btn) {
