@@ -210,11 +210,27 @@ h1 em{font-style:italic;color:var(--gold)}
   <div class="card">
     <div class="ch">&#128218; Cat&aacute;logo de Platillos</div>
     <div class="infobox">Cat&aacute;logo completo: platillos del sistema + tus recetas. Edita ingredientes, cambia tipo y elimina platillos.</div>
+    <div style="margin-bottom:1rem">
+      <input type="text" id="catbuscar" class="fi" placeholder="&#128269; Buscar por nombre..." oninput="renderCat()">
+    </div>
     <div class="fbar">
-      <span class="fl">Ver:</span>
+      <span class="fl">Tipo:</span>
       <button class="fb on" data-fcat onclick="setFiltCat('todos',this)">Todos</button>
       <button class="fb" data-fcat onclick="setFiltCat('precargados',this)">&#127869;&#65039; Precargados</button>
       <button class="fb" data-fcat onclick="setFiltCat('misrecetas',this)">&#11088; Mis Recetas</button>
+      <button class="fb" data-fcat onclick="setFiltCat('guisado',this)">&#127858; Guisados</button>
+      <button class="fb" data-fcat onclick="setFiltCat('garnacha',this)">&#129362; Garnachas</button>
+    </div>
+    <div class="fbar">
+      <span class="fl">Prote&iacute;na:</span>
+      <button class="fb on" data-fprot onclick="setFiltProt('todas',this)">Todas</button>
+      <button class="fb" data-fprot onclick="setFiltProt('Pollo',this)">Pollo</button>
+      <button class="fb" data-fprot onclick="setFiltProt('Res',this)">Res</button>
+      <button class="fb" data-fprot onclick="setFiltProt('Cerdo',this)">Cerdo</button>
+      <button class="fb" data-fprot onclick="setFiltProt('Pescado',this)">Pescado</button>
+      <button class="fb" data-fprot onclick="setFiltProt('Verdura',this)">Verdura</button>
+    </div>
+    <div class="fbar">
       <button class="btn bgold bsm" onclick="exportarTxt()">&#128190; Exportar .TXT</button>
       <button class="btn bsm" style="background:var(--green)" onclick="recalcularCostos()">&#128260; Recalcular Costos</button>
     </div>
@@ -384,6 +400,7 @@ var recetas = [];
 var precios = {};
 var diasMenu = 30;
 var filtCat = 'todos';
+var filtProt = 'todas';
 
 var borradas = [];   // nombres de platillos eliminados (incluye precargados de DB)
 var _tieneRecetasLocales = false;
@@ -1297,19 +1314,35 @@ function renderCat() {
         return {nombre:n, origen:'precargado', tipoPl:DB[n].tipo||'guisado', region:DB[n].region, carnico:DB[n].carnico, ingredientes:DB[n].ingredientes, tiempo:DB[n].tiempo};
     });
     var mis = recetas.map(function(r) { return Object.assign({},r,{origen:'mia',tipoPl:r.tipo||'guisado'}); });
-    var todos = filtCat==='precargados' ? prec : filtCat==='misrecetas' ? mis : [].concat(prec, mis);
-    if(!todos.length) { el.innerHTML='<div style="text-align:center;padding:3rem;color:var(--bl)"><div style="font-size:3rem">&#128466;</div><h3 style="margin-top:.75rem">No hay platillos aqui</h3></div>'; return; }
-    var html = '<div style="display:grid;gap:.75rem">';
+    // Filtro por origen/tipo
+    var todos;
+    if(filtCat==='precargados') todos = prec;
+    else if(filtCat==='misrecetas') todos = mis;
+    else if(filtCat==='guisado') todos = [].concat(prec, mis).filter(function(p){ return p.tipoPl==='guisado'; });
+    else if(filtCat==='garnacha') todos = [].concat(prec, mis).filter(function(p){ return p.tipoPl==='garnacha'; });
+    else todos = [].concat(prec, mis);
+    // Filtro por proteína (carnico)
+    if(filtProt !== 'todas') {
+        todos = todos.filter(function(p){ return (p.carnico||'') === filtProt; });
+    }
+    // Filtro por texto de búsqueda (nombre)
+    var q = (document.getElementById('catbuscar') ? document.getElementById('catbuscar').value : '').toLowerCase().trim();
+    if(q) {
+        todos = todos.filter(function(p){ return p.nombre.toLowerCase().indexOf(q) >= 0; });
+    }
+    if(!todos.length) { el.innerHTML='<div style="text-align:center;padding:3rem;color:var(--bl)"><div style="font-size:3rem">&#128269;</div><h3 style="margin-top:.75rem">Sin resultados</h3><p style="margin-top:.5rem;font-size:.85rem">Prueba con otro nombre, prote&iacute;na o tipo</p></div>'; return; }
+    var html = '<div style="font-size:.8rem;color:var(--bl);margin-bottom:.75rem">' + todos.length + ' platillo' + (todos.length!==1?'s':'') + '</div><div style="display:grid;gap:.75rem">';
     todos.forEach(function(p) {
         var esMia = p.origen === 'mia' || p.origen === 'extra';
         var b1 = esMia ? '<span style="background:var(--gold);color:var(--bd);padding:.15rem .5rem;border-radius:99px;font-size:.7rem;font-weight:700">&#11088; Mi Receta</span>'
             : '<span style="background:var(--bl);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem">&#127869;&#65039; Precargado</span>';
         var b2 = p.tipoPl==='garnacha' ? '<span style="background:var(--tc);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">&#129362; Garnacha</span>'
             : '<span style="background:var(--green);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">&#127858; Guisado</span>';
+        var b3 = p.carnico ? '<span style="background:var(--bm);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">' + p.carnico + '</span>' : '';
         var ingP = p.ingredientes ? p.ingredientes.slice(0,3).map(function(i){return i.nombre;}).join(' · ') + (p.ingredientes.length>3?' +mas':'') : '';
         html += '<div style="background:#fff;border:1.5px solid rgba(212,175,55,.2);border-radius:8px;overflow:hidden">'
             + '<div style="background:linear-gradient(135deg,var(--bd),var(--bm));padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center">'
-            + '<div><div style="color:var(--gold);font-weight:700">' + p.nombre + '</div><div style="margin-top:.2rem">' + b1 + b2 + '</div></div>'
+            + '<div><div style="color:var(--gold);font-weight:700">' + p.nombre + '</div><div style="margin-top:.2rem">' + b1 + b2 + b3 + '</div></div>'
             + '<div style="display:flex;gap:.4rem">'
             + '<button class="btn bgold bsm" data-ae="' + encodeURIComponent(p.nombre) + '">&#9998;&#65039; Editar</button>'
             + '<button class="btn bsm" style="background:var(--tc)" data-ad="' + encodeURIComponent(p.nombre) + '" data-ot="' + p.origen + '">&#128465;&#65039;</button>'
@@ -1331,6 +1364,13 @@ function renderCat() {
 function setFiltCat(f, btn) {
     filtCat = f;
     document.querySelectorAll('[data-fcat]').forEach(function(b){b.classList.remove('on');});
+    btn.classList.add('on');
+    renderCat();
+}
+
+function setFiltProt(p, btn) {
+    filtProt = p;
+    document.querySelectorAll('[data-fprot]').forEach(function(b){b.classList.remove('on');});
     btn.classList.add('on');
     renderCat();
 }
