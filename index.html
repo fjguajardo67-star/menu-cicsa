@@ -385,15 +385,31 @@ var precios = {};
 var diasMenu = 30;
 var filtCat = 'todos';
 
+var borradas = [];   // nombres de platillos eliminados (incluye precargados de DB)
 var _tieneRecetasLocales = false;
 window.addEventListener('load', function() {
+    // Cargar lista de eliminados PRIMERO y aplicarla a DB
+    try { var bd = localStorage.getItem('b_cicsa'); if(bd) { borradas = JSON.parse(bd); aplicarBorradas(); } } catch(e) {}
     try { var s = localStorage.getItem('r_cicsa'); if(s) { recetas = JSON.parse(s); _tieneRecetasLocales = true; updCnt(); recetas.forEach(function(r){ DB_EXTRA[r.nombre] = {region:r.region,carnico:r.carnico,tipo:r.tipo||'guisado',ingredientes:r.ingredientes,procedimiento:r.procedimiento,tiempo:r.tiempo}; }); } } catch(e) {}
     try { var p = localStorage.getItem('p_cicsa'); if(p) precios = JSON.parse(p); else initPrecios(); } catch(e) { initPrecios(); }
     genMenu();
-    document.getElementById('stat-plat').textContent = Object.keys(DB).length;
-    // Sync from Firebase on load — solo si NO hay datos locales (evita repoblar recetas recien eliminadas)
-    if(!_tieneRecetasLocales) setTimeout(sincronizarDesdeFirebase, 1000);
+    document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
+    // Sincronizar SIEMPRE desde la nube para traer borrados/ediciones hechos en otros dispositivos
+    setTimeout(sincronizarDesdeFirebase, 1000);
 });
+
+// Quita de DB (recetas precargadas) las que estan en la lista de borradas
+function aplicarBorradas() {
+    (borradas || []).forEach(function(nombre) {
+        if(DB[nombre]) delete DB[nombre];
+        if(DB_EXTRA[nombre]) delete DB_EXTRA[nombre];
+    });
+}
+
+function saveBorradas() {
+    try { localStorage.setItem('b_cicsa', JSON.stringify(borradas)); } catch(e) {}
+    return fbSet('datos', 'borradas', borradas);
+}
 
 function initPrecios() {
     var h = hoy();
@@ -456,6 +472,13 @@ async function sincronizarDesdeFirebase() {
         if(document.getElementById('tpre')) { renderPrecios(); updPStats(); }
         toast('☁️ Precios sincronizados');
     }
+    // Traer lista de borradas de la nube y aplicarla
+    var bd = await fbGet('datos', 'borradas');
+    if(bd && bd.length >= 0) {
+        borradas = bd;
+        try { localStorage.setItem('b_cicsa', JSON.stringify(borradas)); } catch(e) {}
+        aplicarBorradas();
+    }
     var r = await fbGet('datos', 'recetas');
     if(r && r.length > 0) {
         recetas = r;
@@ -464,6 +487,11 @@ async function sincronizarDesdeFirebase() {
         updCnt();
         toast('☁️ Recetas sincronizadas');
     }
+    // Re-aplicar borradas por si la sync de recetas repobló algo, y refrescar vistas
+    aplicarBorradas();
+    if(document.getElementById('catcon') && document.getElementById('cat').classList.contains('on')) renderCat();
+    genMenu();
+    document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
 }
 function updCnt() { var e = document.getElementById('cnt'); if(e) e.textContent = recetas.length; }
 
@@ -1354,7 +1382,7 @@ function editarPl(nombre) {
             c.appendChild(d);
         });
         var bs = document.getElementById('bsave');
-        if(bs) bs.addEventListener('click', function() {
+        if(bs) bs.addEventListener('click', async function() {
             var nn = document.getElementById('en').value.trim();
             var reg = document.getElementById('er').value.trim();
             var tipo = document.getElementById('et').value;
@@ -1366,19 +1394,29 @@ function editarPl(nombre) {
             });
             if(!ings.length) { alert('Agrega al menos un ingrediente'); return; }
             var updated = Object.assign({}, allDB[window._editando], {region:reg, tipo:tipo, tiempo:tpo, ingredientes:ings});
+            var eraPrecargada = !!DB[window._editando];
             if(DB[window._editando]) { DB[window._editando] = updated; }
             else { if(nn !== window._editando) delete DB_EXTRA[window._editando]; DB_EXTRA[nn] = updated; }
             if(nn !== window._editando && DB[window._editando]) { delete DB[window._editando]; DB[nn] = updated; }
+            // Si era precargada (vive en DB hardcodeado), marcar original como borrada
+            // para que al refrescar no reaparezca la version vieja junto a la editada.
+            if(eraPrecargada) {
+                if(borradas.indexOf(window._editando) < 0) borradas.push(window._editando);
+                delete DB[window._editando];
+                DB_EXTRA[nn] = updated;
+            }
             // Persistir cambios en recetas (localStorage + Firebase)
             var idxR = recetas.findIndex(function(r){ return r.nombre === window._editando; });
             if(idxR >= 0) {
                 recetas[idxR] = Object.assign(recetas[idxR], updated, {nombre: nn});
             } else {
-                // Si no estaba en recetas (era de DB_EXTRA sin pasar por recetas), agregarlo
+                // Si no estaba en recetas (era de DB_EXTRA o precargada), agregarlo
                 recetas.push(Object.assign({id:Date.now()}, updated, {nombre: nn}));
             }
-            saveRecetas(); updCnt();
+            if(eraPrecargada) await saveBorradas();
+            await saveRecetas(); updCnt();
             closeModal(); renderCat();
+            genMenu();
             document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
             toast('"' + nn + '" actualizado');
         });
@@ -1400,8 +1438,12 @@ function delPl(nombre, origen) {
             if(DB_EXTRA[window._dn]) delete DB_EXTRA[window._dn];
             // Siempre eliminar de recetas sin importar origen
             recetas = recetas.filter(function(r) { return r.nombre !== window._dn; });
+            // Registrar en lista de borradas (tombstone) para que no reaparezca al refrescar/sincronizar
+            if(borradas.indexOf(window._dn) < 0) borradas.push(window._dn);
+            await saveBorradas();
             await saveRecetas(); updCnt();
             closeModal(); renderCat();
+            genMenu();
             document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
             toast('"' + window._dn + '" eliminado');
         });
