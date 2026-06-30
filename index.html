@@ -297,7 +297,7 @@ h1 em{font-style:italic;color:var(--gold)}
 <div id="generar" class="page">
   <div class="card">
     <div class="ch">&#10024; Generar Receta</div>
-    <div class="infobox">Escribe el nombre del platillo y el sistema genera la receta escalada con ingredientes y costos.</div>
+    <div class="infobox">Escribe el nombre del platillo y el sistema genera una receta <strong>institucional CICSA</strong>: validada para comedor industrial (ingredientes accesibles, sin proteína cruda, coccion segura, alta aceptacion) y escalada con ingredientes y costos.</div>
     <div class="fg"><label class="fl2">Nombre del Platillo</label><input type="text" id="gnombre" class="fi" placeholder="Ej: Pozole, Tinga de Pollo, Quesadillas"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
       <div class="fg"><label class="fl2">N&uacute;mero de Comensales</label><input type="number" id="gpax" class="fi" value="500" min="1"></div>
@@ -626,30 +626,52 @@ function genMenu() {
         grid.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--bl);grid-column:1/-1"><div style="font-size:4rem">&#128466;</div><h3 style="margin-top:1rem">Catalogo vacio</h3></div>';
         return;
     }
+    // ── Platillos restringidos a un dia especifico ────────────────────────
+    // Solo pueden aparecer en su dia asignado. Se identifican por palabra clave en el nombre.
+    var RESTRINGIDOS = {
+        'pozole':   'Jueves',    // todo pozole (verde, rojo, de puerco) solo jueves
+        'menudo':   'Domingo',   // menudo solo domingo
+        'barbacoa': 'Domingo'    // barbacoa solo domingo
+    };
+    // Devuelve el dia al que esta restringido un platillo, o null si es libre
+    function diaRestringido(nombre) {
+        var nl = (nombre||'').toLowerCase();
+        for(var kw in RESTRINGIDOS) { if(nl.indexOf(kw) >= 0) return RESTRINGIDOS[kw]; }
+        return null;
+    }
+    // Lista de guisados LIBRES para un dia dado (excluye los restringidos a otros dias)
+    function guisadosLibres(dia) {
+        return G.filter(function(n) {
+            var dr = diaRestringido(n);
+            return dr === null || dr === dia;
+        });
+    }
+
     var uG = [], uGa = [], V = Math.max(diasMenu, 15), domN = 0;
     var dias = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
     for(var i = 1; i <= diasMenu; i++) {
         var dia = dias[(i-1) % 7];
+        var Glibre = guisadosLibres(dia);  // guisados permitidos hoy
         var g1, g2, ga, lk1 = false, lkG = false;
         if(dia === 'Jueves') {
-            g1 = G.find(function(n) { return n.toLowerCase().indexOf('pozole') >= 0; }) || G[0] || null;
+            g1 = G.find(function(n) { return n.toLowerCase().indexOf('pozole') >= 0; }) || Glibre[0] || null;
             var c1 = g1 && allDB[g1] ? allDB[g1].carnico : '';
-            g2 = pickFrom(G, uG, V, [g1], [c1], allDB);
+            g2 = pickFrom(Glibre, uG, V, [g1], [c1], allDB);
             ga = Ga.find(function(n) { return n.toLowerCase().indexOf('taco') >= 0; }) || Ga[0] || null;
             lk1 = true; lkG = true;
         } else if(dia === 'Domingo') {
             domN++;
             g1 = domN % 2 === 1
-                ? (G.find(function(n) { return n.toLowerCase().indexOf('barbacoa') >= 0; }) || G[0])
-                : (G.find(function(n) { return n.toLowerCase().indexOf('menudo') >= 0; }) || G[0]);
+                ? (G.find(function(n) { return n.toLowerCase().indexOf('barbacoa') >= 0; }) || Glibre[0])
+                : (G.find(function(n) { return n.toLowerCase().indexOf('menudo') >= 0; }) || Glibre[0]);
             var c1 = g1 && allDB[g1] ? allDB[g1].carnico : '';
-            g2 = pickFrom(G, uG, V, [g1], [c1], allDB);
+            g2 = pickFrom(Glibre, uG, V, [g1], [c1], allDB);
             ga = pickFrom(Ga, uGa, V, [], null, allDB);
             lk1 = true;
         } else {
-            g1 = pickFrom(G, uG, V, [], null, allDB);
+            g1 = pickFrom(Glibre, uG, V, [], null, allDB);
             var c1 = g1 && allDB[g1] ? allDB[g1].carnico : '';
-            g2 = pickFrom(G, uG, V, [g1], [c1], allDB);
+            g2 = pickFrom(Glibre, uG, V, [g1], [c1], allDB);
             ga = pickFrom(Ga, uGa, V, [], null, allDB);
         }
         if(g1) uG.push(g1); if(g2) uG.push(g2); if(ga) uGa.push(ga);
@@ -705,6 +727,17 @@ function cambiar(dia, pos, ev) {
     var lista = esGa
         ? Object.keys(allDB).filter(function(n) { return allDB[n].tipo === 'garnacha'; })
         : Object.keys(allDB).filter(function(n) { var t = allDB[n].tipo; return !t || t === 'guisado'; });
+    // Guardrail: filtrar platillos restringidos a otro dia de la semana
+    var RESTRINGIDOS = {'pozole':'Jueves','menudo':'Domingo','barbacoa':'Domingo'};
+    var diasSem = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
+    var diaSemActual = diasSem[(dia-1) % 7];
+    lista = lista.filter(function(n) {
+        var nl = n.toLowerCase();
+        for(var kw in RESTRINGIDOS) {
+            if(nl.indexOf(kw) >= 0 && RESTRINGIDOS[kw] !== diaSemActual) return false;
+        }
+        return true;
+    });
     if(!lista.length) { toast('No hay ' + (esGa ? 'garnachas' : 'guisados') + ' disponibles'); return; }
     var html = '<div style="margin-bottom:1rem"><input class="fi" id="sbp" placeholder="Buscar..." oninput="filtModal(this.value)"></div>'
         + '<div id="lp" style="max-height:55vh;overflow-y:auto;display:grid;gap:.5rem">';
@@ -1941,17 +1974,25 @@ async function generarReceta() {
     document.getElementById('gres').style.display = 'none';
     // Base SIEMPRE fija en 10 porciones para escalado correcto
     var BASE_PORCIONES = 10;
-    var prompt = 'Eres chef de comedor industrial mexicano. Dame la receta de "' + nombre + '".\n\n'
-        + 'REGLA CRITICA: Las cantidades EXACTAMENTE para ' + BASE_PORCIONES + ' porciones.\n\n'
+    var prompt = 'Eres el chef institucional del Sistema Menu CICSA, comedor industrial mexicano de alto volumen. '
+        + 'NO copies recetas literales de internet ni generes cocina libre: convierte "' + nombre + '" en una receta INSTITUCIONAL CICSA validada.\n\n'
+        + 'VALIDA ANTES DE GENERAR:\n'
+        + '1. INVENTARIO: usa ingredientes comunes de alta rotacion. Si la version tradicional usa algo caro/exotico/importado, sustituyelo por un equivalente accesible.\n'
+        + '2. COSTO: viable para comedor industrial. Evita ingredientes gourmet, exoticos, importados o de baja rotacion.\n'
+        + '3. ACEPTACION: familiar para el comensal mexicano promedio (obreros y personal). Nada de sabores muy novedosos, picante extremo ni preparaciones gourmet.\n'
+        + '4. INOCUIDAD: PROHIBIDA la proteina cruda. Si la receta tradicional usa carne/pescado crudo o marinados tipo ceviche, adaptala a coccion segura. Apta para produccion industrial.\n'
+        + '5. CANTIDADES: calcula EXACTAMENTE para ' + BASE_PORCIONES + ' porciones (el sistema escala despues). Proteina principal proporcional a 150 g por porcion. NUNCA cantidades por 1 sola porcion.\n'
+        + '6. METODO DE COCCION: usa solo Braseado, Hervido, Horneado, Frito, Estofado o Salteado.\n'
+        + '7. SIN "al gusto", "cantidad necesaria" ni "c/n": todo ingrediente lleva cantidad numerica en g o ml.\n\n'
         + 'Responde SOLO JSON valido sin texto ni backticks:\n'
-        + '{"nombre":"' + nombre + '","region":"estado Mexico","carnico":"Pollo/Res/Cerdo/Pescado/Mixto/Vegetariano","tiempo":60,"porciones_base":' + BASE_PORCIONES + ','
-        + '"ingredientes":[{"nombre":"ingrediente","cantidad":500,"unidad":"g","sustitucion":"alternativa"}],'
+        + '{"nombre":"' + nombre + '","region":"Mexico","carnico":"Pollo/Res/Cerdo/Pescado/Verdura/Mixto","tiempo":60,"porciones_base":' + BASE_PORCIONES + ','
+        + '"ingredientes":[{"nombre":"ingrediente","cantidad":500,"unidad":"g","sustitucion":"alternativa accesible"}],'
         + '"procedimiento":["paso 1","paso 2","paso 3","paso 4","paso 5"]}\n\n'
-        + 'Reglas:\n- porciones_base SIEMPRE = ' + BASE_PORCIONES + '\n'
-        + '- cantidades en g o ml UNICAMENTE (NUNCA tazas, cdas, piezas)\n'
+        + 'Reglas de formato:\n- porciones_base SIEMPRE = ' + BASE_PORCIONES + '\n'
+        + '- cantidades en g o ml UNICAMENTE (NUNCA tazas, cdas, piezas, "al gusto")\n'
         + '- minimo 6 ingredientes con gramos precisos para ' + BASE_PORCIONES + ' porciones\n'
-        + '- minimo 5 pasos detallados\n'
-        + '- carnico: Pollo, Res, Cerdo, Pescado, Mixto o Vegetariano';
+        + '- minimo 5 pasos claros y ejecutables en cocina industrial\n'
+        + '- carnico EXACTAMENTE uno de: Pollo, Res, Cerdo, Pescado, Verdura, Mixto (usa "Verdura" para platillos sin carne, NUNCA "Vegetariano")';
     try {
         var resp = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
