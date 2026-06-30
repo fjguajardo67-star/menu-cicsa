@@ -2007,12 +2007,15 @@ async function generarReceta() {
         + '1. INVENTARIO: usa ingredientes comunes de alta rotacion. Si la version tradicional usa algo caro/exotico/importado, sustituyelo por un equivalente accesible.\n'
         + '2. COSTO: viable para comedor industrial. Evita ingredientes gourmet, exoticos, importados o de baja rotacion.\n'
         + '3. ACEPTACION: familiar para el comensal mexicano promedio (obreros y personal). Nada de sabores muy novedosos, picante extremo ni preparaciones gourmet.\n'
-        + '4. INOCUIDAD: PROHIBIDA la proteina cruda. Si la receta tradicional usa carne/pescado crudo o marinados tipo ceviche, adaptala a coccion segura. Apta para produccion industrial.\n'
+        + '4. INOCUIDAD: PROHIBIDA la proteina cruda. Adapta a coccion segura segun el tipo de platillo:\n'
+        + '   a) Para platillos tipo CEVICHE, TIRITAS, AGUACHILE o similares (que tradicionalmente van crudos curados en limon): el pescado/marisco se HIERVE en agua con sal hasta temperatura interna segura (minimo 63 C), se ENFRIA rapido en agua con hielo, y DESPUES se mezcla en frio con el jugo de limon y las verduras crudas (cebolla, jitomate, cilantro, chile). NO saltear, NO freir, NO servir caliente. Conserva el caracter fresco, citrico y frio del platillo original.\n'
+        + '   b) Para el resto de platillos, usa el metodo de coccion tradicional que corresponda.\n'
+        + '   Si adaptaste un platillo crudo a version cocida, indicalo en el campo "nota_adaptacion".\n'
         + '5. CANTIDADES: calcula EXACTAMENTE para ' + BASE_PORCIONES + ' porciones (el sistema escala despues). Proteina principal proporcional a 150 g por porcion. NUNCA cantidades por 1 sola porcion.\n'
-        + '6. METODO DE COCCION: usa solo Braseado, Hervido, Horneado, Frito, Estofado o Salteado.\n'
+        + '6. METODO DE COCCION: usa solo Braseado, Hervido, Horneado, Frito, Estofado o Salteado. (Para ceviches/tiritas el metodo es Hervido seguido de enfriado en hielo.)\n'
         + '7. SIN "al gusto", "cantidad necesaria" ni "c/n": todo ingrediente lleva cantidad numerica en g o ml.\n\n'
         + 'Responde SOLO JSON valido sin texto ni backticks:\n'
-        + '{"nombre":"' + nombre + '","region":"Mexico","carnico":"Pollo/Res/Cerdo/Pescado/Verdura/Mixto","tiempo":60,"porciones_base":' + BASE_PORCIONES + ','
+        + '{"nombre":"' + nombre + '","region":"Mexico","carnico":"Pollo/Res/Cerdo/Pescado/Verdura/Mixto","tiempo":60,"porciones_base":' + BASE_PORCIONES + ',"nota_adaptacion":"",'
         + '"ingredientes":[{"nombre":"ingrediente","cantidad":500,"unidad":"g","sustitucion":"alternativa accesible"}],'
         + '"procedimiento":["paso 1","paso 2","paso 3","paso 4","paso 5"]}\n\n'
         + 'Reglas de formato:\n- porciones_base SIEMPRE = ' + BASE_PORCIONES + '\n'
@@ -2064,7 +2067,7 @@ function mostrarRecetaGenerada(rec, pax, tipo) {
                 sustitucion:ing.sustitucion||'', precio_kg:getPrecio(ing.nombre)};
     });
     window._recProcedimiento = rec.procedimiento || [];
-    window._recMeta = {nombre:rec.nombre, region:rec.region||'Mexico', carnico:rec.carnico||'Mixto', tiempo:rec.tiempo||60, tipo:tipo, base:base, pax:pax};
+    window._recMeta = {nombre:rec.nombre, region:rec.region||'Mexico', carnico:rec.carnico||'Mixto', tiempo:rec.tiempo||60, tipo:tipo, base:base, pax:pax, nota_adaptacion:rec.nota_adaptacion||''};
     renderRecetaGenerada();
 }
 
@@ -2111,6 +2114,7 @@ function renderRecetaGenerada() {
     res.innerHTML = '<div class="card">'
         + '<div class="ch">' + m.nombre + '</div>'
         + '<div style="color:var(--bm);font-size:.88rem;margin-bottom:1rem"><strong>Region:</strong> ' + m.region + ' &nbsp;|&nbsp; <strong>Carnico:</strong> ' + m.carnico + ' &nbsp;|&nbsp; <strong>Tiempo:</strong> ' + m.tiempo + ' min</div>'
+        + (m.nota_adaptacion ? '<div style="background:#FFF3CD;border-left:4px solid var(--gold);padding:.9rem 1.1rem;border-radius:6px;margin-bottom:1rem;font-size:.86rem;color:var(--bm)"><strong>&#9888;&#65039; Versi&oacute;n adaptada CICSA:</strong> ' + m.nota_adaptacion + '</div>' : '')
         + '<div style="background:var(--cream);padding:.6rem 1rem;border-radius:6px;margin-bottom:1.5rem;font-size:.85rem">Base: <strong>' + m.base + ' porciones</strong> &rarr; Escalada a <strong>' + m.pax + ' comensales</strong></div>'
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem">'
         + '<div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">'
