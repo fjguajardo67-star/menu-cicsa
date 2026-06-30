@@ -1956,6 +1956,33 @@ window.addEventListener('load', function() { mostrarApiKeyStatus(); }, true);
 // ============================================================
 // GENERAR RECETA CON API
 // ============================================================
+// Repara un JSON de receta truncado (respuesta de IA cortada por limite de tokens)
+function repararJSONReceta(raw) {
+    var s = raw;
+    // Recortar despues del ultimo objeto/valor completo
+    // Intentar cerrar progresivamente: quitar cola incompleta y balancear llaves/corchetes
+    for(var corte = s.length; corte > 0; corte--) {
+        var frag = s.substring(0, corte);
+        // Balancear comillas: si hay numero impar de comillas sin escapar, seguir recortando
+        var comillas = (frag.match(/(?<!\\)"/g) || []).length;
+        if(comillas % 2 !== 0) continue;
+        // Contar llaves y corchetes abiertos
+        var abreLlave = (frag.match(/\{/g)||[]).length, cierraLlave = (frag.match(/\}/g)||[]).length;
+        var abreCor = (frag.match(/\[/g)||[]).length, cierraCor = (frag.match(/\]/g)||[]).length;
+        // Quitar coma final colgante
+        var limpio = frag.replace(/,\s*$/, '');
+        // Cerrar lo que falte
+        var cierre = '';
+        for(var i=0; i<(abreCor-cierraCor); i++) cierre += ']';
+        for(var j=0; j<(abreLlave-cierraLlave); j++) cierre += '}';
+        try {
+            var obj = JSON.parse(limpio + cierre);
+            if(obj && obj.nombre) return obj;
+        } catch(e) { /* seguir recortando */ }
+    }
+    return null;
+}
+
 async function generarReceta() {
     var nombre = document.getElementById('gnombre').value.trim();
     var pax = parseInt(document.getElementById('gpax').value) || 500;
@@ -1999,7 +2026,7 @@ async function generarReceta() {
             headers: {'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
             body: JSON.stringify({
                 model: 'claude-sonnet-4-6',
-                max_tokens: 1500,
+                max_tokens: 4000,
                 tools: [{"type":"web_search_20250305","name":"web_search"}],
                 messages: [{role:'user', content:prompt}]
             })
@@ -2009,9 +2036,16 @@ async function generarReceta() {
         var txt = (data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('');
         var m = txt.match(/\{[\s\S]*\}/);
         if(!m) throw new Error('No se pudo parsear la receta');
-        var rec = JSON.parse(m[0]);
+        var rec;
+        try {
+            rec = JSON.parse(m[0]);
+        } catch(parseErr) {
+            // Reparar JSON truncado: cerrar arrays/objeto si la respuesta se corto
+            rec = repararJSONReceta(m[0]);
+            if(!rec) throw parseErr;
+        }
         mostrarRecetaGenerada(rec, pax, tipo);
-        toast('Receta generada desde internet');
+        toast('Receta institucional generada');
     } catch(e) {
         document.getElementById('gres').style.display = 'block';
         document.getElementById('gres').innerHTML = '<div style="background:#FFE5E5;padding:1.5rem;border-radius:8px;border-left:4px solid var(--tc)">'
