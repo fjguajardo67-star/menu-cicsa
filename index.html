@@ -505,8 +505,10 @@ function savePrecios() {
 }
 
 async function sincronizarDesdeFirebase() {
+    var preciosCambiaron = false;
     var p = await fbGet('datos', 'precios');
     if(p && Object.keys(p).length > 0) {
+        preciosCambiaron = JSON.stringify(precios) !== JSON.stringify(p);
         precios = p;
         try { localStorage.setItem('p_cicsa', JSON.stringify(precios)); } catch(e) {}
         if(document.getElementById('tpre')) { renderPrecios(); updPStats(); }
@@ -529,6 +531,9 @@ async function sincronizarDesdeFirebase() {
     }
     // Re-aplicar borradas por si la sync de recetas repobló algo, y refrescar vistas
     aplicarBorradas();
+    // Si llegaron precios nuevos, recalcular costos de receta ya con precios y recetas frescos
+    // (evita recalcular sobre una copia vieja de "recetas" y re-subirla pisando cambios recientes)
+    if(preciosCambiaron) recalcularCostos();
     if(document.getElementById('catcon') && document.getElementById('cat').classList.contains('on')) renderCat();
     genMenu();
     document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
