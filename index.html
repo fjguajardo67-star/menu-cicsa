@@ -278,15 +278,16 @@ h1 em{font-style:italic;color:var(--gold)}
         <div><div style="font-size:1.5rem;font-weight:700;color:var(--tc)" id="psh">0</div><div style="font-size:.8rem;color:var(--bl)">Hoy</div></div>
       </div>
       <table style="width:100%;border-collapse:collapse">
-        <thead><tr style="background:var(--bd);color:var(--gold)"><th style="padding:.75rem;text-align:left">Ingrediente</th><th style="padding:.75rem;text-align:center">Precio/Kg</th><th style="padding:.75rem;text-align:center">Fecha</th><th style="padding:.75rem;text-align:center">Acciones</th></tr></thead>
+        <thead><tr style="background:var(--bd);color:var(--gold)"><th style="padding:.75rem;text-align:left">Ingrediente</th><th style="padding:.75rem;text-align:center">Precio</th><th style="padding:.75rem;text-align:center">Fecha</th><th style="padding:.75rem;text-align:center">Acciones</th></tr></thead>
         <tbody id="tpre"></tbody>
       </table>
     </div>
     <div style="margin-top:1.5rem;padding:1.5rem;background:var(--cream);border-radius:8px">
       <h3 style="margin-bottom:1rem">&#9999;&#65039; Actualizaci&oacute;n Manual</h3>
-      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:1rem">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:1rem">
         <div class="fg"><label class="fl2">Ingrediente</label><input type="text" id="pnombre" class="fi" placeholder="Ej: Pollo pechuga"></div>
-        <div class="fg"><label class="fl2">Precio/Kg</label><input type="number" id="pprecio" class="fi" placeholder="99.00" step="0.01" min="0"></div>
+        <div class="fg"><label class="fl2">Precio</label><input type="number" id="pprecio" class="fi" placeholder="99.00" step="0.01" min="0"></div>
+        <div class="fg"><label class="fl2">Unidad</label><select id="punidad" class="fs"><option value="kg">$/kg</option><option value="lt">$/lt</option><option value="pz">$/pz</option></select></div>
         <div class="fg"><label class="fl2" style="opacity:0">-</label><button class="btn bgold bfull" onclick="agregarPrecio()">&#10133; Agregar</button></div>
       </div>
     </div>
@@ -587,14 +588,7 @@ function getPzGramos(nombre) {
 function getCost(rec) {
     var c = 0;
     (rec.ingredientes || []).forEach(function(i) {
-        if (i.unidad === 'g' || i.unidad === 'ml') {
-            c += (i.cantidad / 1000) * i.precio_kg;
-        } else if (i.unidad === 'pz') {
-            var g = getPzGramos(i.nombre);
-            c += (i.cantidad * g / 1000) * i.precio_kg;
-        } else {
-            c += i.cantidad * i.precio_kg;
-        }
+        c += costoIngrediente(i, 1);
     });
     return c;
 }
@@ -847,7 +841,7 @@ function genLista(sem) {
         d.querySelectorAll('.pln').forEach(function(pd) {
             var r = allDB[pd.textContent.trim()];
             if(r) (r.ingredientes||[]).forEach(function(ing) {
-                if(!con[ing.nombre]) con[ing.nombre] = {cantidad:0, unidad:ing.unidad, precio_kg:ing.precio_kg};
+                if(!con[ing.nombre]) con[ing.nombre] = {cantidad:0, unidad:ing.unidad, precio_kg:ing.precio_kg, precio_unidad:ing.precio_unidad};
                 con[ing.nombre].cantidad += ing.cantidad * 500;
             });
         });
@@ -857,7 +851,7 @@ function genLista(sem) {
         var i = con[n], cant = i.cantidad, u = i.unidad;
         if(u==='g' && cant>=1000) { cant/=1000; u='kg'; }
         if(u==='ml' && cant>=1000) { cant/=1000; u='l'; }
-        var c = (i.unidad==='g'||i.unidad==='ml') ? (i.cantidad/1000)*i.precio_kg : i.cantidad*i.precio_kg;
+        var c = costoIngrediente(i, 1);
         tot += c;
         // Label precio unitario según unidad final (kg, l, pz)
         var precioLabel = (u==='l') ? '$' + i.precio_kg.toFixed(2) + '/l'
@@ -1009,7 +1003,7 @@ function parsearRecetaEstructurada(bloque) {
                 var cant = parseFloat(m[2]) || 0;
                 var u = (m[3]||'g').toLowerCase();
                 if(u==='kg'){cant*=1000;u='g';} if(u==='l'){cant*=1000;u='ml';}
-                rec.ingredientes.push({nombre:nombre, cantidad:cant, unidad:u, precio_kg:getPrecio(nombre)});
+                rec.ingredientes.push({nombre:nombre, cantidad:cant, unidad:u, precio_kg:getPrecio(nombre), precio_unidad:getUnidadPrecio(nombre)});
             }
         } else if(seccion === 'proc') {
             var paso = l.replace(/^\d+[\.\)]\s*/,'').replace(/^[\*\-•]\s*/,'').trim();
@@ -1051,7 +1045,7 @@ function cargarLote() {
     Object.keys(DB).forEach(function(n){ nombresExistentes[n.toLowerCase()] = true; });
     Object.keys(DB_EXTRA).forEach(function(n){ nombresExistentes[n.toLowerCase()] = true; });
 
-    var agregadas = [], duplicadas = [], reemplazadas = [], errores = [];
+    var agregadas = [], duplicadas = [], reemplazadas = [], errores = [], sospechosas = [];
     var nombresLote = {}; // detectar duplicados dentro del mismo lote
 
     bloques.forEach(function(bloque) {
@@ -1067,8 +1061,15 @@ function cargarLote() {
 
         // Convertir cantidades a POR PORCION (dividir entre base) para escalado correcto
         var ingPorPorcion = rec.ingredientes.map(function(ing){
-            return {nombre:ing.nombre, cantidad:ing.cantidad/rec.base, unidad:ing.unidad, precio_kg:ing.precio_kg};
+            return {nombre:ing.nombre, cantidad:ing.cantidad/rec.base, unidad:ing.unidad, precio_kg:ing.precio_kg, precio_unidad:ing.precio_unidad};
         });
+        // Alerta de sanidad: si el peso total por porcion queda absurdamente chico, casi
+        // siempre es porque la receta pegada ya traia las cantidades por porcion en vez de
+        // totales para PORCIONES_BASE, y aqui se dividieron entre base una segunda vez.
+        var pesoPorcion = ingPorPorcion.reduce(function(s,ing){ return s + ((ing.unidad==='g'||ing.unidad==='ml') ? ing.cantidad : 0); }, 0);
+        if(pesoPorcion > 0 && pesoPorcion < 20) {
+            sospechosas.push(rec.nombre + ' (~' + pesoPorcion.toFixed(1) + 'g por porcion — revisa si PORCIONES_BASE es correcto)');
+        }
         var nuevaReceta = {
             id: Date.now() + Math.floor(Math.random()*10000),
             nombre: rec.nombre, region: rec.region, carnico: rec.carnico, tipo: rec.tipo,
@@ -1105,6 +1106,10 @@ function cargarLote() {
         + '<div style="background:var(--cream);padding:1rem;border-radius:6px"><div style="font-size:1.8rem;font-weight:700;color:var(--bl)">' + duplicadas.length + '</div><div style="font-size:.8rem;color:var(--bl)">Omitidas (dup)</div></div>'
         + '<div style="background:var(--cream);padding:1rem;border-radius:6px"><div style="font-size:1.8rem;font-weight:700;color:var(--tc)">' + errores.length + '</div><div style="font-size:.8rem;color:var(--bl)">Con error</div></div>'
         + '</div>';
+    if(sospechosas.length) html += '<div style="background:#FFF3CD;border-left:4px solid var(--tc);padding:1rem;border-radius:6px;margin-bottom:1rem">'
+        + '<strong style="color:#8a6200">&#9888;&#65039; ' + sospechosas.length + ' receta(s) con peso por porci&oacute;n sospechosamente chico</strong>'
+        + '<p style="font-size:.85rem;color:var(--bm);margin:.4rem 0 .5rem">Probable causa: la receta pegada ya tra&iacute;a las cantidades por porci&oacute;n, no el total para PORCIONES_BASE, y se dividieron entre base una segunda vez. Rev&iacute;salas en el Cat&aacute;logo antes de usarlas.</p>'
+        + '<ul style="margin-left:1.5rem">' + lista(sospechosas,'#8a6200') + '</ul></div>';
     if(agregadas.length) html += '<h4 style="color:var(--green);margin:.75rem 0 .25rem">✓ Agregadas</h4><ul style="margin-left:1.5rem">' + lista(agregadas,'var(--bd)') + '</ul>';
     if(reemplazadas.length) html += '<h4 style="color:var(--gold);margin:.75rem 0 .25rem">↻ Reemplazadas</h4><ul style="margin-left:1.5rem">' + lista(reemplazadas,'var(--bd)') + '</ul>';
     if(duplicadas.length) html += '<h4 style="color:var(--bl);margin:.75rem 0 .25rem">⊘ Omitidas (ya exist&iacute;an)</h4><ul style="margin-left:1.5rem">' + lista(duplicadas,'var(--bl)') + '</ul>';
@@ -1167,6 +1172,7 @@ async function parsearRecetaIA(txt, pax) {
     // Agregar precio_kg a cada ingrediente
     (rec.ingredientes||[]).forEach(function(ing) {
         ing.precio_kg = getPrecio(ing.nombre);
+        ing.precio_unidad = getUnidadPrecio(ing.nombre);
         // Convertir a cantidad por porcion
         ing.cantidad = ing.cantidad / pax;
     });
@@ -1251,7 +1257,7 @@ function parsearReceta(txt, pax) {
                 else if(unidadRaw.indexOf('diente')>=0){cant2=cant2*5;unidad='g';} // ~5g por diente
                 else if(unidadRaw.indexOf('huevo')>=0||nombreIng.toLowerCase().indexOf('huevo')>=0){cant2=cant2*60;unidad='g';}
                 else { cant2 = cantidad * 50; unidad = 'g'; } // pieza genérica ~50g
-                ings.push({nombre:nombreIng, cantidad:cant2, unidad:unidad, precio_kg:getPrecio(nombreIng)});
+                ings.push({nombre:nombreIng, cantidad:cant2, unidad:unidad, precio_kg:getPrecio(nombreIng), precio_unidad:getUnidadPrecio(nombreIng)});
             }
         });
         // Deduplicar por nombre similar
@@ -1331,7 +1337,7 @@ function parseIng(li) {
             else if(u2.indexOf('cda')>=0){cantidad*=15;unidad='ml';}
         }
     }
-    return {nombre:nombre||txt, cantidad:cantidad, unidad:unidad, precio_kg:getPrecio(nombre||txt)};
+    return {nombre:nombre||txt, cantidad:cantidad, unidad:unidad, precio_kg:getPrecio(nombre||txt), precio_unidad:getUnidadPrecio(nombre||txt)};
 }
 
 function getPrecio(n) {
@@ -1352,6 +1358,29 @@ function getPrecio(n) {
     return 50;
 }
 
+// Unidad en la que viene expresado el precio de un ingrediente: 'kg' (o 'lt', tratado igual
+// que kg) para lo que se pesa/mide, o 'pz' cuando el precio ya es por pieza/porción individual
+// (ej. Cereal, Bimbollos — no tiene sentido un "$/kg" ahi). Default 'kg' para todo lo que no
+// declare unidad_base explicita en precios (compatibilidad con datos existentes).
+function getUnidadPrecio(n) {
+    var nl = n.toLowerCase();
+    for(var k in precios) { if(k.toLowerCase() === nl || nl.indexOf(k.toLowerCase()) >= 0) return precios[k].unidad_base || 'kg'; }
+    return 'kg';
+}
+
+// Costo de un ingrediente de receta, dado un factor de escalado (1 = una porcion).
+// Unica fuente de verdad para esta formula — antes estaba duplicada en 8 lugares del archivo.
+function costoIngrediente(ing, factor) {
+    factor = factor || 1;
+    var cant = ing.cantidad * factor;
+    if (ing.unidad === 'pz') {
+        if (ing.precio_unidad === 'pz') return cant * ing.precio_kg;
+        return (cant * getPzGramos(ing.nombre) / 1000) * ing.precio_kg;
+    }
+    if (ing.unidad === 'g' || ing.unidad === 'ml') return (cant / 1000) * ing.precio_kg;
+    return cant * ing.precio_kg;
+}
+
 function recalcPreview() {
     // Recalcular totales cuando cambia un precio en la tabla
     var tot = 0;
@@ -1363,7 +1392,9 @@ function recalcPreview() {
         if(precioInput) {
             var nuevoPrecio = parseFloat(precioInput.value) || 0;
             ing.precio_kg = nuevoPrecio;
-            var c = (ing.unidad==='g'||ing.unidad==='ml') ? (ing.cantidad*paxD/1000)*nuevoPrecio : (ing.cantidad*paxD)*nuevoPrecio;
+            // La columna ya indica "$/kg·l·pz" segun la fila — si es pz, el numero tecleado es por pieza
+            ing.precio_unidad = ing.unidad === 'pz' ? 'pz' : 'kg';
+            var c = costoIngrediente(ing, paxD);
             tot += c;
             var costoTd = tr.querySelector('.costo-cell');
             if(costoTd) costoTd.textContent = '$' + c.toFixed(2);
@@ -1384,7 +1415,7 @@ function mostrarPreview(rec, paxO, paxD) {
         var cO = ing.cantidad*paxO, cE = ing.cantidad*paxD, uO = ing.unidad, uE = ing.unidad;
         if(uO==='g'&&cO>=1000){cO/=1000;uO='kg';} if(uO==='ml'&&cO>=1000){cO/=1000;uO='l';}
         if(uE==='g'&&cE>=1000){cE/=1000;uE='kg';} if(uE==='ml'&&cE>=1000){cE/=1000;uE='l';}
-        var c = (ing.unidad==='g'||ing.unidad==='ml') ? (ing.cantidad*paxD/1000)*ing.precio_kg : (ing.cantidad*paxD)*ing.precio_kg;
+        var c = costoIngrediente(ing, paxD);
         tot += c;
         // Precio editable inline — fondo amarillo si es precio default (50)
         var esPrecioDefault = ing.precio_kg === 50;
@@ -1457,7 +1488,7 @@ function imprimirRA() {
     (r.ingredientes||[]).forEach(function(ing) {
         var cE = ing.cantidad*paxD, u = ing.unidad;
         if(u==='g'&&cE>=1000){cE/=1000;u='kg';} if(u==='ml'&&cE>=1000){cE/=1000;u='l';}
-        var c = (ing.unidad==='g'||ing.unidad==='ml')?(ing.cantidad*paxD/1000)*ing.precio_kg:(ing.cantidad*paxD)*ing.precio_kg;
+        var c = costoIngrediente(ing, paxD);
         tot += c;
         rows += '<tr><td>' + ing.nombre + '</td><td style="text-align:center">' + (cE<10?cE.toFixed(1):Math.round(cE)) + ' ' + u + '</td><td style="text-align:right">$' + c.toFixed(2) + '</td></tr>';
     });
@@ -1582,6 +1613,7 @@ function repararCatalogo() {
             if(typeof i.cantidad !== 'number' || isNaN(i.cantidad)) i.cantidad = 0;
             if(!i.unidad) i.unidad = 'g';
             if(typeof i.precio_kg !== 'number' || isNaN(i.precio_kg)) i.precio_kg = getPrecio(i.nombre);
+            if(!i.precio_unidad) i.precio_unidad = 'kg';
         });
         if(!Array.isArray(r.procedimiento)) r.procedimiento = [];
         if(!r.tipo) r.tipo = 'guisado';
@@ -1665,7 +1697,7 @@ function editarPl(nombre) {
             var ings = [];
             document.querySelectorAll('#ei .ing-row').forEach(function(row) {
                 var n = row.querySelector('.ing-n'), c = row.querySelector('.ing-c'), u = row.querySelector('.ing-u');
-                if(n && n.value.trim()) ings.push({nombre:n.value.trim(), cantidad:parseFloat(c.value)||0.1, unidad:u?u.value:'g', precio_kg:getPrecio(n.value.trim())});
+                if(n && n.value.trim()) ings.push({nombre:n.value.trim(), cantidad:parseFloat(c.value)||0.1, unidad:u?u.value:'g', precio_kg:getPrecio(n.value.trim()), precio_unidad:getUnidadPrecio(n.value.trim())});
             });
             if(!ings.length) { alert('Agrega al menos un ingrediente'); return; }
             var updated = Object.assign({}, allDB[window._editando], {region:reg, tipo:tipo, tiempo:tpo, ingredientes:ings});
@@ -1732,7 +1764,7 @@ function recalcularCostos() {
         var rec = allDB[nombre];
         if(rec.ingredientes) {
             rec.ingredientes = rec.ingredientes.map(function(ing) {
-                return Object.assign({}, ing, {precio_kg: getPrecio(ing.nombre)});
+                return Object.assign({}, ing, {precio_kg: getPrecio(ing.nombre), precio_unidad: getUnidadPrecio(ing.nombre)});
             });
             count++;
         }
@@ -1741,7 +1773,7 @@ function recalcularCostos() {
     recetas = recetas.map(function(r) {
         if(r.ingredientes) {
             r.ingredientes = r.ingredientes.map(function(ing) {
-                return Object.assign({}, ing, {precio_kg: getPrecio(ing.nombre)});
+                return Object.assign({}, ing, {precio_kg: getPrecio(ing.nombre), precio_unidad: getUnidadPrecio(ing.nombre)});
             });
         }
         return r;
@@ -1777,7 +1809,7 @@ function exportarLibro() {
         (r.ingredientes||[]).forEach(function(ing) {
             var cE = ing.cantidad*paxD, u = ing.unidad;
             if(u==='g'&&cE>=1000){cE/=1000;u='kg';} if(u==='ml'&&cE>=1000){cE/=1000;u='l';}
-            var c = (ing.unidad==='g'||ing.unidad==='ml')?(ing.cantidad*paxD/1000)*ing.precio_kg:(ing.cantidad*paxD)*ing.precio_kg;
+            var c = costoIngrediente(ing, paxD);
             tot += c;
             rows += '<tr><td>' + ing.nombre + '</td><td style="text-align:center">' + (cE<10?cE.toFixed(1):Math.round(cE)) + ' ' + u + '</td><td style="text-align:right">$' + c.toFixed(2) + '</td></tr>';
         });
@@ -1810,7 +1842,7 @@ function renderPrecios() {
         var i = precios[n];
         html += '<tr style="border-bottom:1px solid #E8DCC8" data-pn="' + n.toLowerCase() + '">'
             + '<td style="padding:.75rem"><strong>' + n + '</strong></td>'
-            + '<td style="padding:.75rem;text-align:center">$' + i.precio.toFixed(2) + '</td>'
+            + '<td style="padding:.75rem;text-align:center">$' + i.precio.toFixed(2) + '/' + (i.unidad_base || 'kg') + '</td>'
             + '<td style="padding:.75rem;text-align:center">' + i.fecha + '</td>'
             + '<td style="padding:.75rem;text-align:center">'
             + '<button class="btn bsm" style="padding:.3rem .6rem;margin:.1rem" data-ep="' + encodeURIComponent(n) + '">&#9998;&#65039;</button>'
@@ -1876,15 +1908,17 @@ function importarCSV() {
 function agregarPrecio() {
     var n = document.getElementById('pnombre').value.trim();
     var p = parseFloat(document.getElementById('pprecio').value);
+    var u = document.getElementById('punidad') ? document.getElementById('punidad').value : 'kg';
     if(!n||!p||p<=0) { alert('Ingresa ingrediente y precio valido'); return; }
-    precios[n] = {precio:p, fecha:hoy()};
+    precios[n] = {precio:p, unidad_base:u, fecha:hoy()};
     savePrecios(); renderPrecios();
     document.getElementById('pnombre').value=''; document.getElementById('pprecio').value='';
     toast('Precio de "' + n + '" actualizado');
 }
 function editPrecio(n) {
-    var np = prompt('Nuevo precio por kg/l para "' + n + '":', precios[n].precio);
-    if(np && parseFloat(np) > 0) { precios[n]={precio:parseFloat(np),fecha:hoy()}; savePrecios(); renderPrecios(); toast('Precio actualizado'); }
+    var u = precios[n].unidad_base || 'kg';
+    var np = prompt('Nuevo precio ($/' + u + ') para "' + n + '":', precios[n].precio);
+    if(np && parseFloat(np) > 0) { precios[n]={precio:parseFloat(np), unidad_base:u, fecha:hoy()}; savePrecios(); renderPrecios(); toast('Precio actualizado'); }
 }
 function delPrecio(n) {
     if(confirm('Eliminar precio de "' + n + '"?')) { delete precios[n]; savePrecios(); renderPrecios(); toast('Precio eliminado'); }
@@ -2069,7 +2103,7 @@ function mostrarRecetaGenerada(rec, pax, tipo) {
     // Guardar cantidad POR PORCION (dividida entre base) para escalado correcto
     window._recIngredientes = (rec.ingredientes||[]).map(function(ing) {
         return {nombre:ing.nombre, cantidad:ing.cantidad/base, unidad:ing.unidad,
-                sustitucion:ing.sustitucion||'', precio_kg:getPrecio(ing.nombre)};
+                sustitucion:ing.sustitucion||'', precio_kg:getPrecio(ing.nombre), precio_unidad:getUnidadPrecio(ing.nombre)};
     });
     window._recProcedimiento = rec.procedimiento || [];
     window._recMeta = {nombre:rec.nombre, region:rec.region||'Mexico', carnico:rec.carnico||'Mixto', tiempo:rec.tiempo||60, tipo:tipo, base:base, pax:pax, nota_adaptacion:rec.nota_adaptacion||''};
@@ -2083,7 +2117,7 @@ function renderRecetaGenerada() {
     var ingsHTML = ings.map(function(ing, idx) {
         var cantE = ing.cantidad * factor, u = ing.unidad;
         if(u==='g'&&cantE>=1000){cantE/=1000;u='kg';} if(u==='ml'&&cantE>=1000){cantE/=1000;u='l';}
-        var c = (ing.unidad==='g'||ing.unidad==='ml')?(ing.cantidad*factor/1000)*ing.precio_kg:(ing.cantidad*factor)*ing.precio_kg;
+        var c = costoIngrediente(ing, factor);
         tot += c;
         return '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:.5rem;align-items:center;padding:.6rem .75rem;background:var(--cream);border-radius:6px;margin-bottom:.4rem">'
             + '<div><div style="font-weight:700;font-size:.9rem">' + ing.nombre + '</div>'
@@ -2097,8 +2131,7 @@ function renderRecetaGenerada() {
     // Recalc total
     tot = 0;
     ings.forEach(function(ing){
-        var c = (ing.unidad==='g'||ing.unidad==='ml')?(ing.cantidad*factor/1000)*ing.precio_kg:(ing.cantidad*factor)*ing.precio_kg;
-        tot += c;
+        tot += costoIngrediente(ing, factor);
     });
     var pasosHTML = proc.map(function(p,i){
         return '<div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:start;margin-bottom:.6rem;padding:.75rem;background:var(--cream);border-radius:6px">'
@@ -2148,7 +2181,7 @@ function editarIngRec(idx) {
         + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">'
         + '<div class="fg"><label class="fl2">Cantidad (base ' + window._recMeta.base + ' pax)</label><input id="ei-c" class="fi" type="number" value="' + ing.cantidad + '"></div>'
         + '<div class="fg"><label class="fl2">Unidad</label><select id="ei-u" class="fs"><option value="g"'+(ing.unidad==='g'?' selected':'')+'>g</option><option value="kg"'+(ing.unidad==='kg'?' selected':'')+'>kg</option><option value="ml"'+(ing.unidad==='ml'?' selected':'')+'>ml</option><option value="l"'+(ing.unidad==='l'?' selected':'')+'>l</option><option value="pz"'+(ing.unidad==='pz'?' selected':'')+'>pz</option></select></div>'
-        + '<div class="fg"><label class="fl2">Precio/kg ($)</label><input id="ei-p" class="fi" type="number" value="' + ing.precio_kg + '"></div></div>'
+        + '<div class="fg"><label class="fl2">Precio ($/kg·l, o $/pz si la unidad es pz)</label><input id="ei-p" class="fi" type="number" value="' + ing.precio_kg + '"></div></div>'
         + '<div class="fg"><label class="fl2">Sustitucion (opcional)</label><input id="ei-s" class="fi" value="' + (ing.sustitucion||'') + '" placeholder="Ej: pechuga por muslo de pollo"></div>'
         + '<div style="display:flex;gap:1rem;margin-top:1rem">'
         + '<button class="btn bgold" id="bsave-ing" style="flex:1">&#128190; Guardar</button>'
@@ -2156,11 +2189,13 @@ function editarIngRec(idx) {
     setTimeout(function(){
         var b = document.getElementById('bsave-ing');
         if(b) b.addEventListener('click', function(){
+            var nuevaUnidad = document.getElementById('ei-u').value;
             window._recIngredientes[idx] = {
                 nombre: document.getElementById('ei-n').value.trim(),
                 cantidad: parseFloat(document.getElementById('ei-c').value)||100,
-                unidad: document.getElementById('ei-u').value,
+                unidad: nuevaUnidad,
                 precio_kg: parseFloat(document.getElementById('ei-p').value)||50,
+                precio_unidad: nuevaUnidad === 'pz' ? 'pz' : 'kg',
                 sustitucion: document.getElementById('ei-s').value.trim()
             };
             closeModal(); renderRecetaGenerada(); toast('Ingrediente actualizado');
@@ -2189,6 +2224,7 @@ function sustituirIngRec(idx) {
                 cantidad: parseFloat(document.getElementById('sust-c').value)||ing.cantidad,
                 unidad: document.getElementById('sust-u').value,
                 precio_kg: getPrecio(nn),
+                precio_unidad: getUnidadPrecio(nn),
                 sustitucion: ''
             };
             closeModal(); renderRecetaGenerada(); toast('"' + ing.nombre + '" sustituido por "' + nn + '"');
@@ -2208,7 +2244,7 @@ function agregarIngRec() {
         + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">'
         + '<div class="fg"><label class="fl2">Cantidad (base ' + window._recMeta.base + ' pax)</label><input id="ai-c" class="fi" type="number" value="100"></div>'
         + '<div class="fg"><label class="fl2">Unidad</label><select id="ai-u" class="fs"><option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="l">l</option><option value="pz">pz</option></select></div>'
-        + '<div class="fg"><label class="fl2">Precio/kg ($)</label><input id="ai-p" class="fi" type="number" value="50"></div></div>'
+        + '<div class="fg"><label class="fl2">Precio ($/kg·l, o $/pz si la unidad es pz)</label><input id="ai-p" class="fi" type="number" value="50"></div></div>'
         + '<div style="display:flex;gap:1rem;margin-top:1rem">'
         + '<button class="btn bgold" id="bai-save" style="flex:1">&#10133; Agregar</button>'
         + '<button class="btn bsec" style="flex:1" onclick="closeModal()">Cancelar</button></div>');
@@ -2217,7 +2253,9 @@ function agregarIngRec() {
         if(b) b.addEventListener('click', function(){
             var n = document.getElementById('ai-n').value.trim();
             if(!n){alert('Ingresa el nombre');return;}
-            window._recIngredientes.push({nombre:n, cantidad:parseFloat(document.getElementById('ai-c').value)||100, unidad:document.getElementById('ai-u').value, precio_kg:parseFloat(document.getElementById('ai-p').value)||getPrecio(n), sustitucion:''});
+            var nuevaUnidad = document.getElementById('ai-u').value;
+            var precioManual = parseFloat(document.getElementById('ai-p').value);
+            window._recIngredientes.push({nombre:n, cantidad:parseFloat(document.getElementById('ai-c').value)||100, unidad:nuevaUnidad, precio_kg:precioManual||getPrecio(n), precio_unidad:precioManual ? (nuevaUnidad === 'pz' ? 'pz' : 'kg') : getUnidadPrecio(n), sustitucion:''});
             closeModal(); renderRecetaGenerada(); toast('Ingrediente agregado');
         });
     },50);
