@@ -488,7 +488,12 @@ function initPrecios() {
         'Chile':{precio:45,fecha:h},'Frijol':{precio:35,fecha:h},'Arroz':{precio:24,fecha:h},
         'Aceite':{precio:35,unidad_base:'lt',fecha:h},'Tortilla':{precio:18,fecha:h},'Harina':{precio:18,fecha:h}
     };
-    savePrecios();
+    // IMPORTANTE: solo guardar en localStorage, NUNCA empujar a la nube.
+    // Estos son defaults de primer arranque; sincronizarDesdeFirebase() traera los
+    // precios reales (los que sincroniza Egresos) 1s despues y reemplazara estos.
+    // Si aqui llamaramos savePrecios(), un dispositivo sin cache sobrescribiria
+    // datos/precios en Firestore con estos 18 defaults, borrando lo de Egresos.
+    try { localStorage.setItem('p_cicsa', JSON.stringify(precios)); } catch(e) {}
 }
 function hoy() { return new Date().toLocaleDateString('es-MX'); }
 // ============================================================
@@ -1879,14 +1884,16 @@ function renderAlacarta() {
     el.querySelectorAll('[data-ace]').forEach(function(b){ b.addEventListener('click', function(){ editarAlacarta(parseInt(this.getAttribute('data-ace'))); }); });
     el.querySelectorAll('[data-acd]').forEach(function(b){ b.addEventListener('click', function(){ delAlacarta(parseInt(this.getAttribute('data-acd'))); }); });
 }
+var AC_GRID = 'grid-template-columns:2fr .8fr .7fr 1.4fr .4fr';
 function _acIngRow(ing) {
     ing = ing || {nombre:'', cantidad:100, unidad:'g'};
-    return '<div class="ing-row" style="margin-bottom:.4rem">'
+    return '<div class="ing-row" style="' + AC_GRID + ';margin-bottom:.4rem">'
         + '<input class="fi ac-in" value="' + (ing.nombre||'') + '" placeholder="Ingrediente" style="padding:.4rem .6rem">'
         + '<input class="fi ac-ic" type="number" value="' + (ing.cantidad!=null?ing.cantidad:100) + '" style="padding:.4rem .6rem">'
         + '<select class="fs ac-iu" style="padding:.4rem">'
         + ['g','kg','ml','l','pz'].map(function(u){ return '<option value="'+u+'"'+((ing.unidad||'g')===u?' selected':'')+'>'+u+'</option>'; }).join('')
         + '</select>'
+        + '<div class="ac-ip" style="display:flex;align-items:center;justify-content:flex-end;font-size:.78rem;color:var(--bm);text-align:right;line-height:1.2">&mdash;</div>'
         + '<button class="btn bsm rmac" style="background:var(--tc);padding:.4rem">&#10005;</button>'
         + '</div>';
 }
@@ -1905,7 +1912,8 @@ function _editorAlacarta(p) {
         + '<div class="fg"><label class="fl2">Nombre</label><input id="ac-n" class="fi" value="' + (p?p.nombre:'') + '" placeholder="Ej: Hamburguesa de Res"></div>'
         + '<div class="fg"><label class="fl2">Categoria</label><input id="ac-cat" class="fi" value="' + (p?(p.categoria||''):'') + '" placeholder="Ej: Hamburguesas"></div>'
         + '<div class="fg"><label class="fl2">Estado</label><select id="ac-est" class="fs"><option value="borrador"' + (!p||p.estado!=='activo'?' selected':'') + '>En pruebas</option><option value="activo"' + (p&&p.estado==='activo'?' selected':'') + '>Activo</option></select></div></div>'
-        + '<h4 style="margin:1rem 0 .5rem">Ingredientes <small style="font-weight:400;color:var(--bl)">(por porcion — precio del banco)</small></h4>'
+        + '<h4 style="margin:1rem 0 .5rem">Ingredientes <small style="font-weight:400;color:var(--bl)">(cantidad por porcion — precio tomado del banco)</small></h4>'
+        + '<div style="display:grid;' + AC_GRID + ';gap:.4rem;font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;color:var(--bl);margin-bottom:.3rem;padding:0 .2rem"><span>Ingrediente</span><span>Cant</span><span>Unidad</span><span style="text-align:right">Precio banco = costo</span><span></span></div>'
         + '<div id="ac-ings">' + ingsHTML + '</div>'
         + '<button class="btn bsec bsm" id="ac-add" style="margin:.5rem 0">&#10133; Agregar ingrediente</button>'
         + '<div class="csum" style="margin:.5rem 0"><div class="crow" style="font-size:1.1rem;font-weight:700"><span>Costo MP por porcion</span><span id="ac-costo">$0.00</span></div></div>'
@@ -1919,10 +1927,15 @@ function _editorAlacarta(p) {
             var tot = 0;
             document.querySelectorAll('#ac-ings .ing-row').forEach(function(row){
                 var n = row.querySelector('.ac-in').value.trim();
-                if(!n) return;
+                var ip = row.querySelector('.ac-ip');
+                if(!n) { if(ip) ip.innerHTML = '&mdash;'; return; }
                 var c = parseFloat(row.querySelector('.ac-ic').value) || 0;
                 var u = row.querySelector('.ac-iu').value;
-                tot += costoIngrediente({nombre:n, cantidad:c, unidad:u, precio_kg:getPrecio(n), precio_unidad:getUnidadPrecio(n)}, 1);
+                var pu = getUnidadPrecio(n), pkg = getPrecio(n);
+                var linea = costoIngrediente({nombre:n, cantidad:c, unidad:u, precio_kg:pkg, precio_unidad:pu}, 1);
+                // Muestra el precio unitario del banco (para verificar contra Egresos) y el costo de esta linea
+                if(ip) ip.innerHTML = '$' + pkg.toFixed(2) + '/' + pu + ' <span style="color:var(--tc);font-weight:700;margin-left:.2rem">$' + linea.toFixed(2) + '</span>';
+                tot += linea;
             });
             var out = document.getElementById('ac-costo');
             if(out) out.textContent = '$' + tot.toFixed(2);
