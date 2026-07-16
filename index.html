@@ -1462,41 +1462,71 @@ function parseIng(li) {
     return {nombre:nombre||txt, cantidad:cantidad, unidad:unidad, precio_kg:getPrecio(nombre||txt), precio_unidad:getUnidadPrecio(nombre||txt)};
 }
 
+// ── Matcher de ingrediente -> llave del banco de precios ─────────────────────
+// Egresos define un nombre GENERICO por producto (ej. "Elote"); las recetas usan
+// variantes ("elote en grano", "elote congelado"). Se conecta por PALABRA COMPLETA,
+// no por substring crudo: asi "Elote" captura "elote en grano" pero "Tomate" NO se
+// come a "Jitomate" (ni "Papa" a "Papaya"), que era un error real de costeo.
+function _normIng(s) {
+    return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+}
+// true si "clave" aparece dentro de "nl" como palabra completa (tolera plural simple)
+function _palabraEn(nl, clave) {
+    if(!clave) return false;
+    var esc = clave.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('(^|\\s)' + esc + '(s|es)?($|\\s)').test(nl);
+}
+// Resuelve el nombre de un ingrediente de receta a su llave en el banco:
+//   1) coincidencia exacta  -> gana siempre
+//   2) generico que aparezca como palabra completa -> gana el MAS ESPECIFICO (mas largo),
+//      para que un generico corto no le robe a uno especifico (Tomate vs Pasta de tomate).
+// Devuelve la llave del banco, o null si no hay.
+function resolverClaveBanco(n) {
+    var nl = _normIng(n);
+    if(!nl) return null;
+    var mejor = null, mejorLen = 0;
+    for(var k in precios) {
+        var kl = _normIng(k);
+        if(!kl) continue;
+        if(kl === nl) return k;
+        if(_palabraEn(nl, kl) && kl.length > mejorLen) { mejor = k; mejorLen = kl.length; }
+    }
+    return mejor;
+}
+
 function getPrecio(n) {
-    var nl = n.toLowerCase();
-    for(var k in precios) { if(k.toLowerCase() === nl || nl.indexOf(k.toLowerCase()) >= 0) return precios[k].precio; }
-    if(nl.indexOf('res') >= 0 || nl.indexOf('bistec') >= 0 || nl.indexOf('carne de res') >= 0) return 142;
-    if(nl.indexOf('pollo') >= 0 || nl.indexOf('pechuga') >= 0) return 99;
-    if(nl.indexOf('cerdo') >= 0 || nl.indexOf('puerco') >= 0) return 85;
-    if(nl.indexOf('pescado') >= 0) return 185;
-    if(nl.indexOf('queso') >= 0) return 136;
-    if(nl.indexOf('crema') >= 0) return 65;
-    if(nl.indexOf('papa') >= 0) return 22;
-    if(nl.indexOf('cebolla') >= 0) return 18;
-    if(nl.indexOf('jitomate') >= 0 || nl.indexOf('tomate') >= 0) return 25;
-    if(nl.indexOf('frijol') >= 0) return 35;
-    if(nl.indexOf('arroz') >= 0) return 24;
-    if(nl.indexOf('aceite') >= 0) return 35;
+    var k = resolverClaveBanco(n);
+    if(k) return precios[k].precio;
+    // Respaldos por palabra clave (NO vienen del banco — se marcan como "sin banco").
+    // Tambien por palabra completa: antes "Queso fresco" pegaba con 'res' y costeaba $142.
+    var nl = _normIng(n);
+    if(_palabraEn(nl,'res') || _palabraEn(nl,'bistec') || _palabraEn(nl,'carne de res')) return 142;
+    if(_palabraEn(nl,'pollo') || _palabraEn(nl,'pechuga')) return 99;
+    if(_palabraEn(nl,'cerdo') || _palabraEn(nl,'puerco')) return 85;
+    if(_palabraEn(nl,'pescado')) return 185;
+    if(_palabraEn(nl,'queso')) return 136;
+    if(_palabraEn(nl,'crema')) return 65;
+    if(_palabraEn(nl,'papa')) return 22;
+    if(_palabraEn(nl,'cebolla')) return 18;
+    if(_palabraEn(nl,'jitomate') || _palabraEn(nl,'tomate')) return 25;
+    if(_palabraEn(nl,'frijol')) return 35;
+    if(_palabraEn(nl,'arroz')) return 24;
+    if(_palabraEn(nl,'aceite')) return 35;
     return 50;
 }
 
-// Unidad en la que viene expresado el precio de un ingrediente: 'kg' (o 'lt', tratado igual
-// que kg) para lo que se pesa/mide, o 'pz' cuando el precio ya es por pieza/porción individual
-// (ej. Cereal, Bimbollos — no tiene sentido un "$/kg" ahi). Default 'kg' para todo lo que no
-// declare unidad_base explicita en precios (compatibilidad con datos existentes).
+// Unidad en la que viene expresado el precio: 'kg' (o 'lt', tratado igual que kg) para lo
+// que se pesa/mide, o 'pz' cuando el precio ya es por pieza. Default 'kg'.
 function getUnidadPrecio(n) {
-    var nl = n.toLowerCase();
-    for(var k in precios) { if(k.toLowerCase() === nl || nl.indexOf(k.toLowerCase()) >= 0) return precios[k].unidad_base || 'kg'; }
+    var k = resolverClaveBanco(n);
+    if(k) return precios[k].unidad_base || 'kg';
     return 'kg';
 }
 
-// True si el ingrediente TIENE precio real en el banco sincronizado (misma logica de
-// match que getPrecio). False = getPrecio cayo a una adivinanza por palabra clave o al
-// default $50/kg — un precio que NO viene de Egresos y no debe costear en silencio.
+// True si el ingrediente TIENE precio real en el banco sincronizado de Egresos.
+// False = cayo a una adivinanza por palabra clave o al default $50/kg.
 function precioEnBanco(n) {
-    var nl = (n||'').toLowerCase();
-    for(var k in precios) { if(k.toLowerCase() === nl || nl.indexOf(k.toLowerCase()) >= 0) return true; }
-    return false;
+    return !!resolverClaveBanco(n);
 }
 
 // Costo de un ingrediente de receta, dado un factor de escalado (1 = una porcion).
