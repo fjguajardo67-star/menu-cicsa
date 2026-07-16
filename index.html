@@ -287,6 +287,7 @@ h1 em{font-style:italic;color:var(--gold)}
 <div id="precios" class="page">
   <div class="card">
     <div class="ch">&#128176; Precios de Ingredientes</div>
+    <div class="infobox">&#128274; <strong>Solo lectura.</strong> Los precios se gestionan en <strong>CICSA Control de Egresos</strong> y se sincronizan solos. Para agregar o corregir un precio (o un producto que falte), captúralo en Egresos &mdash; aqu&iacute; se refleja autom&aacute;ticamente.</div>
 
     <div style="padding:1.5rem;background:#fff;border-radius:8px;border:1px solid rgba(212,175,55,.2)">
       <h3 style="margin-bottom:1rem">&#128202; Tabla de Precios</h3>
@@ -300,18 +301,9 @@ h1 em{font-style:italic;color:var(--gold)}
         <div><div style="font-size:1.5rem;font-weight:700;color:var(--tc)" id="psh">0</div><div style="font-size:.8rem;color:var(--bl)">Hoy</div></div>
       </div>
       <table style="width:100%;border-collapse:collapse">
-        <thead><tr style="background:var(--bd);color:var(--gold)"><th style="padding:.75rem;text-align:left">Ingrediente</th><th style="padding:.75rem;text-align:center">Precio</th><th style="padding:.75rem;text-align:center">Fecha</th><th style="padding:.75rem;text-align:center">Acciones</th></tr></thead>
+        <thead><tr style="background:var(--bd);color:var(--gold)"><th style="padding:.75rem;text-align:left">Ingrediente</th><th style="padding:.75rem;text-align:center">Precio</th><th style="padding:.75rem;text-align:center">Fecha</th></tr></thead>
         <tbody id="tpre"></tbody>
       </table>
-    </div>
-    <div style="margin-top:1.5rem;padding:1.5rem;background:var(--cream);border-radius:8px">
-      <h3 style="margin-bottom:1rem">&#9999;&#65039; Actualizaci&oacute;n Manual</h3>
-      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:1rem">
-        <div class="fg"><label class="fl2">Ingrediente</label><input type="text" id="pnombre" class="fi" placeholder="Ej: Pollo pechuga"></div>
-        <div class="fg"><label class="fl2">Precio</label><input type="number" id="pprecio" class="fi" placeholder="99.00" step="0.01" min="0"></div>
-        <div class="fg"><label class="fl2">Unidad</label><select id="punidad" class="fs"><option value="kg">$/kg</option><option value="lt">$/lt</option><option value="pz">$/pz</option></select></div>
-        <div class="fg"><label class="fl2" style="opacity:0">-</label><button class="btn bgold bfull" onclick="agregarPrecio()">&#10133; Agregar</button></div>
-      </div>
     </div>
   </div>
 </div>
@@ -502,6 +494,11 @@ function hoy() { return new Date().toLocaleDateString('es-MX'); }
 var FB_KEY = 'AIzaSyC1QeFfDIgZPhqTs4zh7VpkB8cua93gCo0';
 var FB_BASE = 'https://firestore.googleapis.com/v1/projects/sistema-menu-cicsa/databases/(default)/documents';
 
+// PRECIOS ahora viven en el proyecto de Egresos (cicsa-egresos): Egresos los escribe con
+// su auth, Menu solo los LEE (lectura publica). Menu ya no escribe precios a ningun lado.
+var FB_EGRESOS_KEY = 'AIzaSyC5Scjnnabx4bJAdkUShlm53i38OXj8xgQ';
+var FB_EGRESOS_BASE = 'https://firestore.googleapis.com/v1/projects/cicsa-egresos/databases/(default)/documents';
+
 async function fbSet(col, docId, data) {
     try {
         var fields = {};
@@ -525,6 +522,17 @@ async function fbGet(col, docId) {
     } catch(e) { return null; }
 }
 
+// Lee datos/precios del proyecto de EGRESOS (no del de Menu). Mismo formato de wire.
+async function fbGetPreciosEgresos() {
+    try {
+        var r = await fetch(FB_EGRESOS_BASE + '/datos/precios?key=' + FB_EGRESOS_KEY);
+        if(!r.ok) return null;
+        var d = await r.json();
+        if(d.fields && d.fields.json) return JSON.parse(d.fields.json.stringValue);
+        return null;
+    } catch(e) { return null; }
+}
+
 async function saveRecetas() {
     try { localStorage.setItem('r_cicsa', JSON.stringify(recetas)); } catch(e) {}
     // Mantener DB_EXTRA sincronizado con recetas guardadas
@@ -532,13 +540,14 @@ async function saveRecetas() {
     await fbSet('datos', 'recetas', recetas);
 }
 function savePrecios() {
+    // Menu ya NO escribe precios a Firestore — son de solo-lectura desde cicsa-egresos.
+    // Solo cache local (se reemplaza en cada sync). La fuente de verdad es Egresos.
     try { localStorage.setItem('p_cicsa', JSON.stringify(precios)); } catch(e) {}
-    fbSet('datos', 'precios', precios);
 }
 
 async function sincronizarDesdeFirebase() {
     var preciosCambiaron = false;
-    var p = await fbGet('datos', 'precios');
+    var p = await fbGetPreciosEgresos();  // precios se leen del proyecto de Egresos
     if(p && Object.keys(p).length > 0) {
         preciosCambiaron = JSON.stringify(precios) !== JSON.stringify(p);
         precios = p;
@@ -2072,16 +2081,10 @@ function renderPrecios() {
         html += '<tr style="border-bottom:1px solid #E8DCC8" data-pn="' + n.toLowerCase() + '">'
             + '<td style="padding:.75rem"><strong>' + n + '</strong></td>'
             + '<td style="padding:.75rem;text-align:center">$' + i.precio.toFixed(2) + '/' + (i.unidad_base || 'kg') + '</td>'
-            + '<td style="padding:.75rem;text-align:center">' + i.fecha + '</td>'
-            + '<td style="padding:.75rem;text-align:center">'
-            + '<button class="btn bsm" style="padding:.3rem .6rem;margin:.1rem" data-ep="' + encodeURIComponent(n) + '">&#9998;&#65039;</button>'
-            + '<button class="btn bsm" style="padding:.3rem .6rem;margin:.1rem;background:var(--tc)" data-dp="' + encodeURIComponent(n) + '">&#128465;&#65039;</button>'
-            + '</td></tr>';
+            + '<td style="padding:.75rem;text-align:center">' + i.fecha + '</td></tr>';
     });
     tbody.innerHTML = html;
     updPStats();
-    tbody.querySelectorAll('[data-ep]').forEach(function(b){ b.addEventListener('click', function(){ editPrecio(decodeURIComponent(this.getAttribute('data-ep'))); }); });
-    tbody.querySelectorAll('[data-dp]').forEach(function(b){ b.addEventListener('click', function(){ delPrecio(decodeURIComponent(this.getAttribute('data-dp'))); }); });
 }
 function filtrarPrecios(v) {
     v = v.toLowerCase();
@@ -2096,81 +2099,9 @@ function updPStats() {
     var p = document.getElementById('psp'); if(p) p.textContent = '$' + (ks.length ? (sum/ks.length).toFixed(0) : '0');
     var hh = document.getElementById('psh'); if(hh) hh.textContent = hc;
 }
-function importarCSV() {
-    var csv = document.getElementById('csvtxt').value.trim();
-    var res = document.getElementById('csvres');
-    if(!csv) { res.style.display='block'; res.innerHTML='<div style="background:#FFE5E5;padding:1rem;border-radius:6px">Pega el CSV primero</div>'; return; }
-    var count = 0, h = hoy();
-    var lineas = csv.split('\n').filter(function(l){ return l.trim(); });
-    var primera = lineas[0].toUpperCase();
-    var esF = primera.indexOf('CLAVE') >= 0 || primera.indexOf('UNIDAD') >= 0 || primera.indexOf('DESCRIPCION') >= 0 || primera.indexOf('IMPORTE') >= 0;
-    if(esF) {
-        lineas.forEach(function(linea, idx) {
-            if(idx===0) return; linea=linea.trim(); if(!linea) return;
-            var partes = linea.split(/\s{2,}/).filter(function(p){ return p.trim(); });
-            if(partes.length < 4) return;
-            var nP = [], nums = [];
-            partes.forEach(function(p, i) {
-                if(i===0) return;
-                if(i===1 && /^(KG|PZA|LT|GR)$/i.test(p.trim())) return;
-                if(/^\d+\.?\d*$/.test(p.trim())) nums.push(parseFloat(p.trim()));
-                else nP.push(p.trim());
-            });
-            var nombre = nP.join(' ').replace(/^(KG|PZA|LT|GR)\s+/i,'').trim();
-            nombre = nombre.charAt(0).toUpperCase() + nombre.slice(1).toLowerCase();
-            var precio = nums.length >= 2 ? nums[1] : (nums[0]||0);
-            if(nombre && precio > 0 && precio < 50000) { precios[nombre]={precio:precio,fecha:h}; count++; }
-        });
-    } else {
-        lineas.slice(1).forEach(function(l) {
-            var p = l.trim().split(',');
-            if(p.length>=2 && p[0].trim() && !isNaN(parseFloat(p[1]))) { precios[p[0].trim()]={precio:parseFloat(p[1].trim()),fecha:p[2]?p[2].trim():h}; count++; }
-        });
-    }
-    savePrecios(); renderPrecios();
-    res.style.display = 'block';
-    res.innerHTML = count > 0
-        ? '<div style="background:#d4edda;padding:1rem;border-radius:6px;border-left:4px solid #28a745"><strong style="color:#155724">&#10003; ' + count + ' precios importados' + (esF?' desde factura':'') + '</strong></div>'
-        : '<div style="background:#FFE5E5;padding:1rem;border-radius:6px;border-left:4px solid #C8553D">No se pudieron importar precios</div>';
-    if(count > 0) { document.getElementById('csvtxt').value=''; toast(count + ' precios actualizados'); }
-}
-function agregarPrecio() {
-    var n = document.getElementById('pnombre').value.trim();
-    var p = parseFloat(document.getElementById('pprecio').value);
-    var u = document.getElementById('punidad') ? document.getElementById('punidad').value : 'kg';
-    if(!n||!p||p<=0) { alert('Ingresa ingrediente y precio valido'); return; }
-    precios[n] = {precio:p, unidad_base:u, fecha:hoy()};
-    savePrecios(); renderPrecios();
-    document.getElementById('pnombre').value=''; document.getElementById('pprecio').value='';
-    toast('Precio de "' + n + '" actualizado');
-}
-function editPrecio(n) {
-    var u = precios[n].unidad_base || 'kg';
-    openModal('&#9998;&#65039; Editar: ' + n,
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">'
-        + '<div class="fg"><label class="fl2">Precio</label><input id="ep-precio" class="fi" type="number" step="0.01" min="0" value="' + precios[n].precio + '"></div>'
-        + '<div class="fg"><label class="fl2">Unidad</label><select id="ep-unidad" class="fs">'
-        + '<option value="kg"' + (u==='kg'?' selected':'') + '>$/kg</option>'
-        + '<option value="lt"' + (u==='lt'?' selected':'') + '>$/lt</option>'
-        + '<option value="pz"' + (u==='pz'?' selected':'') + '>$/pz</option>'
-        + '</select></div></div>'
-        + '<div style="display:flex;gap:1rem;margin-top:1rem">'
-        + '<button class="btn bgold" id="bep-save" style="flex:1">&#128190; Guardar</button>'
-        + '<button class="btn bsec" style="flex:1" onclick="closeModal()">Cancelar</button></div>');
-    setTimeout(function(){
-        var b = document.getElementById('bep-save');
-        if(b) b.addEventListener('click', function(){
-            var np = parseFloat(document.getElementById('ep-precio').value);
-            var nu = document.getElementById('ep-unidad').value;
-            if(!np || np <= 0) { alert('Ingresa un precio valido'); return; }
-            precios[n] = {precio:np, unidad_base:nu, fecha:hoy()};
-            savePrecios(); renderPrecios(); closeModal(); toast('Precio actualizado');
-        });
-    }, 50);
-}
-function delPrecio(n) {
-    if(confirm('Eliminar precio de "' + n + '"?')) { delete precios[n]; savePrecios(); renderPrecios(); toast('Precio eliminado'); }
-}
+// Escritura de precios eliminada: los precios son de solo-lectura desde cicsa-egresos.
+// Antes vivian aqui importarCSV/agregarPrecio/editPrecio/delPrecio — se removieron para
+// que Menu no tenga ningun path para modificar precios. Se capturan/corrigen en Egresos.
 function exportarPrecios() {
     var csv = 'Ingrediente,Precio por Kg/L,Ultima Actualizacion\n';
     Object.keys(precios).sort().forEach(function(n){ csv += n + ',' + precios[n].precio + ',' + precios[n].fecha + '\n'; });
