@@ -1408,6 +1408,15 @@ function getUnidadPrecio(n) {
     return 'kg';
 }
 
+// True si el ingrediente TIENE precio real en el banco sincronizado (misma logica de
+// match que getPrecio). False = getPrecio cayo a una adivinanza por palabra clave o al
+// default $50/kg — un precio que NO viene de Egresos y no debe costear en silencio.
+function precioEnBanco(n) {
+    var nl = (n||'').toLowerCase();
+    for(var k in precios) { if(k.toLowerCase() === nl || nl.indexOf(k.toLowerCase()) >= 0) return true; }
+    return false;
+}
+
 // Costo de un ingrediente de receta, dado un factor de escalado (1 = una porcion).
 // Unica fuente de verdad para esta formula — antes estaba duplicada en 8 lugares del archivo.
 function costoIngrediente(ing, factor) {
@@ -1457,9 +1466,10 @@ function mostrarPreview(rec, paxO, paxD) {
         if(uE==='g'&&cE>=1000){cE/=1000;uE='kg';} if(uE==='ml'&&cE>=1000){cE/=1000;uE='l';}
         var c = costoIngrediente(ing, paxD);
         tot += c;
-        // Precio editable inline — fondo amarillo si es precio default (50)
-        var esPrecioDefault = ing.precio_kg === 50;
-        var precioStyle = 'width:70px;padding:.3rem .4rem;border:1.5px solid ' + (esPrecioDefault?'var(--tc)':'rgba(212,175,55,.4)') + ';border-radius:4px;font-size:.85rem;text-align:right;background:' + (esPrecioDefault?'#FFF3CD':'#fff');
+        // Precio editable inline — fondo amarillo si el precio NO viene del banco de Egresos
+        // (adivinanza por palabra clave o default $50): hay que verificarlo/editarlo antes de guardar.
+        var esPrecioFallback = !precioEnBanco(ing.nombre);
+        var precioStyle = 'width:70px;padding:.3rem .4rem;border:1.5px solid ' + (esPrecioFallback?'var(--tc)':'rgba(212,175,55,.4)') + ';border-radius:4px;font-size:.85rem;text-align:right;background:' + (esPrecioFallback?'#FFF3CD':'#fff');
         rows += '<tr style="border-bottom:1px solid #E8DCC8">'
             + '<td style="padding:.5rem .75rem">' + ing.nombre + '</td>'
             + '<td style="padding:.5rem;text-align:center">' + (cO<10?cO.toFixed(1):Math.round(cO)) + ' ' + uO + '</td>'
@@ -1863,16 +1873,22 @@ function renderAlacarta() {
             ? '<span style="background:var(--green);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">&#9989; Activo</span>'
             : '<span style="background:var(--gold);color:var(--bd);padding:.15rem .5rem;border-radius:99px;font-size:.7rem;font-weight:700;margin-left:.3rem">&#128295; En pruebas</span>';
         var bCat = p.categoria ? '<span style="background:var(--bm);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">' + p.categoria + '</span>' : '';
+        var sinBanco = 0;
         var ingRows = (p.ingredientes||[]).map(function(ing){
             var c = costoIngrediente({nombre:ing.nombre, cantidad:ing.cantidad, unidad:ing.unidad, precio_kg:getPrecio(ing.nombre), precio_unidad:getUnidadPrecio(ing.nombre)}, 1);
-            return '<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:.2rem 0;border-bottom:1px solid var(--cream)"><span>' + ing.nombre + ' <span style="color:var(--bl)">' + (ing.cantidad<10?ing.cantidad:Math.round(ing.cantidad)) + ' ' + ing.unidad + '</span></span><span style="color:var(--tc)">$' + c.toFixed(2) + '</span></div>';
+            var enBanco = precioEnBanco(ing.nombre);
+            if(!enBanco) sinBanco++;
+            var marca = enBanco ? '' : ' <span style="color:#C8553D;font-size:.72rem" title="Sin precio en el banco de Egresos">&#9888;</span>';
+            return '<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:.2rem 0;border-bottom:1px solid var(--cream)"><span>' + ing.nombre + marca + ' <span style="color:var(--bl)">' + (ing.cantidad<10?ing.cantidad:Math.round(ing.cantidad)) + ' ' + ing.unidad + '</span></span><span style="color:' + (enBanco?'var(--tc)':'var(--bl)') + '">$' + c.toFixed(2) + '</span></div>';
         }).join('');
+        var avisoBanco = sinBanco ? '<div style="padding:.35rem 1rem;font-size:.75rem;color:#8a3520;background:#FFF3CD;border-top:1px solid var(--cream)">&#9888; ' + sinBanco + ' ingrediente' + (sinBanco!==1?'s':'') + ' sin precio en el banco &mdash; costo estimado. Captura' + (sinBanco!==1?'los':'lo') + ' en Egresos.</div>' : '';
         html += '<div style="background:#fff;border:1.5px solid rgba(212,175,55,.2);border-radius:8px;overflow:hidden">'
             + '<div style="background:linear-gradient(135deg,var(--bd),var(--bm));padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center">'
             + '<div><div style="color:var(--gold);font-weight:700">' + p.nombre + '</div><div style="margin-top:.2rem">' + bEstado + bCat + '</div></div>'
             + '<div style="text-align:right"><div style="color:#fff;font-size:.62rem;text-transform:uppercase;letter-spacing:1px;opacity:.7">Costo MP</div><div style="color:var(--gold);font-weight:700;font-size:1.15rem">$' + costo.toFixed(2) + '</div></div>'
             + '</div>'
             + '<div style="padding:.5rem 1rem">' + (ingRows || '<span style="font-size:.8rem;color:var(--bl)">Sin ingredientes</span>') + '</div>'
+            + avisoBanco
             + (p.notas ? '<div style="padding:.25rem 1rem .5rem;font-size:.78rem;color:var(--bm)"><strong>Notas:</strong> ' + p.notas + '</div>' : '')
             + '<div style="display:flex;gap:.4rem;padding:.5rem 1rem;border-top:1px solid var(--cream)">'
             + '<button class="btn bgold bsm" data-ace="' + p.id + '">&#9998;&#65039; Editar</button>'
@@ -1933,8 +1949,15 @@ function _editorAlacarta(p) {
                 var u = row.querySelector('.ac-iu').value;
                 var pu = getUnidadPrecio(n), pkg = getPrecio(n);
                 var linea = costoIngrediente({nombre:n, cantidad:c, unidad:u, precio_kg:pkg, precio_unidad:pu}, 1);
-                // Muestra el precio unitario del banco (para verificar contra Egresos) y el costo de esta linea
-                if(ip) ip.innerHTML = '$' + pkg.toFixed(2) + '/' + pu + ' <span style="color:var(--tc);font-weight:700;margin-left:.2rem">$' + linea.toFixed(2) + '</span>';
+                // Muestra el precio unitario del banco (para verificar contra Egresos) y el costo de esta linea.
+                // Si el precio NO viene del banco (adivinanza/$50), lo marca en rojo para no costear en silencio.
+                if(ip) {
+                    if(precioEnBanco(n)) {
+                        ip.innerHTML = '$' + pkg.toFixed(2) + '/' + pu + ' <span style="color:var(--tc);font-weight:700;margin-left:.2rem">$' + linea.toFixed(2) + '</span>';
+                    } else {
+                        ip.innerHTML = '<span style="color:#C8553D" title="Sin precio en el banco de Egresos — captura este producto en Egresos">&#9888; sin banco</span> <span style="color:var(--bl);margin-left:.2rem">~$' + linea.toFixed(2) + '</span>';
+                    }
+                }
                 tot += linea;
             });
             var out = document.getElementById('ac-costo');
