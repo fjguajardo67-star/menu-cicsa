@@ -6,6 +6,8 @@
 <title>Sistema Menu CICSA</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>
 
 :root{--bd:#2C1810;--bm:#5C3D2E;--bl:#8B6F47;--gold:#D4AF37;--cream:#F5F1E8;--tc:#C8553D;--green:#588B4F}
@@ -98,6 +100,14 @@ h1 em{font-style:italic;color:var(--gold)}
         <div class="empresa">CICSA &middot; Comedores Industriales de Cuauht&eacute;moc S.A. de C.V.</div>
         <h1>Sistema Men&uacute; <em>CICSA</em></h1>
         <div class="sub">Sistema de Gesti&oacute;n de Men&uacute;s</div>
+      </div>
+      <div id="authbox" style="text-align:right;font-size:.8rem">
+        <button id="btn-login" class="btn bgold bsm" style="display:none" onclick="loginAdmin()">&#128273; Iniciar sesi&oacute;n (admin)</button>
+        <div id="auth-info" style="display:none;color:var(--cream)">
+          <span style="font-size:.72rem;opacity:.7">Administrador</span><br>
+          <span id="auth-email" style="font-weight:700;color:var(--gold)"></span>
+          <button class="btn bsm" style="background:var(--bl);padding:.25rem .6rem;margin-left:.5rem;font-size:.7rem" onclick="logoutAdmin()">Salir</button>
+        </div>
       </div>
     </div>
     <div class="stats">
@@ -453,6 +463,7 @@ window.addEventListener('load', function() {
     try { var ac = localStorage.getItem('ac_cicsa'); if(ac) alacarta = JSON.parse(ac); } catch(e) {}
     genMenu();
     document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
+    if(typeof actualizarUIAuth === 'function') actualizarUIAuth();  // muestra el boton de login (o el estado admin)
     // Sincronizar SIEMPRE desde la nube para traer borrados/ediciones hechos en otros dispositivos
     setTimeout(sincronizarDesdeFirebase, 1000);
 });
@@ -499,17 +510,79 @@ var FB_BASE = 'https://firestore.googleapis.com/v1/projects/sistema-menu-cicsa/d
 var FB_EGRESOS_KEY = 'AIzaSyC5Scjnnabx4bJAdkUShlm53i38OXj8xgQ';
 var FB_EGRESOS_BASE = 'https://firestore.googleapis.com/v1/projects/cicsa-egresos/databases/(default)/documents';
 
+// ============================================================
+// AUTH ADMIN — Firebase Auth + Google Sign-In
+// Ver el menu es publico; ESCRIBIR (recetas/borradas/alacarta) exige admin.
+// Las reglas de Firestore validan el email; aqui es UX + adjuntar el token en fbSet.
+// ============================================================
+var ADMIN_EMAILS = ['facturacion@cicsacomedores.com', 'ops@cicsacomedores.com'];
+var authUser = null;
+try {
+    firebase.initializeApp({
+        apiKey: FB_KEY,
+        authDomain: 'sistema-menu-cicsa.firebaseapp.com',
+        projectId: 'sistema-menu-cicsa'
+    });
+    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    firebase.auth().onAuthStateChanged(function(u){ authUser = u; actualizarUIAuth(); });
+} catch(e) { console.log('auth init error:', e); }
+
+function esAdmin() {
+    return !!(authUser && authUser.email && ADMIN_EMAILS.indexOf(authUser.email.toLowerCase()) >= 0);
+}
+function actualizarUIAuth() {
+    var btn = document.getElementById('btn-login');
+    var info = document.getElementById('auth-info');
+    var em = document.getElementById('auth-email');
+    if(!btn || !info) return;
+    if(esAdmin()) {
+        btn.style.display = 'none'; info.style.display = 'block';
+        if(em) em.textContent = authUser.email;
+    } else {
+        btn.style.display = 'inline-block'; info.style.display = 'none';
+    }
+}
+function loginAdmin() {
+    try {
+        var prov = new firebase.auth.GoogleAuthProvider();
+        firebase.auth().signInWithPopup(prov).then(function(res){
+            var mail = (res.user && res.user.email || '').toLowerCase();
+            if(ADMIN_EMAILS.indexOf(mail) < 0) {
+                toast('⚠ ' + (res.user ? res.user.email : 'Esa cuenta') + ' no tiene permiso de administrador');
+                firebase.auth().signOut();
+            } else {
+                toast('✓ Sesión de administrador iniciada');
+            }
+        }).catch(function(e){ toast('No se pudo iniciar sesión: ' + (e.message || e.code || '')); });
+    } catch(e) { toast('Autenticación no disponible'); }
+}
+function logoutAdmin() {
+    try { firebase.auth().signOut().then(function(){ toast('Sesión cerrada'); }); } catch(e) {}
+}
+async function authToken() {
+    try { if(authUser) return await authUser.getIdToken(); } catch(e) {}
+    return null;
+}
+
 async function fbSet(col, docId, data) {
     try {
         var fields = {};
         fields['json'] = {stringValue: JSON.stringify(data)};
         fields['ts'] = {stringValue: new Date().toISOString()};
-        await fetch(FB_BASE + '/' + col + '/' + docId + '?key=' + FB_KEY, {
+        var headers = {'Content-Type': 'application/json'};
+        var tok = await authToken();
+        if(tok) headers['Authorization'] = 'Bearer ' + tok;  // escritura autenticada si hay admin
+        var r = await fetch(FB_BASE + '/' + col + '/' + docId + '?key=' + FB_KEY, {
             method: 'PATCH',
-            headers: {'Content-Type': 'application/json'},
+            headers: headers,
             body: JSON.stringify({fields: fields})
         });
-    } catch(e) { console.log('fbSet error:', e); }
+        if(!r.ok) {
+            if(r.status === 401 || r.status === 403) toast('🔒 No se pudo guardar en la nube: inicia sesión como administrador');
+            return false;
+        }
+        return true;
+    } catch(e) { console.log('fbSet error:', e); return false; }
 }
 
 async function fbGet(col, docId) {
@@ -581,7 +654,7 @@ async function sincronizarDesdeFirebase() {
     aplicarBorradas();
     // Si llegaron precios nuevos, recalcular costos de receta ya con precios y recetas frescos
     // (evita recalcular sobre una copia vieja de "recetas" y re-subirla pisando cambios recientes)
-    if(preciosCambiaron) recalcularCostos();
+    if(preciosCambiaron) recalcularCostos(true);  // auto-recalc de fondo: silencioso
     if(document.getElementById('catcon') && document.getElementById('cat').classList.contains('on')) renderCat();
     genMenu();
     document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
@@ -1816,7 +1889,7 @@ function delPl(nombre, origen) {
     }, 50);
 }
 
-function recalcularCostos() {
+function recalcularCostos(silencioso) {
     var allDB = Object.assign({}, DB, DB_EXTRA);
     var count = 0;
     Object.keys(allDB).forEach(function(nombre) {
@@ -1837,9 +1910,12 @@ function recalcularCostos() {
         }
         return r;
     });
-    saveRecetas();
+    // Persistir a la nube solo si es admin; un visor no-admin actualiza solo local
+    // (evita el toast de "inicia sesion" en el auto-recalc de fondo tras cerrar reglas).
+    if(esAdmin()) { saveRecetas(); }
+    else { try { localStorage.setItem('r_cicsa', JSON.stringify(recetas)); } catch(e) {} }
     renderCat();
-    toast('&#128260; ' + count + ' platillos actualizados con precios vigentes');
+    if(!silencioso) toast('&#128260; ' + count + ' platillos actualizados con precios vigentes');
 }
 
 // ============================================================
