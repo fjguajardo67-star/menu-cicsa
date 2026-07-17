@@ -399,6 +399,10 @@ h1 em{font-style:italic;color:var(--gold)}
   </div>
 </div>
 
+<!-- Opciones del desplegable de ingredientes: se llena en vivo con los genericos
+     validados en Egresos (las llaves del banco de precios). -->
+<datalist id="dl-ingredientes"></datalist>
+
 <script>
 const DB = {
 "Tinga de Pollo":{region:"Mexico",carnico:"Pollo",tipo:"guisado",ingredientes:[{nombre:"Pechuga de pollo",cantidad:80,unidad:"g",precio_kg:99},{nombre:"Zanahoria",cantidad:20,unidad:"g",precio_kg:18},{nombre:"Cebolla",cantidad:15,unidad:"g",precio_kg:18},{nombre:"Chipotle",cantidad:8,unidad:"g",precio_kg:45},{nombre:"Pure de tomate",cantidad:20,unidad:"g",precio_kg:25},{nombre:"Aceite",cantidad:5,unidad:"ml",precio_kg:35}],procedimiento:["Preparar ingredientes","Cocinar a fuego medio","Sazonar al gusto","Servir caliente"],tiempo:60},
@@ -464,6 +468,7 @@ window.addEventListener('load', function() {
     genMenu();
     document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
     if(typeof actualizarUIAuth === 'function') actualizarUIAuth();  // muestra el boton de login (o el estado admin)
+    actualizarDatalistIngredientes();  // desplegable con lo que haya en cache; el sync lo refresca
     // Sincronizar SIEMPRE desde la nube para traer borrados/ediciones hechos en otros dispositivos
     setTimeout(sincronizarDesdeFirebase, 1000);
 });
@@ -625,6 +630,7 @@ async function sincronizarDesdeFirebase() {
         preciosCambiaron = JSON.stringify(precios) !== JSON.stringify(p);
         precios = p;
         try { localStorage.setItem('p_cicsa', JSON.stringify(precios)); } catch(e) {}
+        actualizarDatalistIngredientes();  // el desplegable sigue al banco vigente
         if(document.getElementById('tpre')) { renderPrecios(); updPStats(); }
         toast('☁️ Precios sincronizados');
     }
@@ -1529,6 +1535,18 @@ function precioEnBanco(n) {
     return !!resolverClaveBanco(n);
 }
 
+// Llena el desplegable de ingredientes con las llaves del banco (los genericos que
+// Egresos valida en "Nombre en las recetas de Menu"). Se repuebla en cada sync, asi
+// que la lista se limpia sola conforme validan productos — sin tocar codigo.
+function actualizarDatalistIngredientes() {
+    var dl = document.getElementById('dl-ingredientes');
+    if(!dl) return;
+    dl.innerHTML = Object.keys(precios).sort(function(a,b){ return a.localeCompare(b); }).map(function(n){
+        var i = precios[n];
+        return '<option value="' + n.replace(/"/g,'&quot;') + '">$' + i.precio.toFixed(2) + '/' + (i.unidad_base || 'kg') + '</option>';
+    }).join('');
+}
+
 // Costo de un ingrediente de receta, dado un factor de escalado (1 = una porcion).
 // Unica fuente de verdad para esta formula — antes estaba duplicada en 8 lugares del archivo.
 function costoIngrediente(ing, factor) {
@@ -2019,7 +2037,7 @@ var AC_GRID = 'grid-template-columns:2fr .8fr .7fr 1.4fr .4fr';
 function _acIngRow(ing) {
     ing = ing || {nombre:'', cantidad:100, unidad:'g'};
     return '<div class="ing-row" style="' + AC_GRID + ';margin-bottom:.4rem">'
-        + '<input class="fi ac-in" value="' + (ing.nombre||'') + '" placeholder="Ingrediente" style="padding:.4rem .6rem">'
+        + '<input class="fi ac-in" list="dl-ingredientes" autocomplete="off" value="' + (ing.nombre||'') + '" placeholder="Escribe o elige del banco..." style="padding:.4rem .6rem">'
         + '<input class="fi ac-ic" type="number" value="' + (ing.cantidad!=null?ing.cantidad:100) + '" style="padding:.4rem .6rem">'
         + '<select class="fs ac-iu" style="padding:.4rem">'
         + ['g','kg','ml','l','pz'].map(function(u){ return '<option value="'+u+'"'+((ing.unidad||'g')===u?' selected':'')+'>'+u+'</option>'; }).join('')
