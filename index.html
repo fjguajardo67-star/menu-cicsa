@@ -113,7 +113,7 @@ h1 em{font-style:italic;color:var(--gold)}
     <div class="stats">
       <div><span class="stat-n" id="stat-plat">40</span><span class="stat-l">Platillos</span></div>
       <div><span class="stat-n">3</span><span class="stat-l">Por D&iacute;a</span></div>
-      <div><span class="stat-n">$35-65</span><span class="stat-l">Costo MP/PAX</span></div>
+      <div><span class="stat-n" id="stat-costo">&mdash;</span><span class="stat-l">Costo MP/PAX</span></div>
     </div>
   </div>
 </div>
@@ -463,7 +463,8 @@ window.addEventListener('load', function() {
     // Cargar lista de eliminados PRIMERO y aplicarla a DB
     try { var bd = localStorage.getItem('b_cicsa'); if(bd) { borradas = JSON.parse(bd); aplicarBorradas(); } } catch(e) {}
     try { var s = localStorage.getItem('r_cicsa'); if(s) { recetas = JSON.parse(s); _tieneRecetasLocales = true; updCnt(); recetas.forEach(function(r){ DB_EXTRA[r.nombre] = {region:r.region,carnico:r.carnico,tipo:r.tipo||'guisado',ingredientes:r.ingredientes,procedimiento:r.procedimiento,tiempo:r.tiempo}; }); } } catch(e) {}
-    try { var p = localStorage.getItem('p_cicsa'); if(p) precios = JSON.parse(p); else initPrecios(); } catch(e) { initPrecios(); }
+    // Sin cache -> precios arranca vacio; el sync con Egresos lo llena (no hay defaults propios)
+    try { var p = localStorage.getItem('p_cicsa'); if(p) precios = JSON.parse(p); } catch(e) { precios = {}; }
     try { var ac = localStorage.getItem('ac_cicsa'); if(ac) alacarta = JSON.parse(ac); } catch(e) {}
     genMenu();
     document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
@@ -486,23 +487,11 @@ function saveBorradas() {
     return fbSet('datos', 'borradas', borradas);
 }
 
-function initPrecios() {
-    var h = hoy();
-    precios = {
-        'Pollo pechuga':{precio:99,fecha:h},'Res':{precio:142,fecha:h},'Cerdo':{precio:85,fecha:h},
-        'Pescado':{precio:185,fecha:h},'Queso fresco':{precio:136,fecha:h},'Crema':{precio:65,unidad_base:'lt',fecha:h},
-        'Leche':{precio:18,unidad_base:'lt',fecha:h},'Papa':{precio:22,fecha:h},'Zanahoria':{precio:18,fecha:h},
-        'Cebolla':{precio:18,fecha:h},'Jitomate':{precio:25,fecha:h},'Ajo':{precio:25,fecha:h},
-        'Chile':{precio:45,fecha:h},'Frijol':{precio:35,fecha:h},'Arroz':{precio:24,fecha:h},
-        'Aceite':{precio:35,unidad_base:'lt',fecha:h},'Tortilla':{precio:18,fecha:h},'Harina':{precio:18,fecha:h}
-    };
-    // IMPORTANTE: solo guardar en localStorage, NUNCA empujar a la nube.
-    // Estos son defaults de primer arranque; sincronizarDesdeFirebase() traera los
-    // precios reales (los que sincroniza Egresos) 1s despues y reemplazara estos.
-    // Si aqui llamaramos savePrecios(), un dispositivo sin cache sobrescribiria
-    // datos/precios en Firestore con estos 18 defaults, borrando lo de Egresos.
-    try { localStorage.setItem('p_cicsa', JSON.stringify(precios)); } catch(e) {}
-}
+// initPrecios() se elimino a proposito. Menu ya NO tiene catalogo propio de precios:
+// la UNICA fuente es el banco que Egresos valida a mano contra facturas recientes.
+// Antes aqui vivian 18 precios inventados (Papa $22, Jitomate $25, Aceite $35...) que
+// contradecian a Egresos (Papa $45, Jitomate $40) y ademas sobrescribian la nube.
+// Si no hay cache local, "precios" arranca vacio y sincronizarDesdeFirebase() lo llena.
 function hoy() { return new Date().toLocaleDateString('es-MX'); }
 // ============================================================
 // FIREBASE REST API
@@ -742,9 +731,21 @@ function pickFrom(list, used, V, excl, exclCarnico, allDB) {
 }
 
 // MENU GEN
+var _rangoCosto = [];
+// El stat "Costo MP/PAX" del header antes era el texto fijo "$35-65" (otro numero
+// inventado, nunca calculado). Ahora se calcula del menu realmente generado.
+function actualizarStatCosto() {
+    var el = document.getElementById('stat-costo');
+    if(!el) return;
+    if(!_rangoCosto.length) { el.textContent = '—'; return; }
+    var min = Math.min.apply(null, _rangoCosto), max = Math.max.apply(null, _rangoCosto);
+    el.textContent = '$' + Math.round(min) + '-' + Math.round(max);
+}
+
 function genMenu() {
     var grid = document.getElementById('grid');
     grid.innerHTML = '';
+    _rangoCosto = [];
     var allDB = Object.assign({}, DB, DB_EXTRA);
     var G = Object.keys(allDB).filter(function(n) { var t = allDB[n].tipo; return !t || t === 'guisado'; });
     var Ga = Object.keys(allDB).filter(function(n) { return allDB[n].tipo === 'garnacha'; });
@@ -806,13 +807,17 @@ function genMenu() {
         var r1 = g1 ? allDB[g1] : null, r2 = g2 ? allDB[g2] : null, rg = ga ? allDB[ga] : null;
         var c1 = r1 ? getCost(r1) : 0, c2 = r2 ? getCost(r2) : 0, cg = rg ? getCost(rg) : 0;
         var ct = c1 + c2 + cg;
+        _rangoCosto.push(ct);
         var cat = ct < 50 ? 'economico' : ct < 80 ? 'medio' : 'premium';
         var badge = lk1 ? '<div style="background:var(--gold);color:var(--bd);padding:.15rem .5rem;border-radius:4px;font-size:.62rem;display:inline-block;margin-top:.2rem">&#11088; Especial</div>' : '';
         function pBox(lbl, nom, rec, c, lk, di, po) {
             if(!nom) return '<div class="pl"><div class="plt">' + lbl + '</div><div style="font-size:.8rem;color:var(--bl)">Sin platillos</div></div>';
+            // Marca el costo como incompleto si algun ingrediente no tiene precio validado
+            var sinP = ((rec && rec.ingredientes) || []).filter(function(i){ return i && !precioEnBanco(i.nombre); }).length;
+            var avisoC = sinP ? ' <span style="color:#C8553D;font-weight:700" title="' + sinP + ' ingrediente(s) sin precio validado en Egresos — no suman al costo">&#9888;</span>' : '';
             return '<div class="pl"><div class="plt">' + lbl + (lk ? ' &#128274;' : '') + '</div>'
                 + '<div class="pln">' + nom + '</div>'
-                + '<div class="plm"><span>&#128205; ' + (rec ? rec.region || 'Mexico' : 'Mexico') + '</span><span>$' + c.toFixed(2) + '/pax</span></div>'
+                + '<div class="plm"><span>&#128205; ' + (rec ? rec.region || 'Mexico' : 'Mexico') + '</span><span>$' + c.toFixed(2) + '/pax' + avisoC + '</span></div>'
                 + (lk ? '' : '<button class="btn bsec bsm" style="margin-top:.4rem;width:100%;padding:.35rem" onclick="cambiar(' + di + ',' + po + ',event)">&#128260; Cambiar</button>')
                 + '</div>';
         }
@@ -824,6 +829,7 @@ function genMenu() {
             + pBox('GARNACHA', ga, rg, cg, lkG, i, 3);
         grid.appendChild(div);
     }
+    actualizarStatCosto();
 }
 
 function setDias(n, btn) {
@@ -1503,22 +1509,11 @@ function resolverClaveBanco(n) {
 function getPrecio(n) {
     var k = resolverClaveBanco(n);
     if(k) return precios[k].precio;
-    // Respaldos por palabra clave (NO vienen del banco — se marcan como "sin banco").
-    // Tambien por palabra completa: antes "Queso fresco" pegaba con 'res' y costeaba $142.
-    var nl = _normIng(n);
-    if(_palabraEn(nl,'res') || _palabraEn(nl,'bistec') || _palabraEn(nl,'carne de res')) return 142;
-    if(_palabraEn(nl,'pollo') || _palabraEn(nl,'pechuga')) return 99;
-    if(_palabraEn(nl,'cerdo') || _palabraEn(nl,'puerco')) return 85;
-    if(_palabraEn(nl,'pescado')) return 185;
-    if(_palabraEn(nl,'queso')) return 136;
-    if(_palabraEn(nl,'crema')) return 65;
-    if(_palabraEn(nl,'papa')) return 22;
-    if(_palabraEn(nl,'cebolla')) return 18;
-    if(_palabraEn(nl,'jitomate') || _palabraEn(nl,'tomate')) return 25;
-    if(_palabraEn(nl,'frijol')) return 35;
-    if(_palabraEn(nl,'arroz')) return 24;
-    if(_palabraEn(nl,'aceite')) return 35;
-    return 50;
+    // Sin precio validado en Egresos = 0. NO se adivina.
+    // Antes aqui habia 12 precios inventados por palabra clave (res 142, pollo 99...) y un
+    // default de $50. Se quitaron: costeaban con numeros sin factura detras y contradecian
+    // a Egresos. Un 0 marcado como "sin banco" es honesto; un numero inventado engaña.
+    return 0;
 }
 
 // Unidad en la que viene expresado el precio: 'kg' (o 'lt', tratado igual que kg) para lo
@@ -1632,7 +1627,7 @@ function mostrarPreview(rec, paxO, paxD) {
         + '<table style="width:100%;border-collapse:collapse;margin-bottom:1.5rem">'
         + '<thead><tr style="background:var(--gold);color:var(--bd)"><th style="padding:.75rem;text-align:left">Ingrediente</th><th style="padding:.75rem;text-align:center">Original</th><th style="padding:.75rem;text-align:center">Para ' + paxD + ' pax</th><th style="padding:.75rem;text-align:center">$/kg·l·pz ✏️</th><th style="padding:.75rem;text-align:right">Costo</th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table>'
-        + '<div style="font-size:.78rem;color:var(--bl);margin-bottom:.5rem;padding:.4rem .75rem;background:#FFF3CD;border-radius:4px;border-left:3px solid var(--tc)">⚠️ Precios en <strong>naranja</strong> son estimados — edítalos antes de guardar</div>'
+        + '<div style="font-size:.78rem;color:var(--bl);margin-bottom:.5rem;padding:.4rem .75rem;background:#FFF3CD;border-radius:4px;border-left:3px solid var(--tc)">⚠️ Los precios en <strong>naranja</strong> están en $0: ese ingrediente <strong>no tiene precio validado en Egresos</strong> y no suma al costo. Captúralo en Egresos.</div>'
         + '<div class="csum"><div class="crow"><span>Costo Total (' + paxD + ' pax)</span><span id="prev-total">$' + tot.toFixed(2) + '</span></div>'
         + '<div class="crow"><span>Por Comensal</span><span id="prev-porcosto">$' + (tot/paxD).toFixed(2) + '</span></div></div>'
         + pasos
@@ -2014,7 +2009,7 @@ function renderAlacarta() {
             var marca = enBanco ? '' : ' <span style="color:#C8553D;font-size:.72rem" title="Sin precio en el banco de Egresos">&#9888;</span>';
             return '<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:.2rem 0;border-bottom:1px solid var(--cream)"><span>' + ing.nombre + marca + ' <span style="color:var(--bl)">' + (ing.cantidad<10?ing.cantidad:Math.round(ing.cantidad)) + ' ' + ing.unidad + '</span></span><span style="color:' + (enBanco?'var(--tc)':'var(--bl)') + '">$' + c.toFixed(2) + '</span></div>';
         }).join('');
-        var avisoBanco = sinBanco ? '<div style="padding:.35rem 1rem;font-size:.75rem;color:#8a3520;background:#FFF3CD;border-top:1px solid var(--cream)">&#9888; ' + sinBanco + ' ingrediente' + (sinBanco!==1?'s':'') + ' sin precio en el banco &mdash; costo estimado. Captura' + (sinBanco!==1?'los':'lo') + ' en Egresos.</div>' : '';
+        var avisoBanco = sinBanco ? '<div style="padding:.35rem 1rem;font-size:.75rem;color:#8a3520;background:#FFF3CD;border-top:1px solid var(--cream)">&#9888; <strong>Costo incompleto</strong>: ' + sinBanco + ' ingrediente' + (sinBanco!==1?'s':'') + ' sin precio validado en Egresos, <strong>no cuenta' + (sinBanco!==1?'n':'') + ' en el total</strong>. Captura' + (sinBanco!==1?'los':'lo') + ' en Egresos.</div>' : '';
         html += '<div style="background:#fff;border:1.5px solid rgba(212,175,55,.2);border-radius:8px;overflow:hidden">'
             + '<div style="background:linear-gradient(135deg,var(--bd),var(--bm));padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center">'
             + '<div><div style="color:var(--gold);font-weight:700">' + p.nombre + '</div><div style="margin-top:.2rem">' + bEstado + bCat + '</div></div>'
@@ -2088,7 +2083,7 @@ function _editorAlacarta(p) {
                     if(precioEnBanco(n)) {
                         ip.innerHTML = '$' + pkg.toFixed(2) + '/' + pu + ' <span style="color:var(--tc);font-weight:700;margin-left:.2rem">$' + linea.toFixed(2) + '</span>';
                     } else {
-                        ip.innerHTML = '<span style="color:#C8553D" title="Sin precio en el banco de Egresos — captura este producto en Egresos">&#9888; sin banco</span> <span style="color:var(--bl);margin-left:.2rem">~$' + linea.toFixed(2) + '</span>';
+                        ip.innerHTML = '<span style="color:#C8553D" title="Sin precio validado en Egresos — no suma al costo. Captura este producto en Egresos.">&#9888; sin precio</span>';
                     }
                 }
                 tot += linea;
