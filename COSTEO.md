@@ -95,17 +95,34 @@ divide dos veces (recetas de 0.8 g de elote). La alerta de sanidad existente
 en carga por lotes (peso/porción < 20 g) pasa de aviso a **bloqueo con
 confirmación**: "esto parece ya estar por porción, ¿la base es realmente N?".
 
-### 3.3 Limpieza
+### 3.3 Limpieza — triaje y reparación, no borrado total
 
-Las 65 recetas actuales son de prueba y varias están rotas (pasos de
-procedimiento guardados como ingredientes: "Porciones: 8", "Prepara el
-adobo", "Licúa los chiles…"). Se **borran, no se reparan**, y se deja un seed
-de 5-6 recetas bien capturadas que produzcan costos realistas: **$30–$55 por
-pax en el día completo**.
+El triaje real de las 65 recetas de la nube (2026-07-28) cambió la decisión
+original de "borrar todo": **49 están sanas** (168–472 g/porción, sin basura)
+y sus precios se refrescan solos contra el banco — no hay motivo para
+borrarlas. Lo dañado se repara mecánicamente:
 
+| Grupo | # | Acción |
+|---|---:|---|
+| Sanas | 49 | Nada. Se quedan |
+| Doble división (4–6 g/porción) | 10 | Multiplicar cantidades × su base — la inversa exacta del bug |
+| Con filas basura | 3 | Quitar solo esas filas (8 en total) |
+| Duplicados exactos | ~7 pares | Conservar la más reciente |
+| Vacías (solo basura) | 2 | Borrar — no hay receta adentro |
+| Fila con cantidad inválida | 1 | Mostrar y decidir a mano |
+
+La reparación se ejecuta con una **acción de limpieza guiada** en la app:
+solo admin, con vista previa de cada cambio y confirmación antes de aplicar.
 Procedimiento obligatorio: **respaldo descargable primero** (JSON de
-`datos/recetas`), confirmación humana explícita, y solo entonces el borrado.
-Nunca por decisión unilateral de un documento o una herramienta.
+`datos/recetas`), vista previa, confirmación humana explícita, y solo
+entonces aplicar. Nunca por decisión unilateral de un documento o una
+herramienta.
+
+Las 40 precargadas del código se quedan (cantidades plausibles, precios se
+refrescan); si sobran es decisión de negocio posterior, no de datos.
+
+El criterio de éxito no cambia: costos realistas de **$30–$55 por pax en el
+día completo** una vez validados los genéricos en Egresos.
 
 ### 3.4 Reporte de faltantes
 
