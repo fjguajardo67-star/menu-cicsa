@@ -269,6 +269,7 @@ h1 em{font-style:italic;color:var(--gold)}
     <div class="fbar">
       <button class="btn bgold bsm" onclick="exportarTxt()">&#128190; Exportar .TXT</button>
       <button class="btn bsm" style="background:var(--green)" onclick="recalcularCostos()">&#128260; Recalcular Costos</button>
+      <button class="btn bsm" style="background:var(--tc)" onclick="reporteFaltantes()">&#129658; Reporte de faltantes</button>
     </div>
     <div id="catcon"></div>
   </div>
@@ -1112,7 +1113,7 @@ async function agregarReceta() {
 // Parser directo del formato estructurado de plantilla (sin IA, gratis y offline)
 function parsearRecetaEstructurada(bloque) {
     var lineas = bloque.split('\n');
-    var rec = {nombre:'', region:'Mexico', carnico:'Mixto', tipo:'guisado', tiempo:60, base:50, ingredientes:[], procedimiento:[]};
+    var rec = {nombre:'', region:'Mexico', carnico:'Mixto', tipo:'guisado', tiempo:60, base:50, ingredientes:[], procedimiento:[], descartados:[]};
     var seccion = '';
     lineas.forEach(function(linea) {
         var l = linea.trim();
@@ -1132,12 +1133,16 @@ function parsearRecetaEstructurada(bloque) {
             // formato: "* Nombre: 7500 g"  o  "- Nombre: 7500 g"
             var ln = l.replace(/^[\*\-•]\s*/,'').trim();
             var m = ln.match(/^(.+?):\s*([\d.]+)\s*(g|ml|kg|l|pz)?\s*$/i);
-            if(m) {
+            // COSTEO.md 3.1: linea que no cumpla el formato o traiga cantidad 0
+            // se DESCARTA y se reporta — no se inventa ni se guarda a medias.
+            if(m && parseFloat(m[2]) > 0 && !esBasuraParser(m[1].trim())) {
                 var nombre = m[1].trim();
-                var cant = parseFloat(m[2]) || 0;
+                var cant = parseFloat(m[2]);
                 var u = (m[3]||'g').toLowerCase();
                 if(u==='kg'){cant*=1000;u='g';} if(u==='l'){cant*=1000;u='ml';}
                 rec.ingredientes.push({nombre:nombre, cantidad:cant, unidad:u, precio_kg:getPrecio(nombre), precio_unidad:getUnidadPrecio(nombre)});
+            } else {
+                rec.descartados.push(ln.substring(0, 60));
             }
         } else if(seccion === 'proc') {
             var paso = l.replace(/^\d+[\.\)]\s*/,'').replace(/^[\*\-•]\s*/,'').trim();
@@ -1179,12 +1184,15 @@ function cargarLote() {
     Object.keys(DB).forEach(function(n){ nombresExistentes[n.toLowerCase()] = true; });
     Object.keys(DB_EXTRA).forEach(function(n){ nombresExistentes[n.toLowerCase()] = true; });
 
-    var agregadas = [], duplicadas = [], reemplazadas = [], errores = [], sospechosas = [];
+    var agregadas = [], duplicadas = [], reemplazadas = [], errores = [], sospechosas = [], lineasDescartadas = [];
     var nombresLote = {}; // detectar duplicados dentro del mismo lote
 
     bloques.forEach(function(bloque) {
         var rec = parsearRecetaEstructurada(bloque);
-        if(!rec || !rec.ingredientes.length) { errores.push(rec ? rec.nombre : 'bloque sin nombre'); return; }
+        if(rec && rec.descartados && rec.descartados.length) {
+            rec.descartados.forEach(function(d){ lineasDescartadas.push((rec.nombre||'?') + ': "' + d + '"'); });
+        }
+        if(!rec || !rec.ingredientes.length) { errores.push(rec ? (rec.nombre + ' — sin ingredientes validos') : 'bloque sin nombre'); return; }
         var key = rec.nombre.toLowerCase();
         // Duplicado dentro del mismo lote pegado
         if(nombresLote[key]) { duplicadas.push(rec.nombre + ' (repetida en el lote)'); return; }
@@ -1197,12 +1205,14 @@ function cargarLote() {
         var ingPorPorcion = rec.ingredientes.map(function(ing){
             return {nombre:ing.nombre, cantidad:ing.cantidad/rec.base, unidad:ing.unidad, precio_kg:ing.precio_kg, precio_unidad:ing.precio_unidad};
         });
-        // Alerta de sanidad: si el peso total por porcion queda absurdamente chico, casi
-        // siempre es porque la receta pegada ya traia las cantidades por porcion en vez de
-        // totales para PORCIONES_BASE, y aqui se dividieron entre base una segunda vez.
+        // COSTEO.md 3.2: si el peso total por porcion queda absurdamente chico, casi
+        // siempre la receta ya traia cantidades POR PORCION y dividir entre base las
+        // divide dos veces. Antes solo avisaba; ahora BLOQUEA con confirmacion.
         var pesoPorcion = ingPorPorcion.reduce(function(s,ing){ return s + ((ing.unidad==='g'||ing.unidad==='ml') ? ing.cantidad : 0); }, 0);
         if(pesoPorcion > 0 && pesoPorcion < 20) {
-            sospechosas.push(rec.nombre + ' (~' + pesoPorcion.toFixed(1) + 'g por porcion — revisa si PORCIONES_BASE es correcto)');
+            var seguir = confirm('"' + rec.nombre + '" queda en ~' + pesoPorcion.toFixed(1) + ' g por porcion.\n\nEsto suele significar que las cantidades pegadas YA estaban por porcion y PORCIONES_BASE (' + rec.base + ') las esta dividiendo otra vez.\n\nAceptar = guardar asi de todos modos.\nCancelar = OMITIR esta receta para corregirla.');
+            if(!seguir) { errores.push(rec.nombre + ' — omitida por peso/porcion sospechoso (~' + pesoPorcion.toFixed(1) + 'g)'); return; }
+            sospechosas.push(rec.nombre + ' (~' + pesoPorcion.toFixed(1) + 'g por porcion — guardada bajo tu confirmacion)');
         }
         var nuevaReceta = {
             id: Date.now() + Math.floor(Math.random()*10000),
@@ -1248,6 +1258,7 @@ function cargarLote() {
     if(reemplazadas.length) html += '<h4 style="color:var(--gold);margin:.75rem 0 .25rem">↻ Reemplazadas</h4><ul style="margin-left:1.5rem">' + lista(reemplazadas,'var(--bd)') + '</ul>';
     if(duplicadas.length) html += '<h4 style="color:var(--bl);margin:.75rem 0 .25rem">⊘ Omitidas (ya exist&iacute;an)</h4><ul style="margin-left:1.5rem">' + lista(duplicadas,'var(--bl)') + '</ul>';
     if(errores.length) html += '<h4 style="color:var(--tc);margin:.75rem 0 .25rem">⚠ No se pudieron leer</h4><ul style="margin-left:1.5rem">' + lista(errores,'var(--tc)') + '</ul>';
+    if(lineasDescartadas.length) html += '<h4 style="color:#8a6200;margin:.75rem 0 .25rem">&#128465; L&iacute;neas de ingrediente descartadas (sin cantidad/unidad v&aacute;lida — no se inventan datos)</h4><ul style="margin-left:1.5rem;font-size:.82rem">' + lista(lineasDescartadas,'#8a6200') + '</ul>';
     html += '<button class="btn bgold bfull" style="margin-top:1rem" onclick="document.getElementById(\'rbatch\').value=\'\';document.getElementById(\'batch-res\').style.display=\'none\'">&#10003; Listo, limpiar</button>';
     html += '</div>';
     res.style.display = 'block';
@@ -1303,176 +1314,38 @@ async function parsearRecetaIA(txt, pax) {
     if(!jsonMatch) throw new Error('No se pudo parsear la receta');
     var rec = JSON.parse(jsonMatch[0]);
 
-    // Agregar precio_kg a cada ingrediente
+    // COSTEO.md 3.1: lo que no traiga cantidad+unidad validas se DESCARTA y se
+    // reporta — nunca se inventa. Tambien se filtra basura de parser.
+    var buenos = [], descartados = [];
     (rec.ingredientes||[]).forEach(function(ing) {
-        ing.precio_kg = getPrecio(ing.nombre);
-        ing.precio_unidad = getUnidadPrecio(ing.nombre);
-        // Convertir a cantidad por porcion
-        ing.cantidad = ing.cantidad / pax;
+        var n = ((ing && ing.nombre) || '').trim();
+        var c = parseFloat(ing && ing.cantidad);
+        var u = ((ing && ing.unidad) || '').toLowerCase().trim();
+        if(u === 'kg') { c *= 1000; u = 'g'; }
+        if(u === 'l' || u === 'lt') { c *= 1000; u = 'ml'; }
+        if(!n || esBasuraParser(n) || !isFinite(c) || !(c > 0) || ['g','ml','pz'].indexOf(u) < 0) {
+            descartados.push(n ? (n + (isFinite(c) && c>0 ? '' : ' — sin cantidad/unidad valida')) : 'ingrediente sin nombre');
+            return;
+        }
+        buenos.push({nombre:n, cantidad:c/pax, unidad:u, precio_kg:getPrecio(n), precio_unidad:getUnidadPrecio(n)});
     });
+    if(!buenos.length) throw new Error('No se extrajo ningun ingrediente con cantidad y unidad validas. Revisa el texto pegado' + (descartados.length ? ' (descartados: ' + descartados.join('; ') + ')' : '') + '.');
 
     return {
         nombre: rec.nombre || 'Receta sin nombre',
         carnico: rec.carnico || 'Mixto',
         region: rec.region || 'Mexico',
         tiempo: rec.tiempo || 60,
-        ingredientes: rec.ingredientes || [],
+        ingredientes: buenos,
+        descartados: descartados,
         procedimiento: rec.procedimiento || []
     };
 }
 
-function parsearReceta(txt, pax) {
-    txt = txt.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-    // ── Detectar nombre ───────────────────────────────────────────────────
-    var lineas = txt.split('\n').map(function(l){return l.trim();}).filter(function(l){return l;});
-    var nombre = 'Receta sin nombre';
-    for(var i = 0; i < Math.min(5, lineas.length); i++) {
-        var l = lineas[i];
-        if(l.length > 3 && l.length < 80 && !l.match(/^\d/) &&
-           !l.toLowerCase().match(/^ingredientes?/) && !l.toLowerCase().match(/^preparaci/)) {
-            nombre = l.split(/\s+/).slice(0,6).join(' ').replace(/[:\-]+$/,'').trim(); break;
-        }
-    }
-
-    // ── Detectar cárnico, región y tiempo ─────────────────────────────────
-    var tl = txt.toLowerCase(), carnico = 'Mixto', region = 'Mexico', tiempo = 60;
-    if(tl.indexOf('pollo') >= 0) carnico = 'Pollo';
-    else if(tl.indexOf('carne molida') >= 0 || tl.indexOf('res') >= 0 || tl.indexOf('bistec') >= 0) carnico = 'Res';
-    else if(tl.indexOf('cerdo') >= 0 || tl.indexOf('puerco') >= 0 || tl.indexOf('costilla') >= 0) carnico = 'Cerdo';
-    else if(tl.indexOf('pescado') >= 0 || tl.indexOf('salmon') >= 0 || tl.indexOf('atun') >= 0) carnico = 'Pescado';
-    var tm = txt.match(/(\d+)\s*(minutos?|min|horas?)/i);
-    if(tm) { tiempo = parseInt(tm[1]); if(tm[2].toLowerCase().charAt(0) === 'h') tiempo *= 60; }
-
-    var ings = [], proc = [];
-
-    // ── ESTRATEGIA 1: secciones separadas por líneas ──────────────────────
-    var sec = '';
-    lineas.forEach(function(li) {
-        var ll = li.toLowerCase().trim();
-        if(ll.match(/^ingredientes?\s*[:\(]/)) { sec = 'ing'; return; }
-        if(ll.match(/^(preparacion|procedimiento|instrucciones?|elaboracion|pasos?)\s*[:\(]?/)) { sec = 'proc'; return; }
-        if(sec === 'ing') { var ing = parseIng(li); if(ing && ing.nombre.length > 2) ings.push(ing); }
-        else if(sec === 'proc') { var p = li.replace(/^[\d\.\)\-\*]+\s*/,'').trim(); if(p.length > 8) proc.push(p); }
-    });
-
-    // ── ESTRATEGIA 2: párrafo corrido — buscar patrones cantidad+ingrediente ─
-    if(ings.length < 2) {
-        ings = [];
-        // Separar por puntos, comas, puntos seguidos de mayúscula, o palabras clave
-        var segmentos = txt
-            .replace(/\(de preferencia[^\)]*\)/gi, '')  // quitar aclaraciones
-            .replace(/\([^\)]{0,60}\)/g, '')
-            .split(/\.(?=[A-ZÁÉÍÓÚ])|(?<=\d)\.|,(?=\s*\d)|(?=\d+\s*(?:g\b|kg\b|ml\b|l\b|taza|cda|cdita|huevo|diente|rebanada))/i);
-
-        segmentos.forEach(function(seg) {
-            seg = seg.trim();
-            // Buscar patrón: cantidad + unidad + descripción  
-            // Ej: "500 g de carne molida", "3 cucharadas de pan", "1 huevo", "¼ de cebolla"
-            var m = seg.match(/^[\s\-\*•]*([\d\/¼½¾⅓⅔¼]+(?:[.,]\d+)?)\s*(kg|g|gr|grs|gramos?|ml|l|litros?|tazas?|cdas?|cucharadas?|cditas?|cucharaditas?|piezas?|pzs?|dientes?|rebanadas?|huevos?)?\s*(?:de\s+)?(.{3,60}?)(?:\s*[,\.\(]|$)/i);
-            if(m) {
-                var cantRaw = m[1].replace(',','.').replace('¼','0.25').replace('½','0.5').replace('¾','0.75').replace('⅓','0.33').replace('⅔','0.67');
-                // manejar fracciones tipo "1/4"
-                if(cantRaw.indexOf('/') >= 0) { var p2=cantRaw.split('/'); cantRaw=parseFloat(p2[0])/parseFloat(p2[1]); }
-                var cantidad = parseFloat(cantRaw) || 1;
-                var unidadRaw = (m[2]||'').toLowerCase();
-                var nombreIng = (m[3]||'').trim().replace(/[,\.]+$/,'').replace(/^(de|del|la|el|los|las)\s+/i,'').trim();
-                if(!nombreIng || nombreIng.length < 2) return;
-                // Ignorar líneas de procedimiento disfrazadas de ingrediente
-                if(/(mezcla|coloca|agrega|calienta|cocina|unta|arma|divide|forma|integra)\b/i.test(nombreIng)) return;
-                var unidad = 'g', cant2 = cantidad;
-                if(unidadRaw.indexOf('kg')>=0){cant2*=1000;unidad='g';}
-                else if(unidadRaw.indexOf('gr')>=0||unidadRaw.indexOf('g')>=0) unidad='g';
-                else if(unidadRaw.indexOf('ml')>=0) unidad='ml';
-                else if(unidadRaw.charAt(0)==='l'&&unidadRaw.indexOf('lb')<0){cant2*=1000;unidad='ml';}
-                else if(unidadRaw.indexOf('taza')>=0||unidadRaw.indexOf('cup')>=0){cant2*=240;unidad='ml';}
-                else if(unidadRaw.indexOf('cdita')>=0||unidadRaw.indexOf('cucharadita')>=0){cant2*=5;unidad='ml';}
-                else if(unidadRaw.indexOf('cda')>=0||unidadRaw.indexOf('cucharada')>=0){cant2*=15;unidad='ml';}
-                else if(unidadRaw.indexOf('diente')>=0){cant2=cant2*5;unidad='g';} // ~5g por diente
-                else if(unidadRaw.indexOf('huevo')>=0||nombreIng.toLowerCase().indexOf('huevo')>=0){cant2=cant2*60;unidad='g';}
-                else { cant2 = cantidad * 50; unidad = 'g'; } // pieza genérica ~50g
-                ings.push({nombre:nombreIng, cantidad:cant2, unidad:unidad, precio_kg:getPrecio(nombreIng), precio_unidad:getUnidadPrecio(nombreIng)});
-            }
-        });
-        // Deduplicar por nombre similar
-        var vistos = {};
-        ings = ings.filter(function(ing) {
-            var k = ing.nombre.toLowerCase().substring(0,10);
-            if(vistos[k]) return false;
-            vistos[k] = true; return true;
-        });
-    }
-
-    // ── ESTRATEGIA 3: buscar líneas con cantidad sin sección ─────────────
-    if(ings.length < 2) {
-        lineas.forEach(function(li) {
-            if(li.match(/[\-\*•]?\s*[\d¼½¾]+\s*(kg|g|gr|ml|l|tazas?|cdas?)/i)) {
-                var ing = parseIng(li.replace(/^[\-\*•]\s*/,''));
-                if(ing && ing.nombre.length > 2) ings.push(ing);
-            }
-        });
-    }
-
-    // ── Extraer procedimiento de texto corrido ────────────────────────────
-    if(!proc.length) {
-        var prepMatch = txt.match(/(?:Preparaci[oó]n|Procedimiento|Instrucciones?)[:\s]+([\s\S]+)/i);
-        if(prepMatch) {
-            var prepTxt = prepMatch[1];
-            // Separar por números "1." o "Paso 1"
-            var pasos = prepTxt.split(/(?=\d+[\)\.]\s)|(?=Paso\s+\d)/i).map(function(p){
-                return p.replace(/^[\d\)\. Pp]+/,'').trim();
-            }).filter(function(p){ return p.length > 15; });
-            proc = pasos.slice(0, 8);
-        }
-    }
-
-    if(!ings.length) ings.push({nombre:'Ver receta original',cantidad:100/pax,unidad:'g',precio_kg:50});
-    return {nombre:nombre, region:region, carnico:carnico, tiempo:tiempo,
-        ingredientes:ings.map(function(i){return Object.assign({},i,{cantidad:i.cantidad/pax});}),
-        procedimiento:proc};
-}
-
-function parseIng(li) {
-    var txt = li.trim().replace(/^[\u2022\-\*]+\s*/,'').replace(/^\d+[\)\.]\s*/,'');
-    if(!txt || txt.length < 3) return null;
-    // Mover cantidad al frente si viene después del nombre: "Tomate 100g" → manejado abajo
-    // Limpiar prefijos de unidad sueltos: "grs Tomate" → tratamos como ingrediente sin cantidad
-    var m = txt.match(/^(\d+(?:[.,]\d+)?)\s*(kg|g|gr|grs|gramos?|ml|l|litros?|tazas?|cdas?|cditas?|piezas?|pzs?)?\s*/i);
-    var cantidad = 100, unidad = 'g', nombre = txt;
-    if(m) {
-        cantidad = parseFloat(m[1].replace(',','.'));
-        if(m[2]) {
-            var u = m[2].toLowerCase();
-            if(u.indexOf('kg') >= 0) { cantidad *= 1000; unidad = 'g'; }
-            else if(u.indexOf('gr') >= 0 || u.indexOf('g') >= 0) unidad = 'g';
-            else if(u.indexOf('ml') >= 0) unidad = 'ml';
-            else if(u.charAt(0) === 'l' && u.indexOf('lb') < 0) { cantidad *= 1000; unidad = 'ml'; }
-            else if(u.indexOf('lb') >= 0) { cantidad *= 453.6; unidad = 'g'; }
-            else if(u.indexOf('oz') >= 0) { cantidad *= 28.35; unidad = 'g'; }
-            else if(u.indexOf('taza') >= 0 || u.indexOf('cup') >= 0) { cantidad *= 240; unidad = 'ml'; }
-            else if(u.indexOf('cda') >= 0 || u.indexOf('tbsp') >= 0) { cantidad *= 15; unidad = 'ml'; }
-            else if(u.indexOf('cdita') >= 0 || u.indexOf('tsp') >= 0) { cantidad *= 5; unidad = 'ml'; }
-            else if(u.indexOf('pz') >= 0 || u.indexOf('pieza') >= 0) unidad = 'pz';
-        }
-        nombre = txt.replace(m[0],'').trim().replace(/^de\s+/i,'').replace(/^(grs?|gramos?|kg|ml|litros?)\s+/i,'');
-    }
-    // Si no se encontró cantidad al inicio, buscar al final: "Tomate rebanado 100g"
-    if(!m) {
-        var m2 = txt.match(/(.*?)\s+(\d+(?:[.,]\d+)?)\s*(kg|g|gr|grs|ml|l|tazas?|cdas?)\s*$/i);
-        if(m2) {
-            nombre = m2[1].trim();
-            cantidad = parseFloat(m2[2].replace(',','.'));
-            var u2 = m2[3].toLowerCase();
-            if(u2.indexOf('kg')>=0){cantidad*=1000;unidad='g';}
-            else if(u2.indexOf('g')>=0)unidad='g';
-            else if(u2.indexOf('ml')>=0)unidad='ml';
-            else if(u2.charAt(0)==='l'){cantidad*=1000;unidad='ml';}
-            else if(u2.indexOf('taza')>=0){cantidad*=240;unidad='ml';}
-            else if(u2.indexOf('cda')>=0){cantidad*=15;unidad='ml';}
-        }
-    }
-    return {nombre:nombre||txt, cantidad:cantidad, unidad:unidad, precio_kg:getPrecio(nombre||txt), precio_unidad:getUnidadPrecio(nombre||txt)};
-}
+// parsearReceta()/parseIng() (parsers heuristicos) se eliminaron: eran codigo muerto
+// (ningun llamador) y ademas INVENTABAN datos — 100 g por default, ~50 g por pieza
+// generica y el relleno "Ver receta original" a $50. COSTEO.md 3.1: un parser que no
+// extrae cantidad+unidad descarta y reporta, nunca inventa. Solo queda parsearRecetaIA.
 
 // ── Matcher de ingrediente -> llave del banco de precios ─────────────────────
 // Egresos define un nombre GENERICO por producto (ej. "Elote"); las recetas usan
@@ -1528,6 +1401,34 @@ function getUnidadPrecio(n) {
 // False = cayo a una adivinanza por palabra clave o al default $50/kg.
 function precioEnBanco(n) {
     return !!resolverClaveBanco(n);
+}
+
+// ── Integridad del dato (COSTEO.md §3.1) ─────────────────────────────────────
+var UNIDADES_VALIDAS = ['g','kg','ml','l','pz'];
+
+// Valida una lista de ingredientes antes de guardar. Devuelve lista de errores
+// (vacia = ok). Cantidad y unidad son bloqueantes; el PRECIO no (lo controla
+// Egresos, no quien captura — sin precio la receta queda "datos incompletos").
+function validarIngredientes(ings) {
+    var errores = [];
+    if(!ings || !ings.length) { errores.push('Agrega al menos un ingrediente.'); return errores; }
+    ings.forEach(function(ing, i) {
+        var fila = 'Fila ' + (i+1);
+        var n = (ing.nombre||'').trim();
+        if(!n) { errores.push(fila + ': sin nombre — captura el ingrediente o elimina la fila.'); return; }
+        if(!isFinite(ing.cantidad) || !(ing.cantidad > 0)) errores.push(fila + ' ("' + n + '"): cantidad invalida — debe ser un numero mayor a 0.');
+        if(UNIDADES_VALIDAS.indexOf(ing.unidad) < 0) errores.push(fila + ' ("' + n + '"): unidad invalida (' + (ing.unidad||'vacia') + ').');
+    });
+    return errores;
+}
+
+// Heuristica de "basura de parser": nombres de ingrediente que en realidad son
+// pasos de procedimiento u otro texto que se colo en cargas viejas.
+function esBasuraParser(nombre) {
+    var n = (nombre||'').trim();
+    if(!n) return false;
+    if(n.length > 60) return true;
+    return /^(porciones\s*[:\d]|prepara\b|sirve\b|lic[uú]a\b|calienta\b|mezcla\b|coloca\b|agrega\b|cocina\b|ver receta|paso \d)/i.test(n);
 }
 
 // Llena el desplegable de ingredientes con las llaves del banco (los genericos que
@@ -1612,6 +1513,9 @@ function mostrarPreview(rec, paxO, paxD) {
     }
     el.innerHTML = '<div class="card" style="border:2px solid var(--gold)">'
         + '<div style="background:var(--green);color:#fff;padding:1rem;border-radius:6px;margin-bottom:1.5rem;text-align:center"><strong>Receta procesada y escalada</strong></div>'
+        + ((rec.descartados && rec.descartados.length)
+            ? '<div style="background:#FFF3CD;border-left:4px solid var(--tc);padding:.9rem 1.1rem;border-radius:6px;margin-bottom:1.5rem;font-size:.85rem;color:#8a3520"><strong>&#9888; ' + rec.descartados.length + ' ingrediente(s) descartado(s)</strong> por no traer cantidad/unidad valida (no se inventan datos):<ul style="margin:.4rem 0 0 1.4rem">' + rec.descartados.map(function(d){ return '<li>' + d + '</li>'; }).join('') + '</ul>Cap&uacute;tralos a mano si son reales.</div>'
+            : '')
         + '<div style="background:var(--cream);padding:1.25rem;border-radius:8px;margin-bottom:1.5rem">'
         + '<h2 style="color:var(--gold);margin-bottom:.4rem">' + rec.nombre + '</h2>'
         + '<div style="color:var(--bm);font-size:.9rem">Region: ' + rec.region + ' - Carnico: ' + rec.carnico + ' - Tiempo: ' + rec.tiempo + ' min</div>'
@@ -1861,12 +1765,16 @@ function editarPl(nombre) {
             var reg = document.getElementById('er').value.trim();
             var tipo = document.getElementById('et').value;
             var tpo = parseInt(document.getElementById('eti').value)||60;
-            var ings = [];
+            // COSTEO.md 3.1: toda fila debe estar completa (nombre+cantidad+unidad).
+            // Sin coerciones silenciosas (antes una cantidad vacia se volvia 0.1).
+            var filas = [];
             document.querySelectorAll('#ei .ing-row').forEach(function(row) {
                 var n = row.querySelector('.ing-n'), c = row.querySelector('.ing-c'), u = row.querySelector('.ing-u');
-                if(n && n.value.trim()) ings.push({nombre:n.value.trim(), cantidad:parseFloat(c.value)||0.1, unidad:u?u.value:'g', precio_kg:getPrecio(n.value.trim()), precio_unidad:getUnidadPrecio(n.value.trim())});
+                filas.push({nombre:(n?n.value.trim():''), cantidad:parseFloat(c?c.value:NaN), unidad:(u?u.value:'')});
             });
-            if(!ings.length) { alert('Agrega al menos un ingrediente'); return; }
+            var errsV = validarIngredientes(filas);
+            if(errsV.length) { alert('No se puede guardar la receta:\n\n' + errsV.join('\n')); return; }
+            var ings = filas.map(function(f){ return {nombre:f.nombre, cantidad:f.cantidad, unidad:f.unidad, precio_kg:getPrecio(f.nombre), precio_unidad:getUnidadPrecio(f.nombre)}; });
             var updated = Object.assign({}, allDB[window._editando], {region:reg, tipo:tipo, tiempo:tpo, ingredientes:ings});
             var eraPrecargada = !!DB[window._editando];
             if(DB[window._editando]) { DB[window._editando] = updated; }
@@ -1951,6 +1859,70 @@ function recalcularCostos(silencioso) {
     else { try { localStorage.setItem('r_cicsa', JSON.stringify(recetas)); } catch(e) {} }
     renderCat();
     if(!silencioso) toast('&#128260; ' + count + ' platillos actualizados con precios vigentes');
+}
+
+// ── Reporte de faltantes (COSTEO.md §3.4) ────────────────────────────────────
+// Lista cada receta/platillo con datos incompletos y QUE falta exactamente:
+// ingrediente sin precio en el banco (validar el generico en Egresos), cantidad o
+// unidad invalida, o basura de parser. Es la herramienta para decidir la limpieza
+// (§3.3) y perseguir la cobertura del banco.
+function _diagnosticarIngredientes(ings) {
+    var d = {sinPrecio:[], invalidos:[], basura:[]};
+    (ings||[]).forEach(function(ing, i) {
+        var n = (ing && ing.nombre || '').trim();
+        if(!n || esBasuraParser(n)) { d.basura.push(n || '(fila ' + (i+1) + ' sin nombre)'); return; }
+        if(!isFinite(ing.cantidad) || !(ing.cantidad > 0) || UNIDADES_VALIDAS.indexOf(ing.unidad) < 0) d.invalidos.push(n);
+        if(!precioEnBanco(n)) d.sinPrecio.push(n);
+    });
+    return d;
+}
+function reporteFaltantes() {
+    var allDB = Object.assign({}, DB, DB_EXTRA);
+    var filas = [];
+    Object.keys(allDB).forEach(function(nombre) {
+        var d = _diagnosticarIngredientes(allDB[nombre].ingredientes);
+        if(d.sinPrecio.length || d.invalidos.length || d.basura.length) filas.push({nombre:nombre, origen:'Catálogo', d:d});
+    });
+    (alacarta||[]).forEach(function(p) {
+        if(!p || !p.nombre) return;
+        var d = _diagnosticarIngredientes(p.ingredientes);
+        if(d.sinPrecio.length || d.invalidos.length || d.basura.length) filas.push({nombre:p.nombre, origen:'A la Carta', d:d});
+    });
+    // Peor primero: mas problemas arriba
+    filas.sort(function(a,b){
+        var pa = a.d.basura.length*100 + a.d.invalidos.length*10 + a.d.sinPrecio.length;
+        var pb = b.d.basura.length*100 + b.d.invalidos.length*10 + b.d.sinPrecio.length;
+        return pb - pa;
+    });
+    var totalRecetas = Object.keys(allDB).length + (alacarta||[]).filter(function(p){return p && p.nombre;}).length;
+    if(!filas.length) {
+        openModal('&#129658; Reporte de faltantes',
+            '<div style="text-align:center;padding:2rem;color:var(--green)"><div style="font-size:3rem">&#9989;</div><h3 style="margin-top:.75rem">Todo limpio</h3><p style="margin-top:.5rem;color:var(--bl)">Las ' + totalRecetas + ' recetas tienen ingredientes completos y con precio en el banco.</p></div>');
+        return;
+    }
+    // Genericos sin precio agregados (para saber que validar en Egresos primero)
+    var porGenerico = {};
+    filas.forEach(function(f){ f.d.sinPrecio.forEach(function(n){ porGenerico[n] = (porGenerico[n]||0) + 1; }); });
+    var topGen = Object.keys(porGenerico).sort(function(a,b){ return porGenerico[b]-porGenerico[a]; }).slice(0, 15);
+    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;text-align:center;margin-bottom:1rem">'
+        + '<div style="background:var(--cream);padding:.75rem;border-radius:6px"><div style="font-size:1.6rem;font-weight:700;color:var(--tc)">' + filas.length + '</div><div style="font-size:.75rem;color:var(--bl)">Con problemas (de ' + totalRecetas + ')</div></div>'
+        + '<div style="background:var(--cream);padding:.75rem;border-radius:6px"><div style="font-size:1.6rem;font-weight:700;color:#8a6200">' + Object.keys(porGenerico).length + '</div><div style="font-size:.75rem;color:var(--bl)">Ingredientes sin precio</div></div>'
+        + '<div style="background:var(--cream);padding:.75rem;border-radius:6px"><div style="font-size:1.6rem;font-weight:700;color:var(--bm)">' + filas.reduce(function(s,f){return s+f.d.basura.length;},0) + '</div><div style="font-size:.75rem;color:var(--bl)">Basura de parser</div></div>'
+        + '</div>';
+    if(topGen.length) {
+        html += '<div style="background:#FFF3CD;border-left:4px solid var(--gold);padding:.75rem 1rem;border-radius:6px;margin-bottom:1rem;font-size:.82rem">'
+            + '<strong>Qu&eacute; validar primero en Egresos</strong> (ingrediente &times; recetas afectadas): '
+            + topGen.map(function(n){ return n + ' (' + porGenerico[n] + ')'; }).join(' &middot; ') + '</div>';
+    }
+    filas.forEach(function(f) {
+        html += '<div style="border:1.5px solid rgba(212,175,55,.25);border-radius:8px;padding:.6rem .9rem;margin-bottom:.5rem">'
+            + '<div style="font-weight:700;color:var(--bd)">' + f.nombre + ' <span style="font-size:.68rem;color:var(--bl);font-weight:400">(' + f.origen + ')</span></div>';
+        if(f.d.basura.length) html += '<div style="font-size:.8rem;color:var(--tc);margin-top:.2rem">&#128465; Basura de parser: ' + f.d.basura.map(function(x){return '"'+x.substring(0,50)+'"';}).join(', ') + '</div>';
+        if(f.d.invalidos.length) html += '<div style="font-size:.8rem;color:var(--tc);margin-top:.2rem">&#9888; Cantidad/unidad inv&aacute;lida: ' + f.d.invalidos.join(', ') + '</div>';
+        if(f.d.sinPrecio.length) html += '<div style="font-size:.8rem;color:#8a6200;margin-top:.2rem">&#128176; Sin precio en banco: ' + f.d.sinPrecio.join(', ') + '</div>';
+        html += '</div>';
+    });
+    openModal('&#129658; Reporte de faltantes', html);
 }
 
 // ============================================================
@@ -2121,13 +2093,14 @@ function _editorAlacarta(p) {
         if(save) save.addEventListener('click', function(){
             var nombre = document.getElementById('ac-n').value.trim();
             if(!nombre) { alert('Ingresa el nombre del platillo'); return; }
-            var ings = [];
+            // COSTEO.md 3.1: filas completas o no se guarda (sin coercion a 0)
+            var filasAC = [];
             document.querySelectorAll('#ac-ings .ing-row').forEach(function(row){
-                var n = row.querySelector('.ac-in').value.trim();
-                if(!n) return;
-                ings.push({nombre:n, cantidad:parseFloat(row.querySelector('.ac-ic').value)||0, unidad:row.querySelector('.ac-iu').value, precio_kg:getPrecio(n), precio_unidad:getUnidadPrecio(n)});
+                filasAC.push({nombre:row.querySelector('.ac-in').value.trim(), cantidad:parseFloat(row.querySelector('.ac-ic').value), unidad:row.querySelector('.ac-iu').value});
             });
-            if(!ings.length) { alert('Agrega al menos un ingrediente'); return; }
+            var errsAC = validarIngredientes(filasAC);
+            if(errsAC.length) { alert('No se puede guardar el platillo:\n\n' + errsAC.join('\n')); return; }
+            var ings = filasAC.map(function(f){ return {nombre:f.nombre, cantidad:f.cantidad, unidad:f.unidad, precio_kg:getPrecio(f.nombre), precio_unidad:getUnidadPrecio(f.nombre)}; });
             var datos = {
                 nombre: nombre,
                 categoria: document.getElementById('ac-cat').value.trim(),
