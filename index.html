@@ -112,8 +112,6 @@ h1 em{font-style:italic;color:var(--gold)}
     </div>
     <div class="stats">
       <div><span class="stat-n" id="stat-plat">40</span><span class="stat-l">Platillos</span></div>
-      <div><span class="stat-n">3</span><span class="stat-l">Por D&iacute;a</span></div>
-      <div><span class="stat-n" id="stat-costo">&mdash;</span><span class="stat-l">Costo MP/PAX</span></div>
     </div>
   </div>
 </div>
@@ -737,21 +735,11 @@ function pickFrom(list, used, V, excl, exclCarnico, allDB) {
 }
 
 // MENU GEN
-var _rangoCosto = [];
-// El stat "Costo MP/PAX" del header antes era el texto fijo "$35-65" (otro numero
-// inventado, nunca calculado). Ahora se calcula del menu realmente generado.
-function actualizarStatCosto() {
-    var el = document.getElementById('stat-costo');
-    if(!el) return;
-    if(!_rangoCosto.length) { el.textContent = '—'; return; }
-    var min = Math.min.apply(null, _rangoCosto), max = Math.max.apply(null, _rangoCosto);
-    el.textContent = '$' + Math.round(min) + '-' + Math.round(max);
-}
-
+// (Los stats "Costo MP/PAX" y "3 Por Dia" se quitaron del header a peticion del
+// usuario — el costo por dia ya se ve en cada tarjeta y lo retomara el semaforo.)
 function genMenu() {
     var grid = document.getElementById('grid');
     grid.innerHTML = '';
-    _rangoCosto = [];
     var allDB = Object.assign({}, DB, DB_EXTRA);
     var G = Object.keys(allDB).filter(function(n) { var t = allDB[n].tipo; return !t || t === 'guisado'; });
     var Ga = Object.keys(allDB).filter(function(n) { return allDB[n].tipo === 'garnacha'; });
@@ -813,7 +801,6 @@ function genMenu() {
         var r1 = g1 ? allDB[g1] : null, r2 = g2 ? allDB[g2] : null, rg = ga ? allDB[ga] : null;
         var c1 = r1 ? getCost(r1) : 0, c2 = r2 ? getCost(r2) : 0, cg = rg ? getCost(rg) : 0;
         var ct = c1 + c2 + cg;
-        _rangoCosto.push(ct);
         var cat = ct < 50 ? 'economico' : ct < 80 ? 'medio' : 'premium';
         var badge = lk1 ? '<div style="background:var(--gold);color:var(--bd);padding:.15rem .5rem;border-radius:4px;font-size:.62rem;display:inline-block;margin-top:.2rem">&#11088; Especial</div>' : '';
         function pBox(lbl, nom, rec, c, lk, di, po) {
@@ -835,7 +822,6 @@ function genMenu() {
             + pBox('GARNACHA', ga, rg, cg, lkG, i, 3);
         grid.appendChild(div);
     }
-    actualizarStatCosto();
 }
 
 function setDias(n, btn) {
