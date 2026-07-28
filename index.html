@@ -163,6 +163,8 @@ h1 em{font-style:italic;color:var(--gold)}
       <button class="btn bgold bsm" onclick="genMenu()">&#128260; Regenerar</button>
       <span class="fl">Comensales:</span>
       <input type="number" id="comensalesDia" class="fi" value="500" min="50" max="500" step="50" style="width:80px;padding:.45rem .6rem">
+      <span class="fl">L&iacute;nea:</span>
+      <select id="lineaMenu" class="fs" style="width:auto;padding:.45rem .6rem" onchange="cambiarLineaMenu(this.value)"></select>
       <button class="btn bsm" onclick="listaCompras()">&#128722; Lista Compras</button>
       <button class="btn bsec bsm" onclick="imprimirMenu()">&#128424; Imprimir</button>
     </div>
@@ -370,6 +372,26 @@ h1 em{font-style:italic;color:var(--gold)}
       </div>
     </div>
   </div>
+
+  <!-- COSTEO — CONFIGURACION DE NEGOCIO (COSTEO.md §4) -->
+  <div class="card">
+    <div class="ch">&#128176; Costeo &mdash; configuraci&oacute;n de negocio</div>
+    <div class="infobox">Precio de venta por <strong>l&iacute;nea de contrato</strong>, costo de producci&oacute;n y margen objetivo. De aqu&iacute; se calculan los umbrales del sem&aacute;foro del men&uacute; &mdash; nunca se escriben a mano. <strong>Guardar requiere sesi&oacute;n de administrador.</strong></div>
+    <h4 style="margin:.5rem 0">L&iacute;neas de contrato</h4>
+    <div style="display:grid;grid-template-columns:2fr 1fr .4fr;gap:.4rem;font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;color:var(--bl);margin-bottom:.3rem;padding:0 .2rem"><span>Nombre</span><span>Precio de venta ($/d&iacute;a)</span><span></span></div>
+    <div id="cfg-lineas"></div>
+    <button class="btn bsec bsm" onclick="cfgAgregarLinea()" style="margin:.4rem 0 1rem">&#10133; Agregar l&iacute;nea</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
+      <div class="fg"><label class="fl2">Costo de producci&oacute;n ($/porci&oacute;n)</label><input type="number" id="cfg-costo-prod" class="fi" step="0.01" min="0">
+        <div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Fijo por porci&oacute;n (n&oacute;mina, gas, agua...). Rango esperado: $17&ndash;$33. Se recalcula cada mes.</div></div>
+      <div class="fg"><label class="fl2">Complementos ($/pax)</label><input type="number" id="cfg-complementos" class="fi" step="0.01" min="0">
+        <div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Arroz, frijoles, postre, refresco y tortillas del d&iacute;a &mdash; lo que la comida incluye fuera de las 3 recetas.</div></div>
+      <div class="fg"><label class="fl2">Margen objetivo (%)</label><input type="number" id="cfg-margen" class="fi" step="1" min="0" max="90">
+        <div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Default 15%. Define el umbral verde del sem&aacute;foro.</div></div>
+    </div>
+    <button class="btn bgold bfull" onclick="guardarConfigNegocio()" style="margin-top:.5rem">&#128190; Guardar configuraci&oacute;n</button>
+  </div>
+
   <div class="card">
     <div class="ch">&#128196; Exportar</div>
     <div style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
@@ -455,6 +477,31 @@ var filtCat = 'todos';
 var filtProt = 'todas';
 
 var alacarta = [];   // platillos a la carta / R&D — viven aparte del menu de comedor
+
+// ── Configuracion de negocio (COSTEO.md §4) ──────────────────────────────────
+// Vive en datos/config (lectura publica, escritura solo admin — mismas reglas que
+// el resto de datos/). IMPORTANTE: los defaults NUNCA se empujan solos a la nube
+// (leccion del bug de initPrecios); solo se escribe cuando un admin guarda.
+function configDefault() {
+    return {
+        lineas: [
+            {id:'comida-completa', nombre:'Comida completa', precio:77.00},
+            {id:'canje', nombre:'Canje', precio:32.00}
+        ],
+        linea_menu: 'comida-completa',  // linea de contrato asociada al menu generado
+        costo_produccion: 22.81,        // $ fijos por porcion (§4.2) — editable, se recalcula cada mes
+        costo_complementos: 0,          // $ por pax de arroz/frijoles/postre/refresco/tortillas (§4.3)
+        margen_objetivo: 0.15           // §5.2 — 15% default
+    };
+}
+var config = configDefault();
+function lineaActiva() {
+    return (config.lineas||[]).find(function(l){ return l.id === config.linea_menu; }) || null;
+}
+async function saveConfig() {
+    try { localStorage.setItem('cfg_cicsa', JSON.stringify(config)); } catch(e) {}
+    return await fbSet('datos', 'config', config);
+}
 var filtAC = 'todos';
 
 var borradas = [];   // nombres de platillos eliminados (incluye precargados de DB)
@@ -466,6 +513,9 @@ window.addEventListener('load', function() {
     // Sin cache -> precios arranca vacio; el sync con Egresos lo llena (no hay defaults propios)
     try { var p = localStorage.getItem('p_cicsa'); if(p) precios = JSON.parse(p); } catch(e) { precios = {}; }
     try { var ac = localStorage.getItem('ac_cicsa'); if(ac) alacarta = JSON.parse(ac); } catch(e) {}
+    try { var cf = localStorage.getItem('cfg_cicsa'); if(cf) config = Object.assign(configDefault(), JSON.parse(cf)); } catch(e) {}
+    if(typeof renderConfigNegocio === 'function') renderConfigNegocio();
+    if(typeof sincronizarSelectorLinea === 'function') sincronizarSelectorLinea();
     genMenu();
     document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
     if(typeof actualizarUIAuth === 'function') actualizarUIAuth();  // muestra el boton de login (o el estado admin)
@@ -648,6 +698,14 @@ async function sincronizarDesdeFirebase() {
         alacarta = ac;
         try { localStorage.setItem('ac_cicsa', JSON.stringify(alacarta)); } catch(e) {}
         if(document.getElementById('alacartacon') && document.getElementById('alacarta').classList.contains('on')) renderAlacarta();
+    }
+    // Configuracion de negocio (lineas de contrato, costos) — §4
+    var cf = await fbGet('datos', 'config');
+    if(cf && typeof cf === 'object' && !Array.isArray(cf)) {
+        config = Object.assign(configDefault(), cf);
+        try { localStorage.setItem('cfg_cicsa', JSON.stringify(config)); } catch(e) {}
+        renderConfigNegocio();
+        sincronizarSelectorLinea();
     }
     // Re-aplicar borradas por si la sync de recetas repobló algo, y refrescar vistas
     aplicarBorradas();
@@ -2332,6 +2390,90 @@ function exportarPrecios() {
     Object.keys(precios).sort().forEach(function(n){ csv += n + ',' + precios[n].precio + ',' + precios[n].fecha + '\n'; });
     dl(csv, 'Precios_CICSA.csv', 'text/csv');
     toast('Precios exportados');
+}
+
+// ============================================================
+// COSTEO — CONFIGURACION DE NEGOCIO (COSTEO.md §4)
+// ============================================================
+function renderConfigNegocio() {
+    var cont = document.getElementById('cfg-lineas');
+    if(!cont) return;
+    cont.innerHTML = (config.lineas||[]).map(function(l, i) {
+        return '<div class="cfg-linea" data-id="' + l.id + '" style="display:grid;grid-template-columns:2fr 1fr .4fr;gap:.4rem;margin-bottom:.4rem">'
+            + '<input class="fi cfg-ln" value="' + (l.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Nombre de la linea" style="padding:.4rem .6rem">'
+            + '<input class="fi cfg-lp" type="number" step="0.01" min="0" value="' + l.precio + '" style="padding:.4rem .6rem">'
+            + '<button class="btn bsm cfg-lx" style="background:var(--tc);padding:.4rem" title="Eliminar linea">&#10005;</button>'
+            + '</div>';
+    }).join('');
+    cont.querySelectorAll('.cfg-lx').forEach(function(b) {
+        b.addEventListener('click', function() {
+            if((config.lineas||[]).length <= 1) { toast('Debe existir al menos una línea de contrato'); return; }
+            this.closest('.cfg-linea').remove();
+        });
+    });
+    var cp = document.getElementById('cfg-costo-prod'); if(cp) cp.value = config.costo_produccion;
+    var cc = document.getElementById('cfg-complementos'); if(cc) cc.value = config.costo_complementos;
+    var cm = document.getElementById('cfg-margen'); if(cm) cm.value = Math.round(config.margen_objetivo * 100);
+}
+function cfgAgregarLinea() {
+    var cont = document.getElementById('cfg-lineas');
+    if(!cont) return;
+    var d = document.createElement('div');
+    var id = 'linea-' + Date.now();
+    d.innerHTML = '<div class="cfg-linea" data-id="' + id + '" style="display:grid;grid-template-columns:2fr 1fr .4fr;gap:.4rem;margin-bottom:.4rem">'
+        + '<input class="fi cfg-ln" placeholder="Nombre de la linea" style="padding:.4rem .6rem">'
+        + '<input class="fi cfg-lp" type="number" step="0.01" min="0" placeholder="0.00" style="padding:.4rem .6rem">'
+        + '<button class="btn bsm cfg-lx" style="background:var(--tc);padding:.4rem">&#10005;</button></div>';
+    var el = d.firstChild;
+    el.querySelector('.cfg-lx').addEventListener('click', function(){ el.remove(); });
+    cont.appendChild(el);
+}
+async function guardarConfigNegocio() {
+    // Leer y validar TODO antes de tocar config (no guardar a medias)
+    var lineas = [], errs = [];
+    document.querySelectorAll('#cfg-lineas .cfg-linea').forEach(function(row, i) {
+        var nombre = row.querySelector('.cfg-ln').value.trim();
+        var precio = parseFloat(row.querySelector('.cfg-lp').value);
+        if(!nombre) { errs.push('Línea ' + (i+1) + ': sin nombre.'); return; }
+        if(!isFinite(precio) || precio <= 0) { errs.push('Línea "' + nombre + '": precio inválido.'); return; }
+        lineas.push({id: row.getAttribute('data-id'), nombre: nombre, precio: precio});
+    });
+    if(!lineas.length) errs.push('Debe existir al menos una línea de contrato.');
+    var prod = parseFloat(document.getElementById('cfg-costo-prod').value);
+    var comp = parseFloat(document.getElementById('cfg-complementos').value);
+    var marg = parseFloat(document.getElementById('cfg-margen').value);
+    if(!isFinite(prod) || prod < 0) errs.push('Costo de producción inválido.');
+    if(!isFinite(comp) || comp < 0) errs.push('Complementos inválidos.');
+    if(!isFinite(marg) || marg < 0 || marg > 90) errs.push('Margen objetivo debe estar entre 0 y 90%.');
+    if(errs.length) { alert('No se puede guardar:\n\n' + errs.join('\n')); return; }
+    // §4.2: fuera del rango esperado -> confirmar, no bloquear
+    if(prod < 17 || prod > 33) {
+        if(!confirm('El costo de producción ($' + prod.toFixed(2) + ') cae fuera del rango esperado $17–$33.\n\nCOSTEO.md: "revisar el denominador antes de aceptarlo".\n\n¿Guardar de todos modos?')) return;
+    }
+    if(!esAdmin()) { toast('🔒 Inicia sesión como administrador para guardar la configuración'); return; }
+    config.lineas = lineas;
+    if(!lineas.some(function(l){ return l.id === config.linea_menu; })) config.linea_menu = lineas[0].id;
+    config.costo_produccion = prod;
+    config.costo_complementos = comp;
+    config.margen_objetivo = marg / 100;
+    var ok = await saveConfig();
+    sincronizarSelectorLinea();
+    toast(ok === false ? '🔒 La nube rechazó el guardado — revisa tu sesión' : '💾 Configuración guardada');
+}
+// Selector "Linea:" del menu — el menu generado entero se asocia a una linea de
+// contrato (§4.1; los dias no se persisten como entidades, comparten la linea).
+function sincronizarSelectorLinea() {
+    var sel = document.getElementById('lineaMenu');
+    if(!sel) return;
+    sel.innerHTML = (config.lineas||[]).map(function(l) {
+        return '<option value="' + l.id + '"' + (l.id === config.linea_menu ? ' selected' : '') + '>' + l.nombre + ' ($' + l.precio.toFixed(2) + ')</option>';
+    }).join('');
+}
+function cambiarLineaMenu(id) {
+    config.linea_menu = id;
+    try { localStorage.setItem('cfg_cicsa', JSON.stringify(config)); } catch(e) {}
+    if(esAdmin()) saveConfig();  // visor no-admin: el cambio queda local, sin escribir nube
+    genMenu();  // el semaforo (Fase 4) leera la linea activa al pintar
 }
 
 // ============================================================
