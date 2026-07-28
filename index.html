@@ -279,8 +279,9 @@ h1 em{font-style:italic;color:var(--gold)}
   <div class="card">
     <div class="ch">&#127828; Platillos A la Carta</div>
     <div class="infobox">Costeo de productos a la carta (hamburguesas, boneless, ensaladas, etc.) y desarrollo de nuevos platillos (R&amp;D). Usan el mismo banco de precios pero viven aparte del men&uacute; de comedor: <strong>no entran en la rotaci&oacute;n de d&iacute;as</strong>. Los ingredientes se capturan a mano.</div>
-    <div style="display:grid;grid-template-columns:1fr auto;gap:1rem;margin-bottom:1rem;align-items:end">
+    <div style="display:grid;grid-template-columns:1fr auto auto;gap:1rem;margin-bottom:1rem;align-items:end">
       <div><input type="text" id="acbuscar" class="fi" placeholder="&#128269; Buscar platillo..." oninput="renderAlacarta()"></div>
+      <button class="btn bsec" onclick="verMenuAlacarta()">&#128065;&#65039; Ver / Imprimir men&uacute;</button>
       <button class="btn bgold" onclick="nuevoAlacarta()">&#10133; Nuevo Platillo</button>
     </div>
     <div class="fbar">
@@ -1972,6 +1973,85 @@ function setFiltAC(f, btn) {
     document.querySelectorAll('[data-fac]').forEach(function(b){ b.classList.remove('on'); });
     btn.classList.add('on');
     renderAlacarta();
+}
+
+// ── Visor / impresion del menu A la Carta ───────────────────────────────────
+var _acVerCostos = true, _acVerSoloActivos = true;
+// Agrupa los platillos a la carta por categoria (respetando "solo activos").
+function _acAgrupado(soloActivos) {
+    var grupos = {};
+    alacarta.filter(function(p){ return p && p.nombre && (!soloActivos || (p.estado||'borrador') === 'activo'); })
+        .sort(function(a,b){ return (a.nombre||'').localeCompare(b.nombre||''); })
+        .forEach(function(p){ var c = p.categoria || 'Sin categoría'; (grupos[c] = grupos[c] || []).push(p); });
+    return grupos;
+}
+// Cuerpo del menu para la vista en pantalla.
+function _htmlMenuAC(conCostos, soloActivos) {
+    var grupos = _acAgrupado(soloActivos);
+    var cats = Object.keys(grupos).sort();
+    if(!cats.length) return '<div style="text-align:center;padding:2rem;color:var(--bl)">Sin platillos para mostrar' + (soloActivos ? ' (no hay activos)' : '') + '</div>';
+    var h = '';
+    cats.forEach(function(cat){
+        h += '<div style="margin:1rem 0 .4rem;font-family:\'Playfair Display\',serif;font-size:1.15rem;color:var(--bd);border-bottom:2px solid var(--gold);padding-bottom:.25rem">' + cat + '</div>';
+        grupos[cat].forEach(function(p){
+            var ings = (p.ingredientes||[]).map(function(i){ return i.nombre; }).join(', ');
+            var badge = (p.estado||'borrador') !== 'activo' ? ' <span style="font-size:.62rem;color:var(--tc);border:1px solid var(--tc);border-radius:99px;padding:0 .4rem">en pruebas</span>' : '';
+            h += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;padding:.4rem 0;border-bottom:1px solid var(--cream)">'
+               + '<div><div style="font-weight:700;color:var(--bd)">' + p.nombre + badge + '</div>'
+               + (ings ? '<div style="font-size:.8rem;color:var(--bl)">' + ings + '</div>' : '') + '</div>'
+               + (conCostos ? '<div style="font-weight:700;color:var(--tc);white-space:nowrap">$' + costoAlacarta(p).toFixed(2) + '</div>' : '')
+               + '</div>';
+        });
+    });
+    return h;
+}
+function _acRefrescarVisor() {
+    var cont = document.getElementById('ac-visor-body');
+    if(cont) cont.innerHTML = _htmlMenuAC(_acVerCostos, _acVerSoloActivos);
+}
+function verMenuAlacarta() {
+    openModal('&#127828; Men&uacute; A la Carta',
+        '<div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem;padding:.6rem .9rem;background:var(--cream);border-radius:8px">'
+        + '<label style="font-size:.85rem;cursor:pointer"><input type="checkbox" id="ac-tg-costos"' + (_acVerCostos?' checked':'') + '> Mostrar costos</label>'
+        + '<label style="font-size:.85rem;cursor:pointer"><input type="checkbox" id="ac-tg-activos"' + (_acVerSoloActivos?' checked':'') + '> Solo activos</label>'
+        + '<button class="btn bsec bsm" id="ac-imprimir" style="margin-left:auto">&#128424;&#65039; Imprimir / Exportar</button>'
+        + '</div>'
+        + '<div id="ac-visor-body">' + _htmlMenuAC(_acVerCostos, _acVerSoloActivos) + '</div>');
+    setTimeout(function(){
+        var tc = document.getElementById('ac-tg-costos');
+        if(tc) tc.addEventListener('change', function(){ _acVerCostos = this.checked; _acRefrescarVisor(); });
+        var ta = document.getElementById('ac-tg-activos');
+        if(ta) ta.addEventListener('change', function(){ _acVerSoloActivos = this.checked; _acRefrescarVisor(); });
+        var bi = document.getElementById('ac-imprimir');
+        if(bi) bi.addEventListener('click', function(){ imprimirAlacarta(_acVerCostos, _acVerSoloActivos); });
+    }, 50);
+}
+// Genera un HTML imprimible/descargable del menu a la carta.
+function imprimirAlacarta(conCostos, soloActivos) {
+    var grupos = _acAgrupado(soloActivos);
+    var cats = Object.keys(grupos).sort();
+    if(!cats.length) { toast('No hay platillos para imprimir'); return; }
+    var body = '';
+    cats.forEach(function(cat){
+        body += '<h2 style="font-family:Georgia,serif;color:#2C1810;border-bottom:2px solid #D4AF37;padding-bottom:.25rem;margin:1.5rem 0 .5rem">' + cat + '</h2>';
+        grupos[cat].forEach(function(p){
+            var ings = (p.ingredientes||[]).map(function(i){ return i.nombre; }).join(', ');
+            body += '<div style="display:flex;justify-content:space-between;gap:1rem;padding:.4rem 0;border-bottom:1px solid #E8DCC8">'
+                 + '<div><div style="font-weight:700">' + p.nombre + '</div>'
+                 + (ings ? '<div style="font-size:.85rem;color:#8B6F47">' + ings + '</div>' : '') + '</div>'
+                 + (conCostos ? '<div style="font-weight:700;color:#C8553D;white-space:nowrap">$' + costoAlacarta(p).toFixed(2) + '</div>' : '')
+                 + '</div>';
+        });
+    });
+    var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Menu A la Carta - CICSA</title>'
+        + '<style>body{font-family:Arial,sans-serif;max-width:820px;margin:0 auto;padding:2rem;color:#2C1810}'
+        + '.h{background:#2C1810;color:#D4AF37;padding:1.25rem 1.75rem;border-radius:8px;margin-bottom:1rem}'
+        + '@media print{body{padding:.5rem}}</style></head><body>'
+        + '<div class="h"><h1 style="margin:0;font-family:Georgia,serif">Men&uacute; A la Carta</h1>'
+        + '<div style="color:#F5F1E8;font-size:.85rem;margin-top:.25rem">CICSA &middot; ' + hoy() + (conCostos ? ' &middot; costos en materia prima' : '') + '</div></div>'
+        + body + '</body></html>';
+    dl(html, 'Menu_A_la_Carta_CICSA.html', 'text/html');
+    toast('Men&uacute; descargado');
 }
 function renderAlacarta() {
     var el = document.getElementById('alacartacon');
