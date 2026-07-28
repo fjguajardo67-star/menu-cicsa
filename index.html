@@ -156,10 +156,13 @@ h1 em{font-style:italic;color:var(--gold)}
     </div>
     <div class="fbar">
       <span class="fl">Filtrar:</span>
-      <button class="fb on" data-fc onclick="filtCosto('todos',this)">Todos</button>
-      <button class="fb" data-fc onclick="filtCosto('economico',this)">&#128154; &lt;$50</button>
-      <button class="fb" data-fc onclick="filtCosto('medio',this)">&#128993; $50-80</button>
-      <button class="fb" data-fc onclick="filtCosto('premium',this)">&#128308; $80+</button>
+      <button class="fb on" data-fc onclick="filtSemaforo('todos',this)">Todos</button>
+      <button class="fb" data-fc onclick="filtSemaforo('verde',this)">&#128994; Verde</button>
+      <button class="fb" data-fc onclick="filtSemaforo('amarillo',this)">&#128993; Amarillo</button>
+      <button class="fb" data-fc onclick="filtSemaforo('naranja',this)">&#128992; Naranja</button>
+      <button class="fb" data-fc onclick="filtSemaforo('rojo',this)">&#128308; Rojo</button>
+      <button class="fb" data-fc onclick="filtSemaforo('incompleto',this)">&#9888;&#65039; Incompletos</button>
+      <button class="fb" id="btn-orden" onclick="toggleOrdenMenu(this)">&#8645; Peor margen primero</button>
       <button class="btn bgold bsm" onclick="genMenu()">&#128260; Regenerar</button>
       <span class="fl">Comensales:</span>
       <input type="number" id="comensalesDia" class="fi" value="500" min="50" max="500" step="50" style="width:80px;padding:.45rem .6rem">
@@ -792,9 +795,44 @@ function pickFrom(list, used, V, excl, exclCarnico, allDB) {
     return pool.length ? pool[Math.floor(Math.random() * pool.length)] : list[0];
 }
 
+// ── Semaforo del dia (COSTEO.md §5) ──────────────────────────────────────────
+// Umbrales SIEMPRE calculados de la config (linea de contrato + costo de
+// produccion + complementos + margen objetivo). Nunca escritos a mano.
+var SEM_COLORES = {
+    verde:    {bg:'#2E7D32', label:'Verde'},
+    amarillo: {bg:'#C9A227', label:'Amarillo'},
+    naranja:  {bg:'#E07B39', label:'Naranja'},
+    rojo:     {bg:'#C0392B', label:'Rojo'}
+};
+function umbralesSemaforo() {
+    var l = lineaActiva();
+    if(!l || !(l.precio > 0)) return null;
+    var fijo = (config.costo_produccion || 0) + (config.costo_complementos || 0);
+    return {
+        precio:   l.precio,
+        verde:    l.precio * (1 - (config.margen_objetivo || 0)) - fijo,
+        amarillo: l.precio * 0.90 - fijo,
+        naranja:  l.precio - fijo   // MP_disponible: arriba de esto, el dia pierde dinero
+    };
+}
+// mp = MP del dia por pax. incompleto = alguna receta del dia tiene ingredientes
+// sin precio validado -> "datos incompletos", nunca un color (§5.4).
+function semaforoDia(mp, incompleto) {
+    if(incompleto) return {estado:'incompleto', margen:null};
+    var u = umbralesSemaforo();
+    if(!u) return {estado:'sinlinea', margen:null};
+    var margen = ((u.naranja - mp) / u.precio) * 100;  // % del precio que queda tras MP+fijos
+    var color = mp <= u.verde ? 'verde' : mp <= u.amarillo ? 'amarillo' : mp <= u.naranja ? 'naranja' : 'rojo';
+    return {estado:color, margen:margen};
+}
+function badgeSemaforo(s) {
+    if(s.estado === 'incompleto') return '<div class="sem-badge" style="background:#FFF3CD;color:#8a6200;padding:.2rem .55rem;border-radius:99px;font-size:.68rem;font-weight:700;margin-top:.25rem;text-align:center" title="Alguna receta del día tiene ingredientes sin precio validado en Egresos — no puede pintar semáforo">&#9888; datos incompletos</div>';
+    if(s.estado === 'sinlinea') return '<div class="sem-badge" style="background:var(--bl);color:#fff;padding:.2rem .55rem;border-radius:99px;font-size:.68rem;font-weight:700;margin-top:.25rem;text-align:center" title="Sin línea de contrato asignada — asigna una en el selector Línea">sin l&iacute;nea</div>';
+    var c = SEM_COLORES[s.estado];
+    return '<div class="sem-badge" style="background:' + c.bg + ';color:#fff;padding:.2rem .55rem;border-radius:99px;font-size:.68rem;font-weight:700;margin-top:.25rem;text-align:center">' + c.label + ' &middot; margen ' + (s.margen >= 0 ? '+' : '') + s.margen.toFixed(1) + '%</div>';
+}
+
 // MENU GEN
-// (Los stats "Costo MP/PAX" y "3 Por Dia" se quitaron del header a peticion del
-// usuario — el costo por dia ya se ve en cada tarjeta y lo retomara el semaforo.)
 function genMenu() {
     var grid = document.getElementById('grid');
     grid.innerHTML = '';
@@ -859,7 +897,12 @@ function genMenu() {
         var r1 = g1 ? allDB[g1] : null, r2 = g2 ? allDB[g2] : null, rg = ga ? allDB[ga] : null;
         var c1 = r1 ? getCost(r1) : 0, c2 = r2 ? getCost(r2) : 0, cg = rg ? getCost(rg) : 0;
         var ct = c1 + c2 + cg;
-        var cat = ct < 50 ? 'economico' : ct < 80 ? 'medio' : 'premium';
+        // §5.4: si alguna receta del dia esta incompleta (ingredientes sin precio
+        // validado), el dia NO pinta color — muestra "datos incompletos".
+        var diaIncompleto = [r1, r2, rg].some(function(rec) {
+            return rec && (rec.ingredientes||[]).some(function(ing){ return ing && !precioEnBanco(ing.nombre); });
+        });
+        var sem = semaforoDia(ct, diaIncompleto);
         var badge = lk1 ? '<div style="background:var(--gold);color:var(--bd);padding:.15rem .5rem;border-radius:4px;font-size:.62rem;display:inline-block;margin-top:.2rem">&#11088; Especial</div>' : '';
         function pBox(lbl, nom, rec, c, lk, di, po) {
             if(!nom) return '<div class="pl"><div class="plt">' + lbl + '</div><div style="font-size:.8rem;color:var(--bl)">Sin platillos</div></div>';
@@ -873,13 +916,17 @@ function genMenu() {
                 + '</div>';
         }
         var div = document.createElement('div');
-        div.className = 'day'; div.dataset.cat = cat; div.dataset.cost = ct;
-        div.innerHTML = '<div class="dh"><div><div class="dn">Dia ' + String(i).padStart(2,'0') + '</div><div class="dw">' + dia + '</div>' + badge + '</div><div class="dc">$' + ct.toFixed(2) + '/pax</div></div>'
+        div.className = 'day';
+        div.dataset.sem = sem.estado; div.dataset.cost = ct; div.dataset.dia = i;
+        div.dataset.margen = (sem.margen != null ? sem.margen : -9999);
+        div.innerHTML = '<div class="dh"><div><div class="dn">Dia ' + String(i).padStart(2,'0') + '</div><div class="dw">' + dia + '</div>' + badge + '</div>'
+            + '<div style="text-align:right"><div class="dc">$' + ct.toFixed(2) + '/pax</div>' + badgeSemaforo(sem) + '</div></div>'
             + pBox('GUISADO 1', g1, r1, c1, lk1, i, 1)
             + pBox('GUISADO 2', g2, r2, c2, false, i, 2)
             + pBox('GARNACHA', ga, rg, cg, lkG, i, 3);
         grid.appendChild(div);
     }
+    ordenarGridMenu();  // respeta el orden elegido (dias / peor margen) tras regenerar
 }
 
 function setDias(n, btn) {
@@ -895,10 +942,36 @@ function setDiasC() {
     document.querySelectorAll('[data-dias]').forEach(function(b) { b.classList.remove('on'); });
     genMenu(); toast('Menu ' + n + ' dias generado');
 }
-function filtCosto(t, btn) {
+// Filtro por color del semaforo (§5.4) — reemplaza los rangos fijos <$50/$50-80/$80+
+function filtSemaforo(t, btn) {
     document.querySelectorAll('[data-fc]').forEach(function(b) { b.classList.remove('on'); });
     btn.classList.add('on');
-    document.querySelectorAll('.day').forEach(function(d) { d.style.display = (t === 'todos' || d.dataset.cat === t) ? '' : 'none'; });
+    document.querySelectorAll('.day').forEach(function(d) { d.style.display = (t === 'todos' || d.dataset.sem === t) ? '' : 'none'; });
+}
+// Orden "peor margen primero" (§5.4): la pantalla que se abre cuando sube un
+// ingrediente. Incompletos/sin linea van arriba — necesitan atencion antes que nada.
+var _ordenMenu = 'dias';
+function toggleOrdenMenu(btn) {
+    _ordenMenu = _ordenMenu === 'dias' ? 'margen' : 'dias';
+    if(btn) btn.classList.toggle('on', _ordenMenu === 'margen');
+    ordenarGridMenu();
+}
+function ordenarGridMenu() {
+    var grid = document.getElementById('grid');
+    if(!grid) return;
+    var days = Array.from(grid.children).filter(function(d){ return d.classList && d.classList.contains('day'); });
+    if(!days.length) return;
+    if(_ordenMenu === 'margen') {
+        days.sort(function(a, b) {
+            var ia = (a.dataset.sem === 'incompleto' || a.dataset.sem === 'sinlinea');
+            var ib = (b.dataset.sem === 'incompleto' || b.dataset.sem === 'sinlinea');
+            if(ia !== ib) return ia ? -1 : 1;
+            return parseFloat(a.dataset.margen) - parseFloat(b.dataset.margen);
+        });
+    } else {
+        days.sort(function(a, b) { return parseInt(a.dataset.dia) - parseInt(b.dataset.dia); });
+    }
+    days.forEach(function(d){ grid.appendChild(d); });
 }
 
 // CAMBIAR PLATILLO
@@ -992,7 +1065,17 @@ function aplicar(dia, pos, nom) {
         });
         card.querySelector('.dc').textContent = '$' + tot.toFixed(2) + '/pax';
         card.dataset.cost = tot;
-        card.dataset.cat = tot < 50 ? 'economico' : tot < 80 ? 'medio' : 'premium';
+        // Recalcular el semaforo del dia con el platillo nuevo (§5)
+        var nombresDia = Array.from(card.querySelectorAll('.pln')).map(function(el){ return el.textContent.trim(); });
+        var incDia = nombresDia.some(function(nm) {
+            var rr = allDB[nm];
+            return rr && (rr.ingredientes||[]).some(function(ing){ return ing && !precioEnBanco(ing.nombre); });
+        });
+        var semDia = semaforoDia(tot, incDia);
+        card.dataset.sem = semDia.estado;
+        card.dataset.margen = (semDia.margen != null ? semDia.margen : -9999);
+        var bAnt = card.querySelector('.sem-badge');
+        if(bAnt) bAnt.outerHTML = badgeSemaforo(semDia);
     }
     closeModal(); toast('Dia ' + dia + ' actualizado');
 }
