@@ -270,6 +270,7 @@ h1 em{font-style:italic;color:var(--gold)}
       <button class="btn bgold bsm" onclick="exportarTxt()">&#128190; Exportar .TXT</button>
       <button class="btn bsm" style="background:var(--green)" onclick="recalcularCostos()">&#128260; Recalcular Costos</button>
       <button class="btn bsm" style="background:var(--tc)" onclick="reporteFaltantes()">&#129658; Reporte de faltantes</button>
+      <button class="btn bsm" style="background:var(--bm)" onclick="limpiezaGuiada()">&#129529; Limpieza guiada</button>
     </div>
     <div id="catcon"></div>
   </div>
@@ -605,7 +606,7 @@ async function saveRecetas() {
     try { localStorage.setItem('r_cicsa', JSON.stringify(recetas)); } catch(e) {}
     // Mantener DB_EXTRA sincronizado con recetas guardadas
     recetas.forEach(function(r){ DB_EXTRA[r.nombre] = {region:r.region,carnico:r.carnico,tipo:r.tipo||'guisado',ingredientes:r.ingredientes,procedimiento:r.procedimiento,tiempo:r.tiempo}; });
-    await fbSet('datos', 'recetas', recetas);
+    return await fbSet('datos', 'recetas', recetas);  // true/false segun la nube acepte
 }
 function savePrecios() {
     // Menu ya NO escribe precios a Firestore — son de solo-lectura desde cicsa-egresos.
@@ -632,9 +633,13 @@ async function sincronizarDesdeFirebase() {
         aplicarBorradas();
     }
     var r = await fbGet('datos', 'recetas');
-    if(r && r.length > 0) {
+    // Acepta tambien el array VACIO: si la nube dice "cero recetas" (tras una limpieza),
+    // el cache local debe vaciarse igual — antes `r.length > 0` lo ignoraba y cualquier
+    // navegador con cache viejo "revivia" lo borrado en su siguiente guardado.
+    if(r && Array.isArray(r)) {
         recetas = r;
         try { localStorage.setItem('r_cicsa', JSON.stringify(recetas)); } catch(e) {}
+        DB_EXTRA = {};
         recetas.forEach(function(r){ DB_EXTRA[r.nombre] = {region:r.region,carnico:r.carnico,tipo:r.tipo||'guisado',ingredientes:r.ingredientes,procedimiento:r.procedimiento,tiempo:r.tiempo}; });
         updCnt();
         toast('☁️ Recetas sincronizadas');
@@ -1923,6 +1928,129 @@ function reporteFaltantes() {
         html += '</div>';
     });
     openModal('&#129658; Reporte de faltantes', html);
+}
+
+// ── Limpieza guiada (COSTEO.md §3.3) ─────────────────────────────────────────
+// Triaje + reparacion mecanica de las recetas de la nube, con VISTA PREVIA y
+// confirmacion. Nunca borra en masa: repara lo reparable (doble division ×base,
+// filas basura, duplicados) y solo elimina recetas que quedan vacias.
+function _planLimpieza() {
+    var plan = {xbase:[], stripFilas:[], eliminar:[], dedup:[], revisar:[], quitarIdx:{}};
+    // 1) Duplicados exactos por nombre: conservar la de id mas alto (la mas reciente)
+    var porNombre = {};
+    recetas.forEach(function(r, i) {
+        if(!r || !r.nombre) { plan.quitarIdx[i] = 'sin nombre'; return; }
+        var k = r.nombre.trim().toLowerCase();
+        (porNombre[k] = porNombre[k] || []).push(i);
+    });
+    Object.keys(porNombre).forEach(function(k) {
+        var idxs = porNombre[k];
+        if(idxs.length < 2) return;
+        var keep = idxs.reduce(function(a,b){ return (recetas[a].id||0) >= (recetas[b].id||0) ? a : b; });
+        idxs.forEach(function(i){ if(i !== keep) plan.quitarIdx[i] = 'duplicado'; });
+        plan.dedup.push({nombre: recetas[keep].nombre, copias: idxs.length});
+    });
+    // 2) Por receta conservada: filas basura/invalidas, vacias, doble division
+    recetas.forEach(function(r, i) {
+        if(plan.quitarIdx[i]) return;
+        var ings = r.ingredientes || [];
+        var buenas = [], fuera = [];
+        ings.forEach(function(ing) {
+            var n = (ing && ing.nombre || '').trim();
+            var invalida = !n || esBasuraParser(n) || !isFinite(ing.cantidad) || !(ing.cantidad > 0) || UNIDADES_VALIDAS.indexOf(ing.unidad) < 0;
+            if(invalida) fuera.push(n || '(sin nombre)'); else buenas.push(ing);
+        });
+        if(!buenas.length) { plan.quitarIdx[i] = 'vacia'; plan.eliminar.push(r.nombre); return; }
+        if(fuera.length) plan.stripFilas.push({idx:i, nombre:r.nombre, filas:fuera});
+        // Doble division: peso/porcion absurdo cuya inversa ×base cae en rango plausible
+        var peso = buenas.reduce(function(s,ing){ return s + ((ing.unidad==='g'||ing.unidad==='ml') ? ing.cantidad : 0); }, 0);
+        var base = r.paxO || 0;
+        if(peso > 0 && peso < 20 && base > 1) {
+            var nuevo = peso * base;
+            if(nuevo >= 100 && nuevo <= 900) plan.xbase.push({idx:i, nombre:r.nombre, peso:peso, base:base, nuevo:nuevo});
+            else plan.revisar.push({nombre:r.nombre, detalle:'~' + peso.toFixed(1) + ' g/porcion y ×' + base + ' no cae en rango plausible (' + Math.round(nuevo) + ' g)'});
+        }
+    });
+    return plan;
+}
+function limpiezaGuiada() {
+    var plan = _planLimpieza();
+    var nada = !plan.xbase.length && !plan.stripFilas.length && !plan.eliminar.length && !plan.dedup.length;
+    if(nada) {
+        openModal('&#129529; Limpieza guiada', '<div style="text-align:center;padding:2rem;color:var(--green)"><div style="font-size:3rem">&#9989;</div><h3 style="margin-top:.75rem">Nada que limpiar</h3><p style="margin-top:.5rem;color:var(--bl)">Las ' + recetas.length + ' recetas de la nube pasan el triaje.</p></div>');
+        return;
+    }
+    var h = '<div class="infobox" style="margin-bottom:1rem">Vista previa — <strong>no se aplica nada</strong> hasta que confirmes. Respaldo previo obligatorio (ya entregado). Las precargadas del c&oacute;digo no se tocan.</div>';
+    if(plan.xbase.length) {
+        h += '<h4 style="margin:.75rem 0 .35rem;color:var(--bd)">&#10005;base — reparar doble divisi&oacute;n (' + plan.xbase.length + ')</h4><ul style="margin-left:1.4rem;font-size:.85rem">';
+        plan.xbase.forEach(function(x){ h += '<li>' + x.nombre + ': ~' + x.peso.toFixed(1) + ' g &rarr; <strong>' + Math.round(x.nuevo) + ' g/porci&oacute;n</strong> (&times;' + x.base + ')</li>'; });
+        h += '</ul>';
+    }
+    if(plan.stripFilas.length) {
+        var totF = plan.stripFilas.reduce(function(s,x){ return s + x.filas.length; }, 0);
+        h += '<h4 style="margin:.75rem 0 .35rem;color:var(--bd)">&#128465; Quitar filas basura/inv&aacute;lidas (' + totF + ' filas en ' + plan.stripFilas.length + ' recetas)</h4><ul style="margin-left:1.4rem;font-size:.85rem">';
+        plan.stripFilas.forEach(function(x){ h += '<li>' + x.nombre + ': ' + x.filas.map(function(f){ return '"' + f.substring(0,45) + '"'; }).join(', ') + '</li>'; });
+        h += '</ul>';
+    }
+    if(plan.dedup.length) {
+        h += '<h4 style="margin:.75rem 0 .35rem;color:var(--bd)">&#128209; Deduplicar (' + plan.dedup.length + ' nombres)</h4><ul style="margin-left:1.4rem;font-size:.85rem">';
+        plan.dedup.forEach(function(x){ h += '<li>' + x.nombre + ' (&times;' + x.copias + ' &rarr; 1)</li>'; });
+        h += '</ul>';
+    }
+    if(plan.eliminar.length) {
+        h += '<h4 style="margin:.75rem 0 .35rem;color:var(--tc)">&#10060; Eliminar — quedan vac&iacute;as sin sus filas basura (' + plan.eliminar.length + ')</h4><ul style="margin-left:1.4rem;font-size:.85rem">';
+        plan.eliminar.forEach(function(n){ h += '<li>' + n + '</li>'; });
+        h += '</ul>';
+    }
+    if(plan.revisar.length) {
+        h += '<h4 style="margin:.75rem 0 .35rem;color:#8a6200">&#128269; Revisar a mano — no se tocan (' + plan.revisar.length + ')</h4><ul style="margin-left:1.4rem;font-size:.85rem">';
+        plan.revisar.forEach(function(x){ h += '<li>' + x.nombre + ': ' + x.detalle + '</li>'; });
+        h += '</ul>';
+    }
+    h += '<div style="display:flex;gap:1rem;margin-top:1.25rem">'
+       + '<button class="btn bgold" id="lg-aplicar" style="flex:1">&#9989; Aplicar limpieza</button>'
+       + '<button class="btn bsec" style="flex:1" onclick="closeModal()">Cancelar</button></div>';
+    openModal('&#129529; Limpieza guiada — vista previa', h);
+    setTimeout(function() {
+        var b = document.getElementById('lg-aplicar');
+        if(b) b.addEventListener('click', function(){ _aplicarLimpieza(plan); });
+    }, 50);
+}
+async function _aplicarLimpieza(plan) {
+    if(!esAdmin()) { toast('🔒 Inicia sesión como administrador para aplicar la limpieza'); return; }
+    // ×base
+    plan.xbase.forEach(function(x) {
+        var r = recetas[x.idx];
+        r.ingredientes = (r.ingredientes||[]).map(function(ing){ return Object.assign({}, ing, {cantidad: ing.cantidad * x.base}); });
+    });
+    // quitar filas basura/invalidas
+    plan.stripFilas.forEach(function(x) {
+        var r = recetas[x.idx];
+        r.ingredientes = (r.ingredientes||[]).filter(function(ing) {
+            var n = (ing && ing.nombre || '').trim();
+            return n && !esBasuraParser(n) && isFinite(ing.cantidad) && ing.cantidad > 0 && UNIDADES_VALIDAS.indexOf(ing.unidad) >= 0;
+        });
+    });
+    // filtrar quitadas (duplicados, vacias, sin nombre) + tombstones solo para nombres
+    // totalmente eliminados (no compartidos con una copia que se conserva)
+    var nuevas = recetas.filter(function(r, i){ return !plan.quitarIdx[i]; });
+    var quedanNombres = {};
+    nuevas.forEach(function(r){ quedanNombres[r.nombre.trim().toLowerCase()] = true; });
+    var huboTombstone = false;
+    plan.eliminar.forEach(function(n) {
+        if(!quedanNombres[n.trim().toLowerCase()] && borradas.indexOf(n) < 0) { borradas.push(n); huboTombstone = true; }
+    });
+    recetas = nuevas;
+    // reconstruir DB_EXTRA desde el array limpio
+    DB_EXTRA = {};
+    recetas.forEach(function(r){ DB_EXTRA[r.nombre] = {region:r.region,carnico:r.carnico,tipo:r.tipo||'guisado',ingredientes:r.ingredientes,procedimiento:r.procedimiento,tiempo:r.tiempo}; });
+    aplicarBorradas();
+    if(huboTombstone) await saveBorradas();
+    var ok = await saveRecetas();
+    updCnt(); renderCat(); genMenu();
+    document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
+    closeModal();
+    toast(ok === false ? '🔒 No se pudo guardar en la nube — revisa tu sesión' : '🧹 Limpieza aplicada: ' + recetas.length + ' recetas quedan');
 }
 
 // ============================================================
