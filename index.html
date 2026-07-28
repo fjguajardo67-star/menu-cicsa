@@ -1827,27 +1827,15 @@ function editarPl(nombre) {
     }
     if(!r) { toast('No encontrado: ' + nombre.substring(0,20)); return; }
     window._editando = nombre;
-    var ingsHTML = (r.ingredientes||[]).map(function(ing) {
-        return '<div class="ing-row" style="margin-bottom:.4rem">'
-            + '<input class="fi ing-n" value="' + ing.nombre + '" style="padding:.4rem .6rem">'
-            + '<input class="fi ing-c" type="number" value="' + ing.cantidad.toFixed(3) + '" style="padding:.4rem .6rem">'
-            + '<select class="fs ing-u" style="padding:.4rem">'
-            + '<option value="g"' + (ing.unidad==='g'?' selected':'') + '>g</option>'
-            + '<option value="kg"' + (ing.unidad==='kg'?' selected':'') + '>kg</option>'
-            + '<option value="ml"' + (ing.unidad==='ml'?' selected':'') + '>ml</option>'
-            + '<option value="l"' + (ing.unidad==='l'?' selected':'') + '>l</option>'
-            + '<option value="pz"' + (ing.unidad==='pz'?' selected':'') + '>pz</option>'
-            + '</select>'
-            + '<button class="btn bsm rmi" style="background:var(--tc);padding:.4rem">&#10005;</button>'
-            + '</div>';
-    }).join('');
+    var ingsHTML = (r.ingredientes||[]).map(_recIngRow).join('');
     openModal('&#9998;&#65039; Editar: ' + nombre,
         '<div class="fg"><label class="fl2">Nombre</label><input id="en" class="fi" value="' + nombre + '"></div>'
         + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">'
         + '<div class="fg"><label class="fl2">Region</label><input id="er" class="fi" value="' + (r.region||'Mexico') + '"></div>'
         + '<div class="fg"><label class="fl2">Tipo</label><select id="et" class="fs"><option value="guisado"' + (r.tipo!=='garnacha'?' selected':'') + '>Guisado</option><option value="garnacha"' + (r.tipo==='garnacha'?' selected':'') + '>Garnacha</option></select></div>'
         + '<div class="fg"><label class="fl2">Tiempo (min)</label><input id="eti" class="fi" type="number" value="' + (r.tiempo||60) + '"></div></div>'
-        + '<h4 style="margin:1rem 0 .5rem">Ingredientes <small style="font-weight:400;color:var(--bl)">(por porcion)</small></h4>'
+        + '<h4 style="margin:1rem 0 .5rem">Ingredientes <small style="font-weight:400;color:var(--bl)">(por porcion — precio del banco de Egresos)</small></h4>'
+        + '<div style="display:grid;' + AC_GRID + ';gap:.4rem;font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;color:var(--bl);margin-bottom:.3rem;padding:0 .2rem"><span>Ingrediente</span><span>Cant</span><span>Unidad</span><span style="text-align:right">Precio en Egresos</span><span></span></div>'
         + '<div id="ei">' + ingsHTML + '</div>'
         + '<button class="btn bsec bsm" id="bai" style="margin:.5rem 0">&#10133; Agregar</button>'
         + '<div style="display:flex;gap:1rem;margin-top:1rem">'
@@ -1855,13 +1843,17 @@ function editarPl(nombre) {
         + '<button class="btn bsec" style="flex:1" onclick="closeModal()">Cancelar</button></div>');
     setTimeout(function() {
         var ei = document.getElementById('ei');
-        if(ei) ei.addEventListener('click', function(e){ if(e.target.classList.contains('rmi')) e.target.closest('.ing-row').remove(); });
+        if(ei) {
+            ei.addEventListener('click', function(e){ if(e.target.classList.contains('rmi')) { e.target.closest('.ing-row').remove(); _recRecalcBanco(); } });
+            ei.addEventListener('input', _recRecalcBanco);  // actualiza el indicador de banco al escribir/elegir
+        }
+        _recRecalcBanco();  // pinta el estado inicial de cada ingrediente
         var bai = document.getElementById('bai');
         if(bai) bai.addEventListener('click', function() {
             var c = document.getElementById('ei'), d = document.createElement('div');
-            d.className = 'ing-row'; d.style.marginBottom = '.4rem';
-            d.innerHTML = '<input class="fi ing-n" placeholder="Ingrediente" style="padding:.4rem .6rem"><input class="fi ing-c" type="number" value="0.1" style="padding:.4rem .6rem"><select class="fs ing-u" style="padding:.4rem"><option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="l">l</option><option value="pz">pz</option></select><button class="btn bsm rmi" style="background:var(--tc);padding:.4rem">&#10005;</button>';
-            c.appendChild(d);
+            d.innerHTML = _recIngRow(null);
+            c.appendChild(d.firstChild);
+            _recRecalcBanco();
         });
         var bs = document.getElementById('bsave');
         if(bs) bs.addEventListener('click', async function() {
@@ -2029,6 +2021,33 @@ function renderAlacarta() {
     el.querySelectorAll('[data-acd]').forEach(function(b){ b.addEventListener('click', function(){ delAlacarta(parseInt(this.getAttribute('data-acd'))); }); });
 }
 var AC_GRID = 'grid-template-columns:2fr .8fr .7fr 1.4fr .4fr';
+
+// Fila de ingrediente para el editor de recetas del Catalogo, con indicador de si el
+// precio viene validado de Egresos (verde ✓ + precio) o no (rojo ⚠ sin precio).
+function _recIngRow(ing) {
+    ing = ing || {nombre:'', cantidad:0.1, unidad:'g'};
+    var cant = (ing.cantidad!=null) ? Number(ing.cantidad).toFixed(3) : '0.100';
+    return '<div class="ing-row" style="' + AC_GRID + ';margin-bottom:.4rem">'
+        + '<input class="fi ing-n" list="dl-ingredientes" autocomplete="off" value="' + (ing.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Ingrediente" style="padding:.4rem .6rem">'
+        + '<input class="fi ing-c" type="number" value="' + cant + '" style="padding:.4rem .6rem">'
+        + '<select class="fs ing-u" style="padding:.4rem">'
+        + ['g','kg','ml','l','pz'].map(function(u){ return '<option value="'+u+'"'+((ing.unidad||'g')===u?' selected':'')+'>'+u+'</option>'; }).join('')
+        + '</select>'
+        + '<div class="ing-ip" style="display:flex;align-items:center;justify-content:flex-end;font-size:.75rem;text-align:right;line-height:1.15">&mdash;</div>'
+        + '<button class="btn bsm rmi" style="background:var(--tc);padding:.4rem">&#10005;</button>'
+        + '</div>';
+}
+// Refresca el indicador de banco de cada fila del editor de recetas.
+function _recRecalcBanco() {
+    document.querySelectorAll('#ei .ing-row').forEach(function(row){
+        var inp = row.querySelector('.ing-n'), ip = row.querySelector('.ing-ip');
+        if(!inp || !ip) return;
+        var n = inp.value.trim();
+        if(!n) { ip.innerHTML = '&mdash;'; return; }
+        if(precioEnBanco(n)) ip.innerHTML = '<span style="color:var(--green)" title="Precio validado en Egresos">&#10003; $' + getPrecio(n).toFixed(2) + '/' + getUnidadPrecio(n) + '</span>';
+        else ip.innerHTML = '<span style="color:#C8553D" title="Sin precio validado en Egresos — no suma al costo">&#9888; sin precio</span>';
+    });
+}
 function _acIngRow(ing) {
     ing = ing || {nombre:'', cantidad:100, unidad:'g'};
     return '<div class="ing-row" style="' + AC_GRID + ';margin-bottom:.4rem">'
