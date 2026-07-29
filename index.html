@@ -2192,12 +2192,39 @@ function saveAlacarta() {
     try { localStorage.setItem('ac_cicsa', JSON.stringify(alacarta)); } catch(e) {}
     return fbSet('datos', 'alacarta', alacarta);
 }
-// Costo de un platillo a la carta con precios FRESCOS del banco (no el snapshot
+// Costo de una lista de ingredientes con precios FRESCOS del banco (no el snapshot
 // cacheado) — asi refleja siempre el precio vigente sin boton de recalcular.
-function costoAlacarta(p) {
-    return (p.ingredientes||[]).reduce(function(s, ing) {
+function _costoLista(lista) {
+    return (lista||[]).reduce(function(s, ing) {
         return s + costoIngrediente({nombre:ing.nombre, cantidad:ing.cantidad, unidad:ing.unidad, precio_kg:getPrecio(ing.nombre), precio_unidad:getUnidadPrecio(ing.nombre)}, 1);
     }, 0);
+}
+// Costo de MATERIA PRIMA (solo ingredientes) — compatibilidad con el resto de la app.
+function costoAlacarta(p) { return _costoLista(p.ingredientes); }
+
+// ── Grill Express: costeo completo del platillo a la carta ───────────────────
+// A diferencia del menu de comedor (donde produccion es un fijo por dia servido),
+// aqui cada platillo trae su propio costo de produccion: un boneless de 12 min de
+// freidora no cuesta lo mismo que una ensalada que se arma en 2. Los desechables
+// solo aplican cuando el platillo es para llevar, y se capturan por separado para
+// poder ver cuanto pesa el empaque.
+function desgloseAlacarta(p) {
+    var mp = _costoLista(p.ingredientes);
+    var des = _costoLista(p.desechables);
+    var prod = parseFloat(p.costo_produccion) || 0;
+    var total = mp + des + prod;
+    var pv = parseFloat(p.precio_venta) || 0;
+    var margen = pv > 0 ? ((pv - total) / pv) * 100 : null;
+    return {mp:mp, desechables:des, produccion:prod, total:total, precio_venta:pv, margen:margen};
+}
+// Semaforo de 3 bandas (definido con el usuario): rojo pierde, amarillo gana pero
+// por debajo del objetivo, verde cumple. Sin precio de venta no hay semaforo.
+function semaforoGrill(margen) {
+    if(margen == null) return {estado:'sinprecio', bg:'var(--bl)', label:'sin precio de venta'};
+    var obj = (config.margen_objetivo || 0.15) * 100;
+    if(margen < 0)   return {estado:'rojo',     bg:'#C0392B', label:'Pierde'};
+    if(margen < obj) return {estado:'amarillo', bg:'#C9A227', label:'Bajo objetivo'};
+    return {estado:'verde', bg:'#2E7D32', label:'Cumple'};
 }
 function setFiltAC(f, btn) {
     filtAC = f;
@@ -2230,7 +2257,17 @@ function _htmlMenuAC(conCostos, soloActivos) {
             h += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;padding:.4rem 0;border-bottom:1px solid var(--cream)">'
                + '<div><div style="font-weight:700;color:var(--bd)">' + p.nombre + badge + '</div>'
                + (ings ? '<div style="font-size:.8rem;color:var(--bl)">' + ings + '</div>' : '') + '</div>'
-               + (conCostos ? '<div style="font-weight:700;color:var(--tc);white-space:nowrap">$' + costoAlacarta(p).toFixed(2) + '</div>' : '')
+               + (function(){
+                   var dd = desgloseAlacarta(p);
+                   // Menu = precio de venta. "Mostrar costos" agrega el costo total y el margen.
+                   var pv = dd.precio_venta > 0 ? '<div style="font-weight:700;color:var(--bd);white-space:nowrap">$' + dd.precio_venta.toFixed(2) + '</div>' : '';
+                   if(!conCostos) return pv;
+                   var ss = semaforoGrill(dd.margen);
+                   return '<div style="text-align:right;white-space:nowrap">' + pv
+                       + '<div style="font-size:.75rem;color:var(--tc)">costo $' + dd.total.toFixed(2) + '</div>'
+                       + (dd.margen != null ? '<div style="font-size:.72rem;color:' + ss.bg + ';font-weight:700">' + (dd.margen>=0?'+':'') + dd.margen.toFixed(1) + '%</div>' : '')
+                       + '</div>';
+                 })()
                + '</div>';
         });
     });
@@ -2270,7 +2307,15 @@ function imprimirAlacarta(conCostos, soloActivos) {
             body += '<div style="display:flex;justify-content:space-between;gap:1rem;padding:.4rem 0;border-bottom:1px solid #E8DCC8">'
                  + '<div><div style="font-weight:700">' + p.nombre + '</div>'
                  + (ings ? '<div style="font-size:.85rem;color:#8B6F47">' + ings + '</div>' : '') + '</div>'
-                 + (conCostos ? '<div style="font-weight:700;color:#C8553D;white-space:nowrap">$' + costoAlacarta(p).toFixed(2) + '</div>' : '')
+                 + (function(){
+                     var dd = desgloseAlacarta(p);
+                     var pv = dd.precio_venta > 0 ? '<div style="font-weight:700;white-space:nowrap">$' + dd.precio_venta.toFixed(2) + '</div>' : '';
+                     if(!conCostos) return pv;
+                     return '<div style="text-align:right;white-space:nowrap">' + pv
+                         + '<div style="font-size:.8rem;color:#C8553D">costo $' + dd.total.toFixed(2) + '</div>'
+                         + (dd.margen != null ? '<div style="font-size:.78rem">margen ' + (dd.margen>=0?'+':'') + dd.margen.toFixed(1) + '%</div>' : '')
+                         + '</div>';
+                   })()
                  + '</div>';
         });
     });
@@ -2298,27 +2343,46 @@ function renderAlacarta() {
     lista.sort(function(a,b){ return (a.nombre||'').localeCompare(b.nombre||''); });
     var html = '<div style="font-size:.8rem;color:var(--bl);margin-bottom:.75rem">' + lista.length + ' platillo' + (lista.length!==1?'s':'') + '</div><div style="display:grid;gap:.75rem">';
     lista.forEach(function(p) {
-        var costo = costoAlacarta(p);
         var estado = p.estado || 'borrador';
         var bEstado = estado === 'activo'
             ? '<span style="background:var(--green);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">&#9989; Activo</span>'
             : '<span style="background:var(--gold);color:var(--bd);padding:.15rem .5rem;border-radius:99px;font-size:.7rem;font-weight:700;margin-left:.3rem">&#128295; En pruebas</span>';
         var bCat = p.categoria ? '<span style="background:var(--bm);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">' + p.categoria + '</span>' : '';
         var sinBanco = 0;
-        var ingRows = (p.ingredientes||[]).map(function(ing){
+        function filaIng(ing) {
             var c = costoIngrediente({nombre:ing.nombre, cantidad:ing.cantidad, unidad:ing.unidad, precio_kg:getPrecio(ing.nombre), precio_unidad:getUnidadPrecio(ing.nombre)}, 1);
             var enBanco = precioEnBanco(ing.nombre);
             if(!enBanco) sinBanco++;
             var marca = enBanco ? '' : ' <span style="color:#C8553D;font-size:.72rem" title="Sin precio en el banco de Egresos">&#9888;</span>';
             return '<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:.2rem 0;border-bottom:1px solid var(--cream)"><span>' + ing.nombre + marca + ' <span style="color:var(--bl)">' + (ing.cantidad<10?ing.cantidad:Math.round(ing.cantidad)) + ' ' + ing.unidad + '</span></span><span style="color:' + (enBanco?'var(--tc)':'var(--bl)') + '">$' + c.toFixed(2) + '</span></div>';
-        }).join('');
+        }
+        var ingRows = (p.ingredientes||[]).map(filaIng).join('');
+        var desRows = (p.desechables||[]).length
+            ? '<div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;color:var(--bl);margin-top:.4rem">Desechables</div>' + (p.desechables||[]).map(filaIng).join('')
+            : '';
+        var d = desgloseAlacarta(p);
+        var sem = semaforoGrill(d.margen);
+        // Desglose de costo total y margen — solo si hay algo mas que MP
+        var resumen = (d.desechables > 0 || d.produccion > 0 || d.precio_venta > 0)
+            ? '<div style="padding:.4rem 1rem;font-size:.78rem;color:var(--bm);background:var(--cream);border-top:1px solid var(--cream)">'
+              + '<div style="display:flex;justify-content:space-between"><span>Materia prima</span><span>$' + d.mp.toFixed(2) + '</span></div>'
+              + (d.desechables > 0 ? '<div style="display:flex;justify-content:space-between"><span>Desechables</span><span>$' + d.desechables.toFixed(2) + '</span></div>' : '')
+              + (d.produccion > 0 ? '<div style="display:flex;justify-content:space-between"><span>Produccion</span><span>$' + d.produccion.toFixed(2) + '</span></div>' : '')
+              + '<div style="display:flex;justify-content:space-between;font-weight:700;color:var(--bd);border-top:1px solid rgba(0,0,0,.08);margin-top:.2rem;padding-top:.2rem"><span>Costo total</span><span>$' + d.total.toFixed(2) + '</span></div>'
+              + (d.precio_venta > 0 ? '<div style="display:flex;justify-content:space-between"><span>Precio de venta</span><span>$' + d.precio_venta.toFixed(2) + '</span></div>' : '')
+              + '</div>'
+            : '';
+        var badgeMargen = d.margen != null
+            ? '<div style="margin-top:.25rem"><span style="background:' + sem.bg + ';color:#fff;padding:.15rem .55rem;border-radius:99px;font-size:.68rem;font-weight:700">' + (d.margen>=0?'+':'') + d.margen.toFixed(1) + '% &middot; ' + sem.label + '</span></div>'
+            : '';
         var avisoBanco = sinBanco ? '<div style="padding:.35rem 1rem;font-size:.75rem;color:#8a3520;background:#FFF3CD;border-top:1px solid var(--cream)">&#9888; <strong>Costo incompleto</strong>: ' + sinBanco + ' ingrediente' + (sinBanco!==1?'s':'') + ' sin precio validado en Egresos, <strong>no cuenta' + (sinBanco!==1?'n':'') + ' en el total</strong>. Captura' + (sinBanco!==1?'los':'lo') + ' en Egresos.</div>' : '';
         html += '<div style="background:#fff;border:1.5px solid rgba(212,175,55,.2);border-radius:8px;overflow:hidden">'
             + '<div style="background:linear-gradient(135deg,var(--bd),var(--bm));padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center">'
             + '<div><div style="color:var(--gold);font-weight:700">' + p.nombre + '</div><div style="margin-top:.2rem">' + bEstado + bCat + '</div></div>'
-            + '<div style="text-align:right"><div style="color:#fff;font-size:.62rem;text-transform:uppercase;letter-spacing:1px;opacity:.7">Costo MP</div><div style="color:var(--gold);font-weight:700;font-size:1.15rem">$' + costo.toFixed(2) + '</div></div>'
+            + '<div style="text-align:right"><div style="color:#fff;font-size:.62rem;text-transform:uppercase;letter-spacing:1px;opacity:.7">' + (d.total > d.mp ? 'Costo total' : 'Costo MP') + '</div><div style="color:var(--gold);font-weight:700;font-size:1.15rem">$' + d.total.toFixed(2) + '</div>' + badgeMargen + '</div>'
             + '</div>'
-            + '<div style="padding:.5rem 1rem">' + (ingRows || '<span style="font-size:.8rem;color:var(--bl)">Sin ingredientes</span>') + '</div>'
+            + '<div style="padding:.5rem 1rem">' + (ingRows || '<span style="font-size:.8rem;color:var(--bl)">Sin ingredientes</span>') + desRows + '</div>'
+            + resumen
             + avisoBanco
             + (p.notas ? '<div style="padding:.25rem 1rem .5rem;font-size:.78rem;color:var(--bm)"><strong>Notas:</strong> ' + p.notas + '</div>' : '')
             + '<div style="display:flex;gap:.4rem;padding:.5rem 1rem;border-top:1px solid var(--cream)">'
@@ -2359,17 +2423,25 @@ function _recRecalcBanco() {
         else ip.innerHTML = '<span style="color:#C8553D" title="Sin precio validado en Egresos — no suma al costo">&#9888; sin precio</span>';
     });
 }
-function _acIngRow(ing) {
-    ing = ing || {nombre:'', cantidad:100, unidad:'g'};
+// defUnidad/defCant permiten que los desechables arranquen en "1 pz" (caja, bolsa,
+// servilleta se cuentan por pieza) en vez de "100 g".
+function _acIngRow(ing, defUnidad, defCant) {
+    var du = defUnidad || 'g', dc = (defCant != null ? defCant : 100);
+    ing = ing || {nombre:'', cantidad:dc, unidad:du};
     return '<div class="ing-row" style="' + AC_GRID + ';margin-bottom:.4rem">'
-        + '<input class="fi ac-in" list="dl-ingredientes" autocomplete="off" value="' + (ing.nombre||'') + '" placeholder="Escribe o elige del banco..." style="padding:.4rem .6rem">'
-        + '<input class="fi ac-ic" type="number" value="' + (ing.cantidad!=null?ing.cantidad:100) + '" style="padding:.4rem .6rem">'
+        + '<input class="fi ac-in" list="dl-ingredientes" autocomplete="off" value="' + (ing.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Escribe o elige del banco..." style="padding:.4rem .6rem">'
+        + '<input class="fi ac-ic" type="number" value="' + (ing.cantidad!=null?ing.cantidad:dc) + '" style="padding:.4rem .6rem">'
         + '<select class="fs ac-iu" style="padding:.4rem">'
-        + ['g','kg','ml','l','pz'].map(function(u){ return '<option value="'+u+'"'+((ing.unidad||'g')===u?' selected':'')+'>'+u+'</option>'; }).join('')
+        + ['g','kg','ml','l','pz'].map(function(u){ return '<option value="'+u+'"'+((ing.unidad||du)===u?' selected':'')+'>'+u+'</option>'; }).join('')
         + '</select>'
         + '<div class="ac-ip" style="display:flex;align-items:center;justify-content:flex-end;font-size:.78rem;color:var(--bm);text-align:right;line-height:1.2">&mdash;</div>'
         + '<button class="btn bsm rmac" style="background:var(--tc);padding:.4rem">&#10005;</button>'
         + '</div>';
+}
+// Encabezado de columnas reutilizable para las dos secciones de filas
+function _acHeaderCols(etiqueta) {
+    return '<div style="display:grid;' + AC_GRID + ';gap:.4rem;font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;color:var(--bl);margin-bottom:.3rem;padding:0 .2rem">'
+        + '<span>' + etiqueta + '</span><span>Cant</span><span>Unidad</span><span style="text-align:right">Precio banco = costo</span><span></span></div>';
 }
 function nuevoAlacarta() { _editorAlacarta(null); }
 function editarAlacarta(id) {
@@ -2380,26 +2452,47 @@ function editarAlacarta(id) {
 function _editorAlacarta(p) {
     var esNuevo = !p;
     window._acEdit = p ? p.id : null;
-    var ingsHTML = ((p && p.ingredientes && p.ingredientes.length) ? p.ingredientes : [{nombre:'',cantidad:100,unidad:'g'}]).map(_acIngRow).join('');
+    var ingsHTML = ((p && p.ingredientes && p.ingredientes.length) ? p.ingredientes : [{nombre:'',cantidad:100,unidad:'g'}]).map(function(i){ return _acIngRow(i); }).join('');
+    var desHTML = ((p && p.desechables && p.desechables.length) ? p.desechables : []).map(function(i){ return _acIngRow(i, 'pz', 1); }).join('');
     openModal(esNuevo ? '&#127828; Nuevo Platillo A la Carta' : '&#9998;&#65039; Editar: ' + p.nombre,
         '<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:1rem">'
         + '<div class="fg"><label class="fl2">Nombre</label><input id="ac-n" class="fi" value="' + (p?p.nombre:'') + '" placeholder="Ej: Hamburguesa de Res"></div>'
         + '<div class="fg"><label class="fl2">Categoria</label><input id="ac-cat" class="fi" value="' + (p?(p.categoria||''):'') + '" placeholder="Ej: Hamburguesas"></div>'
         + '<div class="fg"><label class="fl2">Estado</label><select id="ac-est" class="fs"><option value="borrador"' + (!p||p.estado!=='activo'?' selected':'') + '>En pruebas</option><option value="activo"' + (p&&p.estado==='activo'?' selected':'') + '>Activo</option></select></div></div>'
         + '<h4 style="margin:1rem 0 .5rem">Ingredientes <small style="font-weight:400;color:var(--bl)">(cantidad por porcion — precio tomado del banco)</small></h4>'
-        + '<div style="display:grid;' + AC_GRID + ';gap:.4rem;font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;color:var(--bl);margin-bottom:.3rem;padding:0 .2rem"><span>Ingrediente</span><span>Cant</span><span>Unidad</span><span style="text-align:right">Precio banco = costo</span><span></span></div>'
+        + _acHeaderCols('Ingrediente')
         + '<div id="ac-ings">' + ingsHTML + '</div>'
         + '<button class="btn bsec bsm" id="ac-add" style="margin:.5rem 0">&#10133; Agregar ingrediente</button>'
-        + '<div class="csum" style="margin:.5rem 0"><div class="crow" style="font-size:1.1rem;font-weight:700"><span>Costo MP por porcion</span><span id="ac-costo">$0.00</span></div></div>'
+        // ── Desechables: solo cuando el platillo es para llevar ──
+        + '<h4 style="margin:1rem 0 .5rem">Desechables <small style="font-weight:400;color:var(--bl)">(solo si es para llevar: caja, bolsa, servilleta...)</small></h4>'
+        + _acHeaderCols('Desechable')
+        + '<div id="ac-des">' + desHTML + '</div>'
+        + '<button class="btn bsec bsm" id="ac-add-des" style="margin:.5rem 0">&#10133; Agregar desechable</button>'
+        // ── Produccion y precio de venta ──
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:.75rem">'
+        + '<div class="fg"><label class="fl2">Costo de produccion ($/porcion)</label><input type="number" id="ac-prod" class="fi" step="0.01" min="0" value="' + (p&&p.costo_produccion!=null?p.costo_produccion:'') + '" placeholder="0.00">'
+        + '<div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Mano de obra, gas y energia de ESTE platillo. Es propio de Grill Express, no el del comedor.</div></div>'
+        + '<div class="fg"><label class="fl2">Precio de venta ($)</label><input type="number" id="ac-pv" class="fi" step="0.01" min="0" value="' + (p&&p.precio_venta!=null?p.precio_venta:'') + '" placeholder="0.00">'
+        + '<div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Lo que cobras al comensal. Sin esto no se puede calcular margen.</div></div></div>'
+        // ── Desglose y semaforo ──
+        + '<div class="csum" style="margin:.75rem 0;display:block">'
+        + '<div class="crow"><span>Materia prima</span><span id="ac-costo">$0.00</span></div>'
+        + '<div class="crow"><span>Desechables</span><span id="ac-cdes">$0.00</span></div>'
+        + '<div class="crow"><span>Produccion</span><span id="ac-cprod">$0.00</span></div>'
+        + '<div class="crow" style="font-size:1.1rem;font-weight:700"><span>Costo total</span><span id="ac-ctot">$0.00</span></div>'
+        + '<div class="crow" style="font-size:1.05rem;font-weight:700"><span>Margen</span><span id="ac-margen">&mdash;</span></div>'
+        + '</div>'
         + '<div class="fg"><label class="fl2">Notas (preparacion / R&amp;D)</label><textarea id="ac-notas" class="ft" style="min-height:70px" placeholder="Metodo de coccion, ajustes de prueba, etc.">' + (p?(p.notas||''):'') + '</textarea></div>'
         + '<div style="display:flex;gap:1rem;margin-top:1rem">'
         + '<button class="btn bgold" id="ac-save" style="flex:1">&#128190; Guardar</button>'
         + '<button class="btn bsec" style="flex:1" onclick="closeModal()">Cancelar</button></div>');
     setTimeout(function(){
         var cont = document.getElementById('ac-ings');
-        function recalc() {
+        var contDes = document.getElementById('ac-des');
+        // Suma una seccion de filas y pinta el precio del banco por linea
+        function sumarSeccion(sel) {
             var tot = 0;
-            document.querySelectorAll('#ac-ings .ing-row').forEach(function(row){
+            document.querySelectorAll(sel + ' .ing-row').forEach(function(row){
                 var n = row.querySelector('.ac-in').value.trim();
                 var ip = row.querySelector('.ac-ip');
                 if(!n) { if(ip) ip.innerHTML = '&mdash;'; return; }
@@ -2408,7 +2501,7 @@ function _editorAlacarta(p) {
                 var pu = getUnidadPrecio(n), pkg = getPrecio(n);
                 var linea = costoIngrediente({nombre:n, cantidad:c, unidad:u, precio_kg:pkg, precio_unidad:pu}, 1);
                 // Muestra el precio unitario del banco (para verificar contra Egresos) y el costo de esta linea.
-                // Si el precio NO viene del banco (adivinanza/$50), lo marca en rojo para no costear en silencio.
+                // Si el precio NO viene del banco, lo marca en rojo para no costear en silencio.
                 if(ip) {
                     if(precioEnBanco(n)) {
                         ip.innerHTML = '$' + pkg.toFixed(2) + '/' + pu + ' <span style="color:var(--tc);font-weight:700;margin-left:.2rem">$' + linea.toFixed(2) + '</span>';
@@ -2418,15 +2511,35 @@ function _editorAlacarta(p) {
                 }
                 tot += linea;
             });
-            var out = document.getElementById('ac-costo');
-            if(out) out.textContent = '$' + tot.toFixed(2);
+            return tot;
         }
-        if(cont) {
-            cont.addEventListener('input', recalc);
-            cont.addEventListener('click', function(e){ if(e.target.classList.contains('rmac')){ e.target.closest('.ing-row').remove(); recalc(); } });
+        function recalc() {
+            var mp = sumarSeccion('#ac-ings');
+            var des = sumarSeccion('#ac-des');
+            var prod = parseFloat(document.getElementById('ac-prod').value) || 0;
+            var pv = parseFloat(document.getElementById('ac-pv').value) || 0;
+            var total = mp + des + prod;
+            var margen = pv > 0 ? ((pv - total) / pv) * 100 : null;
+            document.getElementById('ac-costo').textContent = '$' + mp.toFixed(2);
+            document.getElementById('ac-cdes').textContent = '$' + des.toFixed(2);
+            document.getElementById('ac-cprod').textContent = '$' + prod.toFixed(2);
+            document.getElementById('ac-ctot').textContent = '$' + total.toFixed(2);
+            var s = semaforoGrill(margen), out = document.getElementById('ac-margen');
+            if(margen == null) out.innerHTML = '<span style="opacity:.8">&mdash; captura el precio de venta</span>';
+            else out.innerHTML = '<span style="background:' + s.bg + ';color:#fff;padding:.15rem .6rem;border-radius:99px">' + (margen>=0?'+':'') + margen.toFixed(1) + '% &middot; ' + s.label + '</span>';
         }
+        [cont, contDes].forEach(function(c){
+            if(!c) return;
+            c.addEventListener('input', recalc);
+            c.addEventListener('click', function(e){ if(e.target.classList.contains('rmac')){ e.target.closest('.ing-row').remove(); recalc(); } });
+        });
+        ['ac-prod','ac-pv'].forEach(function(id){
+            var e = document.getElementById(id); if(e) e.addEventListener('input', recalc);
+        });
         var add = document.getElementById('ac-add');
         if(add) add.addEventListener('click', function(){ var d = document.createElement('div'); d.innerHTML = _acIngRow(null); cont.appendChild(d.firstChild); recalc(); });
+        var addDes = document.getElementById('ac-add-des');
+        if(addDes) addDes.addEventListener('click', function(){ var d = document.createElement('div'); d.innerHTML = _acIngRow(null, 'pz', 1); contDes.appendChild(d.firstChild); recalc(); });
         recalc();
         var save = document.getElementById('ac-save');
         if(save) save.addEventListener('click', function(){
@@ -2440,11 +2553,32 @@ function _editorAlacarta(p) {
             var errsAC = validarIngredientes(filasAC);
             if(errsAC.length) { alert('No se puede guardar el platillo:\n\n' + errsAC.join('\n')); return; }
             var ings = filasAC.map(function(f){ return {nombre:f.nombre, cantidad:f.cantidad, unidad:f.unidad, precio_kg:getPrecio(f.nombre), precio_unidad:getUnidadPrecio(f.nombre)}; });
+            // Desechables: seccion OPCIONAL (solo para llevar). Las filas vacias se
+            // ignoran; las que traen algo se validan con el mismo criterio de 3.1.
+            var filasDes = [];
+            document.querySelectorAll('#ac-des .ing-row').forEach(function(row){
+                var n = row.querySelector('.ac-in').value.trim();
+                var c = row.querySelector('.ac-ic').value;
+                if(!n && (c === '' || c == null)) return;  // fila en blanco -> se descarta
+                filasDes.push({nombre:n, cantidad:parseFloat(c), unidad:row.querySelector('.ac-iu').value});
+            });
+            if(filasDes.length) {
+                var errsDes = validarIngredientes(filasDes);
+                if(errsDes.length) { alert('Revisa los desechables:\n\n' + errsDes.join('\n')); return; }
+            }
+            var des = filasDes.map(function(f){ return {nombre:f.nombre, cantidad:f.cantidad, unidad:f.unidad, precio_kg:getPrecio(f.nombre), precio_unidad:getUnidadPrecio(f.nombre)}; });
+            var prodVal = parseFloat(document.getElementById('ac-prod').value);
+            var pvVal = parseFloat(document.getElementById('ac-pv').value);
+            if(document.getElementById('ac-prod').value.trim() !== '' && (!isFinite(prodVal) || prodVal < 0)) { alert('Costo de produccion invalido.'); return; }
+            if(document.getElementById('ac-pv').value.trim() !== '' && (!isFinite(pvVal) || pvVal < 0)) { alert('Precio de venta invalido.'); return; }
             var datos = {
                 nombre: nombre,
                 categoria: document.getElementById('ac-cat').value.trim(),
                 estado: document.getElementById('ac-est').value,
                 ingredientes: ings,
+                desechables: des,
+                costo_produccion: isFinite(prodVal) ? prodVal : 0,
+                precio_venta: isFinite(pvVal) ? pvVal : 0,
                 notas: document.getElementById('ac-notas').value.trim(),
                 fecha: new Date().toLocaleString('es-MX')
             };
