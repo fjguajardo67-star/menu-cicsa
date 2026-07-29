@@ -28,9 +28,9 @@ no tiene precio de venta propio: el guisado 1 del lunes no se vende suelto.
 
 Esto es lo que determina dónde vive el semáforo (ver §5).
 
-**Fuera de alcance del semáforo:** los platillos de A la Carta. No tienen línea
-de contrato ni precio de venta individual en esta app; su módulo es solo costeo
-MP y R&D.
+**Fuera de alcance del semáforo del día:** los platillos de A la Carta
+(Grill Express). No pertenecen a una línea de contrato ni entran en la rotación
+de días: se venden por pieza y tienen su propio costeo y semáforo (§8).
 
 ---
 
@@ -301,7 +301,62 @@ contrato vigente, que da el conteo exacto.
 
 ---
 
-## 8. Orden de trabajo
+## 8. Grill Express — costeo a la carta
+
+A la Carta empezó como costeo de materia prima y R&D. Grill Express lo convierte
+en un producto que se vende, así que necesita costo completo y margen propio.
+
+### 8.1 Qué compone el costo de un platillo
+
+| Componente | Dónde vive | Nota |
+|---|---|---|
+| Materia prima | Ingredientes del platillo | Precio del banco de Egresos, como siempre |
+| Desechables | Sección aparte en el platillo | **Opcional** — solo cuando es para llevar (caja, bolsa, servilleta). Se eligen del banco igual que un ingrediente |
+| Costo de producción | Campo del platillo | **Por platillo**, no global |
+
+```
+costo_total = materia_prima + desechables + costo_produccion
+margen_%    = (precio_venta - costo_total) / precio_venta * 100
+```
+
+### 8.2 El costo de producción es por platillo, no el del comedor
+
+No se reutiliza el `costo_produccion` global de §4.2. Ese sale de
+`estructura del mes / comidas completas servidas` — es el costo de operar el
+comedor prorrateado entre las comidas de contrato. Grill Express es otra
+operación, y además un boneless de 12 minutos de freidora no cuesta lo mismo
+que una ensalada que se arma en 2. Cada platillo captura el suyo.
+
+### 8.3 Semáforo de Grill Express — 3 bandas
+
+A diferencia del semáforo del día (§5, cuatro bandas contra el contrato), aquí
+la pregunta es simple: ¿este platillo gana o pierde?
+
+| Condición sobre el margen | Color | Significado |
+|---|---|---|
+| `margen < 0` | Rojo | Pierde dinero |
+| `0 <= margen < margen_objetivo` | Amarillo | Gana, por debajo del objetivo |
+| `margen >= margen_objetivo` | Verde | Cumple |
+
+`margen_objetivo` es el mismo configurable de Admin (default 15 %). Sin precio
+de venta capturado **no se pinta semáforo** — se muestra "sin precio de venta".
+
+### 8.4 Qué NO aplica a Grill Express
+
+- **Complementos** (§4.3): arroz, frijoles, postre, refresco y tortillas son de
+  la comida completa del comedor. Un platillo a la carta no los lleva
+- **El costo de producción del comedor** (§4.2): ver §8.2
+- **El semáforo del día** (§5): Grill Express no entra en la rotación de días
+
+### 8.5 Compatibilidad
+
+`desechables`, `costo_produccion` y `precio_venta` son campos nuevos y
+opcionales. Un platillo capturado antes sigue funcionando: se muestra su costo
+de materia prima y no pinta semáforo hasta que se capture precio de venta.
+
+---
+
+## 9. Orden de trabajo
 
 1. **§3 Integridad del dato.** Validación al guardar + parsers sin invento +
    reporte de faltantes. Con el reporte a la vista: respaldo, borrado de las
