@@ -87,10 +87,10 @@
     <div class="fbar">
       <span class="fl">Filtrar:</span>
       <button class="fb on" data-fc onclick="filtSemaforo('todos',this)">Todos</button>
-      <button class="fb" data-fc onclick="filtSemaforo('verde',this)">&#128994; Verde</button>
-      <button class="fb" data-fc onclick="filtSemaforo('amarillo',this)">&#128993; Amarillo</button>
-      <button class="fb" data-fc onclick="filtSemaforo('naranja',this)">&#128992; Naranja</button>
-      <button class="fb" data-fc onclick="filtSemaforo('rojo',this)">&#128308; Rojo</button>
+      <button class="fb" data-fc onclick="filtSemaforo('verde',this)"><i class="dot dot-verde"></i>Verde</button>
+      <button class="fb" data-fc onclick="filtSemaforo('amarillo',this)"><i class="dot dot-amarillo"></i>Amarillo</button>
+      <button class="fb" data-fc onclick="filtSemaforo('naranja',this)"><i class="dot dot-naranja"></i>Naranja</button>
+      <button class="fb" data-fc onclick="filtSemaforo('rojo',this)"><i class="dot dot-rojo"></i>Rojo</button>
       <button class="fb" data-fc onclick="filtSemaforo('incompleto',this)">&#9888;&#65039; Incompletos</button>
       <button class="fb" id="btn-orden" onclick="toggleOrdenMenu(this)">&#8645; Peor margen primero</button>
       <button class="btn bgold bsm" onclick="genMenu()">&#128260; Regenerar</button>
@@ -776,10 +776,35 @@ function semaforoDia(mp, incompleto) {
     return {estado:color, margen:margen};
 }
 function badgeSemaforo(s) {
-    if(s.estado === 'incompleto') return '<div class="sem-badge" style="background:#FFF3CD;color:#8a6200;padding:.2rem .55rem;border-radius:99px;font-size:.68rem;font-weight:700;margin-top:.25rem;text-align:center" title="Alguna receta del día tiene ingredientes sin precio validado en Egresos — no puede pintar semáforo">&#9888; datos incompletos</div>';
-    if(s.estado === 'sinlinea') return '<div class="sem-badge" style="background:var(--bl);color:#fff;padding:.2rem .55rem;border-radius:99px;font-size:.68rem;font-weight:700;margin-top:.25rem;text-align:center" title="Sin línea de contrato asignada — asigna una en el selector Línea">sin l&iacute;nea</div>';
+    // Pildoras con glifo por banda (DESIGN.md): el color no es el unico portador.
+    if(s.estado === 'incompleto') return '<div class="sem-badge"><span class="pill pill-incompleto" title="Alguna receta del día tiene ingredientes sin precio validado en Egresos — no puede pintar semáforo">&#9888; datos incompletos</span></div>';
+    if(s.estado === 'sinlinea') return '<div class="sem-badge"><span class="pill pill-sinlinea" title="Sin línea de contrato asignada — asigna una en el selector del panel lateral">sin l&iacute;nea</span></div>';
     var c = SEM_COLORES[s.estado];
-    return '<div class="sem-badge" style="background:' + c.bg + ';color:#fff;padding:.2rem .55rem;border-radius:99px;font-size:.68rem;font-weight:700;margin-top:.25rem;text-align:center">' + c.label + ' &middot; margen ' + (s.margen >= 0 ? '+' : '') + s.margen.toFixed(1) + '%</div>';
+    return '<div class="sem-badge"><span class="pill pill-' + s.estado + '"><i></i>' + c.label + ' &middot; ' + (s.margen >= 0 ? '+' : '') + s.margen.toFixed(1) + '%</span></div>';
+}
+
+// Medidor de umbrales (DESIGN.md, componente de firma): ubica la materia prima
+// del dia entre los umbrales de COSTEO.md y avisa cuando esta a punto de
+// cambiar de banda. Solo presenta datos que el semaforo ya calcula.
+function medidorUmbrales(mp, estado) {
+    if(estado === 'incompleto' || estado === 'sinlinea') return '';
+    var u = umbralesSemaforo();
+    if(!u) return '';
+    var max = u.naranja * 1.23;  // aire tras el tope, para que el rojo tenga ancho
+    function pct(v) { return Math.max(0, Math.min(100, v / max * 100)); }
+    var tope = mp <= u.verde ? u.verde : mp <= u.amarillo ? u.amarillo : mp <= u.naranja ? u.naranja : null;
+    var borde = '';
+    if(tope !== null) {
+        var falta = tope - mp;
+        if(falta <= 2.5) borde = '<span class="edge">a $' + falta.toFixed(2) + ' del borde</span>';
+    }
+    return '<div class="meter"><div class="track">'
+        + '<i style="left:0;width:' + pct(u.verde) + '%;background:var(--ok)"></i>'
+        + '<i style="left:' + pct(u.verde) + '%;width:' + (pct(u.amarillo) - pct(u.verde)) + '%;background:var(--warn)"></i>'
+        + '<i style="left:' + pct(u.amarillo) + '%;width:' + (pct(u.naranja) - pct(u.amarillo)) + '%;background:var(--caution)"></i>'
+        + '<i style="left:' + pct(u.naranja) + '%;right:0;background:var(--crit)"></i>'
+        + '<span class="needle" style="left:' + pct(mp) + '%"></span></div>'
+        + '<div class="mlabels"><span>$0</span>' + borde + '<span>tope $' + u.naranja.toFixed(2) + '</span></div></div>';
 }
 
 // MENU GEN
@@ -853,7 +878,7 @@ function genMenu() {
             return rec && (rec.ingredientes||[]).some(function(ing){ return ing && !precioEnBanco(ing.nombre); });
         });
         var sem = semaforoDia(ct, diaIncompleto);
-        var badge = lk1 ? '<div style="background:var(--gold);color:var(--bd);padding:.15rem .5rem;border-radius:4px;font-size:.62rem;display:inline-block;margin-top:.2rem">&#11088; Especial</div>' : '';
+        var badge = lk1 ? '<div style="margin-top:3px"><span class="pill pill-especial">Especial</span></div>' : '';
         function pBox(lbl, nom, rec, c, lk, di, po) {
             if(!nom) return '<div class="pl"><div class="plt">' + lbl + '</div><div style="font-size:.8rem;color:var(--bl)">Sin platillos</div></div>';
             // Marca el costo como incompleto si algun ingrediente no tiene precio validado
@@ -861,8 +886,8 @@ function genMenu() {
             var avisoC = sinP ? ' <span style="color:#C8553D;font-weight:700" title="' + sinP + ' ingrediente(s) sin precio validado en Egresos — no suman al costo">&#9888;</span>' : '';
             return '<div class="pl"><div class="plt">' + lbl + (lk ? ' &#128274;' : '') + '</div>'
                 + '<div class="pln">' + nom + '</div>'
-                + '<div class="plm"><span>&#128205; ' + (rec ? rec.region || 'Mexico' : 'Mexico') + '</span><span>$' + c.toFixed(2) + '/pax' + avisoC + '</span></div>'
-                + (lk ? '' : '<button class="btn bsec bsm" style="margin-top:.4rem;width:100%;padding:.35rem" onclick="cambiar(' + di + ',' + po + ',event)">&#128260; Cambiar</button>')
+                + '<div class="plm"><span>' + (rec ? rec.region || 'Mexico' : 'Mexico') + '</span><span>$' + c.toFixed(2) + '/pax' + avisoC + '</span></div>'
+                + (lk ? '' : '<button class="btn bsec bsm" style="margin-top:.4rem;width:100%;padding:.35rem" onclick="cambiar(' + di + ',' + po + ',event)">Cambiar</button>')
                 + '</div>';
         }
         var div = document.createElement('div');
@@ -871,6 +896,7 @@ function genMenu() {
         div.dataset.margen = (sem.margen != null ? sem.margen : -9999);
         div.innerHTML = '<div class="dh"><div><div class="dn">Dia ' + String(i).padStart(2,'0') + '</div><div class="dw">' + dia + '</div>' + badge + '</div>'
             + '<div style="text-align:right"><div class="dc">$' + ct.toFixed(2) + '/pax</div>' + badgeSemaforo(sem) + '</div></div>'
+            + medidorUmbrales(ct, sem.estado)
             + pBox('GUISADO 1', g1, r1, c1, lk1, i, 1)
             + pBox('GUISADO 2', g2, r2, c2, false, i, 2)
             + pBox('GARNACHA', ga, rg, cg, lkG, i, 3);
