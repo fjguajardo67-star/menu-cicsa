@@ -75,8 +75,14 @@ body{
   border-right:1px solid var(--side-line);
   position:sticky;top:0;height:100vh;overflow-y:auto;
 }
-.brand{padding:14px 16px 10px;border-bottom:1px solid var(--side-line)}
+.brand{padding:14px 16px 12px;border-bottom:1px solid var(--side-line)}
 .brand img{display:block;width:100%;max-width:210px;height:auto;margin:-14px 0 -18px -8px}
+/* El tagline vive separado de la firma "Powered by Sparx AI" que ya trae el
+   logo: distinta tipografia y un respiro de aire para que no se amontonen. */
+.tagline{
+  margin-top:24px;font-size:11px;font-weight:600;font-style:italic;
+  color:#8EA3C9;letter-spacing:.02em;
+}
 .linea{padding:14px 20px;border-bottom:1px solid var(--side-line);background:rgba(255,255,255,.03)}
 .linea .lbl,.side-foot .lbl{
   font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
@@ -269,6 +275,31 @@ body{
   font-size:10px;color:var(--text-3);font-weight:600;font-variant-numeric:tabular-nums;
 }
 .edge{color:var(--caution-ink);font-weight:700}
+
+/* ── Fichas de resumen y tablas de datos ── */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.stat-tile{
+  background:var(--surface-2);border:1px solid var(--border);border-radius:9px;
+  padding:12px 14px;
+}
+.stat-num{
+  font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--text);
+  font-variant-numeric:tabular-nums;line-height:1.15;
+}
+.stat-lbl{
+  font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.13em;
+  color:var(--text-3);margin-top:3px;
+}
+.tabla{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.tabla th{
+  font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.13em;
+  color:var(--text-3);text-align:left;padding:8px 12px;
+  border-bottom:1px solid var(--border);background:var(--surface-2);
+}
+.tabla td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px}
+.tabla tr:last-child td{border-bottom:none}
+.tabla .num{text-align:right}
+.tabla tbody tr:hover td{background:var(--surface-2)}
 
 /* Puntos de los filtros por banda */
 .fb{display:inline-flex;align-items:center;gap:6px}
