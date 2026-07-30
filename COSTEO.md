@@ -356,6 +356,28 @@ de materia prima y no pinta semáforo hasta que se capture precio de venta.
 
 ---
 
+## 8b. Indicador orientativo en el editor de recetas (Catálogo)
+
+Pedido del usuario (2026-07-31). El editor de recetas del Catálogo muestra un
+resumen vivo al pie:
+
+```
+suma_mp     = Σ costo de ingredientes por porción (precios del banco)
+total       = suma_mp + costo_produccion            (§4.2, global)
+margen      = (precio_linea_activa − total) / precio_linea_activa
+```
+
+- Las bandas son las de Grill Express (§8, `semaforoGrill`): rojo pierde,
+  amarillo gana bajo objetivo, verde cumple.
+- El costo de producción y el precio de venta son **globales** (§4): en el
+  editor solo se muestran, nunca se editan — se editan en Admin.
+- Ingredientes sin precio validado no suman y se avisan (§3): el indicador
+  puede ser optimista, igual que el semáforo del día.
+- **Es orientativo por receta y NO sustituye al semáforo del día (§5).** El
+  día se vende completo (guisado 1 + guisado 2 + garnacha por $77): una
+  receta individual "verde" aquí no garantiza nada del día. Sirve para
+  comparar recetas entre sí mientras se editan.
+
 ## 9. Orden de trabajo
 
 1. **§3 Integridad del dato.** Validación al guardar + parsers sin invento +
