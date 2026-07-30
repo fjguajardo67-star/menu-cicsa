@@ -23,6 +23,10 @@
 </head>
 <body>
 <div id="toast" class="toast"></div>
+<button id="badge-version" class="badge-version" type="button" onclick="verificarVersion()"
+        title="Clic para comprobar si hay una version mas nueva desplegada">
+  <span id="badge-version-txt"></span>
+</button>
 
 <div class="app">
 <aside class="side">
@@ -357,6 +361,54 @@
 </div><!-- /.app -->
 
 <script>
+// ── Version desplegada ───────────────────────────────────────────────────────
+// CalVer: el numero ES la fecha de publicacion, asi que la frescura se lee sin
+// tabla de equivalencias. SUBIR ESTO EN CADA PR QUE SE MERGEE A MAIN.
+// Si se olvida, el badge no miente: al comprobar compara contra el archivo
+// realmente servido y ademas muestra su last-modified, que viene del servidor.
+var FORX_VERSION = '2026.07.31';
+
+function _pintarBadge(txt, estado) {
+    var b = document.getElementById('badge-version');
+    var t = document.getElementById('badge-version-txt');
+    if(!b || !t) return;
+    t.textContent = txt;
+    b.className = 'badge-version' + (estado ? ' bv-' + estado : '');
+}
+
+// Compara la version que corre en este navegador contra la desplegada. Resuelve
+// el caso real: alguien con la pestania abierta desde ayer creyendo que ve lo
+// mismo que el resto del equipo.
+function verificarVersion() {
+    _pintarBadge('comprobando...', 'check');
+    fetch('/index.html?_=' + Date.now(), {cache:'no-store'})
+        .then(function(r){
+            var lm = r.headers.get('last-modified');
+            return r.text().then(function(txt){ return {txt:txt, lm:lm}; });
+        })
+        .then(function(d){
+            var m = d.txt.match(/var FORX_VERSION = '([^']+)'/);
+            var remota = m ? m[1] : null;
+            var fecha = d.lm ? new Date(d.lm).toLocaleString('es-MX', {dateStyle:'medium', timeStyle:'short'}) : null;
+            if(remota && remota !== FORX_VERSION) {
+                _pintarBadge('v' + FORX_VERSION + ' — hay v' + remota + ', recarga', 'vieja');
+                document.getElementById('badge-version').title =
+                    'Est\u00e1s viendo una copia en cach\u00e9. Desplegado: ' + (fecha || 'desconocido') + '. Clic para recargar.';
+                document.getElementById('badge-version').onclick = function(){ location.reload(true); };
+            } else {
+                _pintarBadge('v' + FORX_VERSION + ' \u00b7 al d\u00eda', 'ok');
+                document.getElementById('badge-version').title =
+                    'Es la version desplegada. Publicado: ' + (fecha || 'desconocido');
+                setTimeout(function(){ _pintarBadge('v' + FORX_VERSION); }, 4000);
+            }
+        })
+        .catch(function(){
+            _pintarBadge('v' + FORX_VERSION + ' \u00b7 sin conexi\u00f3n', 'error');
+            setTimeout(function(){ _pintarBadge('v' + FORX_VERSION); }, 4000);
+        });
+}
+_pintarBadge('v' + FORX_VERSION);
+
 // Alternar tema claro/oscuro. La preferencia persiste en localStorage y el
 // script del <head> la aplica antes de pintar en la siguiente carga.
 function alternarTema() {
