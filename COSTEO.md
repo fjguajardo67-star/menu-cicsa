@@ -356,6 +356,33 @@ de materia prima y no pinta semáforo hasta que se capture precio de venta.
 
 ---
 
+## 6b. Familias de unidad — no se convierte entre ellas
+
+Egresos define la `unidad_base` de cada producto y en el banco conviven cuatro
+familias: **masa** (g, kg), **volumen** (ml, l, lt), **pieza** (pz) y
+**porción**. Una receta solo puede pedir un ingrediente en una unidad de su
+propia familia.
+
+| unidad_base en Egresos | La receta debe pedirlo en |
+|---|---|
+| kg | g o kg |
+| lt | ml o l |
+| pz | pz |
+| **porción** | **porción** |
+
+Única excepción, que ya existía: pedir en `pz` un producto costeado por masa se
+convierte con la tabla `CONV_PZ` (gramos por pieza).
+
+Si las familias no coinciden, el ingrediente **no se costea** (aporta $0) y el
+editor lo marca con "⚠ usa <unidad>". No se inventa una conversión: no existe
+una equivalencia real entre una porción de spring mix y un kilogramo, y
+adivinarla produciría un costo con cara de válido — justo lo que §3 prohíbe.
+
+Bug corregido el 2026-07-31: `porcion` no existía como unidad en los editores
+de Menú, aunque Egresos ya la usaba. Al elegir `kg` para un producto costeado
+por porción, el sistema multiplicaba la cantidad por el precio de la porción y
+daba un costo silenciosamente incorrecto.
+
 ## 8b. Indicador orientativo en el editor de recetas (Catálogo)
 
 Pedido del usuario (2026-07-31). El editor de recetas del Catálogo muestra un
