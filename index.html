@@ -28,6 +28,7 @@
 <aside class="side">
   <div class="brand">
     <img src="/forx-logo-dark.svg" alt="ForX &mdash; Powered by Sparx AI">
+    <div class="tagline">Forjamos tu men&uacute;</div>
   </div>
   <div class="linea">
     <span class="lbl">Costeando contra</span>
@@ -233,21 +234,20 @@
     <div class="ch">&#128176; Precios de Ingredientes</div>
     <div class="infobox">&#128274; <strong>Solo lectura.</strong> Los precios se gestionan en <strong>CICSA Control de Egresos</strong> y se sincronizan solos. Para agregar o corregir un precio (o un producto que falte), captúralo en Egresos &mdash; aqu&iacute; se refleja autom&aacute;ticamente.</div>
 
-    <div style="padding:1.5rem;background:#fff;border-radius:8px;border:1px solid rgba(212,175,55,.2)">
+    <div style="padding:1.5rem;background:var(--surface);border-radius:8px;border:1px solid var(--border)">
       <h3 style="margin-bottom:1rem">&#128202; Tabla de Precios</h3>
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-bottom:1rem">
         <input type="text" class="fi" placeholder="&#128269; Buscar ingrediente..." oninput="filtrarPrecios(this.value)">
         <button class="btn bsec bsm" onclick="exportarPrecios()">&#128229; Exportar CSV</button>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;padding:1rem;background:var(--cream);border-radius:6px;text-align:center">
-        <div><div style="font-size:1.5rem;font-weight:700;color:var(--gold)" id="pst">0</div><div style="font-size:.8rem;color:var(--bl)">Ingredientes</div></div>
-        <div><div style="font-size:1.5rem;font-weight:700;color:var(--green)" id="psp">$0</div><div style="font-size:.8rem;color:var(--bl)">Promedio</div></div>
-        <div><div style="font-size:1.5rem;font-weight:700;color:var(--tc)" id="psh">0</div><div style="font-size:.8rem;color:var(--bl)">Hoy</div></div>
+      <div class="stat-row">
+        <div class="stat-tile"><div class="stat-num" id="pst">0</div><div class="stat-lbl">Ingredientes validados</div></div>
+        <div class="stat-tile"><div class="stat-num" id="psh">0</div><div class="stat-lbl">Actualizados hoy</div></div>
       </div>
-      <table style="width:100%;border-collapse:collapse">
-        <thead><tr style="background:var(--bd);color:var(--gold)"><th style="padding:.75rem;text-align:left">Ingrediente</th><th style="padding:.75rem;text-align:center">Precio</th><th style="padding:.75rem;text-align:center">Fecha</th></tr></thead>
+      <div style="overflow-x:auto"><table class="tabla">
+        <thead><tr><th>Ingrediente</th><th class="num">Precio</th><th class="num">Fecha</th></tr></thead>
         <tbody id="tpre"></tbody>
-      </table>
+      </table></div>
     </div>
   </div>
 </div>
@@ -1760,7 +1760,7 @@ function renderCat() {
             : '<span style="background:var(--green);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">&#127858; Guisado</span>';
         var b3 = p.carnico ? '<span style="background:var(--bm);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">' + p.carnico + '</span>' : '';
         var ingP = (p.ingredientes && p.ingredientes.length) ? p.ingredientes.slice(0,3).map(function(i){return (i && i.nombre) ? i.nombre : '';}).filter(function(x){return x;}).join(' · ') + (p.ingredientes.length>3?' +mas':'') : '';
-        html += '<div style="background:#fff;border:1.5px solid rgba(212,175,55,.2);border-radius:8px;overflow:hidden">'
+        html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden">'
             + '<div style="background:linear-gradient(135deg,var(--bd),var(--bm));padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center">'
             + '<div><div style="color:var(--gold);font-weight:700">' + p.nombre + '</div><div style="margin-top:.2rem">' + b1 + b2 + b3 + '</div></div>'
             + '<div style="display:flex;gap:.4rem">'
@@ -2347,7 +2347,7 @@ function renderAlacarta() {
             ? '<div style="margin-top:.25rem"><span style="background:' + sem.bg + ';color:#fff;padding:.15rem .55rem;border-radius:99px;font-size:.68rem;font-weight:700">' + (d.margen>=0?'+':'') + d.margen.toFixed(1) + '% &middot; ' + sem.label + '</span></div>'
             : '';
         var avisoBanco = sinBanco ? '<div style="padding:.35rem 1rem;font-size:.75rem;color:#8a3520;background:#FFF3CD;border-top:1px solid var(--cream)">&#9888; <strong>Costo incompleto</strong>: ' + sinBanco + ' ingrediente' + (sinBanco!==1?'s':'') + ' sin precio validado en Egresos, <strong>no cuenta' + (sinBanco!==1?'n':'') + ' en el total</strong>. Captura' + (sinBanco!==1?'los':'lo') + ' en Egresos.</div>' : '';
-        html += '<div style="background:#fff;border:1.5px solid rgba(212,175,55,.2);border-radius:8px;overflow:hidden">'
+        html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden">'
             + '<div style="background:linear-gradient(135deg,var(--bd),var(--bm));padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center">'
             + '<div><div style="color:var(--gold);font-weight:700">' + p.nombre + '</div><div style="margin-top:.2rem">' + bEstado + bCat + '</div></div>'
             + '<div style="text-align:right"><div style="color:#fff;font-size:.62rem;text-transform:uppercase;letter-spacing:1px;opacity:.7">' + (d.total > d.mp ? 'Costo total' : 'Costo MP') + '</div><div style="color:var(--gold);font-weight:700;font-size:1.15rem">$' + d.total.toFixed(2) + '</div>' + badgeMargen + '</div>'
@@ -2633,10 +2633,10 @@ function renderPrecios() {
     var html = '';
     Object.keys(precios).sort().forEach(function(n) {
         var i = precios[n];
-        html += '<tr style="border-bottom:1px solid #E8DCC8" data-pn="' + n.toLowerCase() + '">'
-            + '<td style="padding:.75rem"><strong>' + n + '</strong></td>'
-            + '<td style="padding:.75rem;text-align:center">$' + i.precio.toFixed(2) + '/' + (i.unidad_base || 'kg') + '</td>'
-            + '<td style="padding:.75rem;text-align:center">' + i.fecha + '</td></tr>';
+        html += '<tr data-pn="' + n.toLowerCase() + '">'
+            + '<td><strong>' + n + '</strong></td>'
+            + '<td class="num">$' + i.precio.toFixed(2) + '/' + (i.unidad_base || 'kg') + '</td>'
+            + '<td class="num">' + i.fecha + '</td></tr>';
     });
     tbody.innerHTML = html;
     updPStats();
@@ -2647,11 +2647,9 @@ function filtrarPrecios(v) {
 }
 function updPStats() {
     var ks = Object.keys(precios);
-    var sum = ks.reduce(function(s,k){ return s + precios[k].precio; }, 0);
     var h = hoy();
     var hc = ks.filter(function(k){ return precios[k].fecha === h; }).length;
     var t = document.getElementById('pst'); if(t) t.textContent = ks.length;
-    var p = document.getElementById('psp'); if(p) p.textContent = '$' + (ks.length ? (sum/ks.length).toFixed(0) : '0');
     var hh = document.getElementById('psh'); if(hh) hh.textContent = hc;
 }
 // Escritura de precios eliminada: los precios son de solo-lectura desde cicsa-egresos.
