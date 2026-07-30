@@ -137,20 +137,46 @@ recetas con IA.
 
 ## Identidad entregada
 
-El logotipo todavía **no está en el repo**; existe solo como PNG con alfa de
-1536×1024 fuera del control de versiones. Colores medidos sobre ese archivo, no
-estimados:
+Existe el vector: `viewBox="0 0 1412 728"`, cinco trazos, tipografía ya
+convertida a curvas (sin dependencia de fuentes). El logotipo no llena su
+viewBox — su recuadro ajustado es `123.8 126.1 1193.6 467.2`.
+
+Valores tomados del vector, que es la fuente autoritativa. **Un PNG previo daba
+colores distintos y más saturados; esos valores quedaron descartados.**
 
 | Rol | Valor |
 |---|---|
-| Azul marino del logotipo | `#002058` — `#002060` |
-| Rampa de acento, extremo cálido rojo | `#F83000` |
-| Rampa de acento, medios | `#F86000` · `#F88000` |
-| Rampa de acento, extremo ámbar | `#F8A800` — `#F8B000` |
+| Azul marino del logotipo | `#0C255C` |
+| Rampa de la marca, extremo rojo | `#D83021` |
+| Rampa de la marca, medios | `#E64328` · `#EA7630` · `#EB7C32` |
+| Rampa de la marca, extremo ámbar | `#F2BE43` · `#F9C043` |
+| Acento del bloque "Sparx AI" | `#E95B2D` |
 
-Limitaciones del activo tal como está hoy: solo existe en raster, la marca
-depende de un degradado, y el bloque "POWERED BY Sparx AI" con su filete es
-ilegible por debajo de ~96 px.
+### Variantes necesarias, y por qué
+
+Ninguna es opcional; cada una cubre un caso donde la principal falla:
+
+1. **Completa, fondo claro.** El activo tal como se entregó.
+2. **Completa, fondo oscuro.** Obligatoria: el marino `#0C255C` sobre superficie
+   oscura da 1.09:1, o sea invisible. El logotipo se aclara y la marca conserva
+   su degradado.
+3. **Monocroma plana.** Para los documentos que se imprimen en láser
+   monocromo, donde un degradado sale como mancha.
+4. **Solo marca (la X).** Verificado: la versión completa a 32 px es ilegible y
+   la marca sola lee bien. Necesaria para favicon e íconos PWA.
+
+### La rampa de la marca es la escala del semáforo
+
+Decisión de diseño con consecuencia funcional: la rampa cálida del logotipo se
+reserva **exclusivamente** para comunicar estado, y lo interactivo usa un
+acento frío. Si el naranja fuera además el color de lo clickeable, dejaría de
+significar "margen mínimo, revisar" — y detectar el día que pierde dinero es el
+trabajo central del producto.
+
+Consecuencia medida: la rampa sirve como texto sobre fondo oscuro pero no sobre
+claro (`#F9C043` da 1.66:1 contra blanco). Los colores del logotipo se usan como
+**relleno**, y cada tema necesita sus propias **tintas** de texto verificadas
+contra su fondo.
 
 ## Stack
 
