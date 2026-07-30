@@ -1512,7 +1512,7 @@ function precioEnBanco(n) {
 }
 
 // ── Integridad del dato (COSTEO.md §3.1) ─────────────────────────────────────
-var UNIDADES_VALIDAS = ['g','kg','ml','l','pz'];
+var UNIDADES_VALIDAS = ['g','kg','ml','l','pz','porcion'];
 
 // Valida una lista de ingredientes antes de guardar. Devuelve lista de errores
 // (vacia = ok). Cantidad y unidad son bloqueantes; el PRECIO no (lo controla
@@ -1553,13 +1553,35 @@ function actualizarDatalistIngredientes() {
 
 // Costo de un ingrediente de receta, dado un factor de escalado (1 = una porcion).
 // Unica fuente de verdad para esta formula — antes estaba duplicada en 8 lugares del archivo.
+// Familias de unidad: solo se convierte DENTRO de una familia. Un producto
+// costeado por porcion o por pieza no tiene equivalencia en gramos que no sea
+// inventada, asi que pedirlo en gramos no se costea (COSTEO.md §3: mejor un 0
+// marcado que un numero adivinado).
+var UNIDAD_FAMILIA = {g:'masa', kg:'masa', ml:'volumen', l:'volumen', lt:'volumen', pz:'pieza', porcion:'porcion'};
+function familiaUnidad(u) { return UNIDAD_FAMILIA[String(u||'').toLowerCase()] || 'masa'; }
+
+// True si la unidad de la receta se puede costear con la unidad_base del banco.
+function unidadCompatible(nombreIng, unidadReceta) {
+    return familiaUnidad(unidadReceta) === familiaUnidad(getUnidadPrecio(nombreIng));
+}
+
 function costoIngrediente(ing, factor) {
     factor = factor || 1;
     var cant = ing.cantidad * factor;
-    if (ing.unidad === 'pz') {
-        if (ing.precio_unidad === 'pz') return cant * ing.precio_kg;
-        return (cant * getPzGramos(ing.nombre) / 1000) * ing.precio_kg;
+    var base = String(ing.precio_unidad || 'kg').toLowerCase();
+    var fBase = familiaUnidad(base), fRec = familiaUnidad(ing.unidad);
+
+    // Por porcion: el precio ya es de una racion servida. Solo se pide en porciones.
+    if (fBase === 'porcion' || fRec === 'porcion') {
+        return (fBase === 'porcion' && fRec === 'porcion') ? cant * ing.precio_kg : 0;
     }
+    if (ing.unidad === 'pz') {
+        if (base === 'pz') return cant * ing.precio_kg;
+        // pieza pedida contra precio por masa: se convierte con la tabla CONV_PZ
+        if (fBase === 'masa') return (cant * getPzGramos(ing.nombre) / 1000) * ing.precio_kg;
+        return 0;
+    }
+    if (base === 'pz') return 0;  // masa/volumen pedido contra precio por pieza
     if (ing.unidad === 'g' || ing.unidad === 'ml') return (cant / 1000) * ing.precio_kg;
     return cant * ing.precio_kg;
 }
@@ -1850,10 +1872,12 @@ function editarPl(nombre) {
         + '<div style="display:grid;' + AC_GRID + ';gap:.4rem;font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;color:var(--bl);margin-bottom:.3rem;padding:0 .2rem"><span>Ingrediente</span><span>Cant</span><span>Unidad</span><span style="text-align:right">Precio en Egresos</span><span></span></div>'
         + '<div id="ei">' + ingsHTML + '</div>'
         + '<button class="btn bsec bsm" id="bai" style="margin:.5rem 0">&#10133; Agregar</button>'
+        + '<div id="ei-resumen" class="csum" style="margin-top:.75rem"></div>'
         + '<div style="display:flex;gap:1rem;margin-top:1rem">'
         + '<button class="btn bgold" id="bsave" style="flex:1">&#128190; Guardar</button>'
         + '<button class="btn bsec" style="flex:1" onclick="closeModal()">Cancelar</button></div>');
     setTimeout(function() {
+        actualizarDatalistIngredientes();
         var ei = document.getElementById('ei');
         if(ei) {
             ei.addEventListener('click', function(e){ if(e.target.classList.contains('rmi')) { e.target.closest('.ing-row').remove(); _recRecalcBanco(); } });
@@ -2392,10 +2416,10 @@ function _recIngRow(ing) {
     ing = ing || {nombre:'', cantidad:0.1, unidad:'g'};
     var cant = (ing.cantidad!=null) ? Number(ing.cantidad).toFixed(3) : '0.100';
     return '<div class="ing-row" style="' + AC_GRID + ';margin-bottom:.4rem">'
-        + '<input class="fi ing-n" list="dl-ingredientes" autocomplete="off" value="' + (ing.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Ingrediente" style="padding:.4rem .6rem">'
+        + '<input class="fi ing-n" list="dl-ingredientes" autocomplete="off" value="' + (ing.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Buscar en Egresos..." style="padding:.4rem .6rem">'
         + '<input class="fi ing-c" type="number" value="' + cant + '" style="padding:.4rem .6rem">'
         + '<select class="fs ing-u" style="padding:.4rem">'
-        + ['g','kg','ml','l','pz'].map(function(u){ return '<option value="'+u+'"'+((ing.unidad||'g')===u?' selected':'')+'>'+u+'</option>'; }).join('')
+        + UNIDADES_VALIDAS.map(function(u){ return '<option value="'+u+'"'+((ing.unidad||'g')===u?' selected':'')+'>'+u+'</option>'; }).join('')
         + '</select>'
         + '<div class="ing-ip" style="display:flex;align-items:center;justify-content:flex-end;font-size:.75rem;text-align:right;line-height:1.15">&mdash;</div>'
         + '<button class="btn bsm rmi" style="background:var(--tc);padding:.4rem">&#10005;</button>'
@@ -2408,9 +2432,49 @@ function _recRecalcBanco() {
         if(!inp || !ip) return;
         var n = inp.value.trim();
         if(!n) { ip.innerHTML = '&mdash;'; return; }
-        if(precioEnBanco(n)) ip.innerHTML = '<span style="color:var(--green)" title="Precio validado en Egresos">&#10003; $' + getPrecio(n).toFixed(2) + '/' + getUnidadPrecio(n) + '</span>';
-        else ip.innerHTML = '<span style="color:#C8553D" title="Sin precio validado en Egresos — no suma al costo">&#9888; sin precio</span>';
+        if(!precioEnBanco(n)) { ip.innerHTML = '<span style="color:#C8553D" title="Sin precio validado en Egresos — no suma al costo">&#9888; sin precio</span>'; return; }
+        var u = row.querySelector('.ing-u');
+        var ub = getUnidadPrecio(n);
+        if(u && !unidadCompatible(n, u.value)) {
+            ip.innerHTML = '<span style="color:#C8553D" title="Este producto se costea por ' + ub + ' en Egresos. Cambia la unidad a ' + ub + ' — mezclar familias inventaria una conversion.">&#9888; usa ' + ub + '</span>';
+            return;
+        }
+        ip.innerHTML = '<span style="color:var(--green)" title="Precio validado en Egresos">&#10003; $' + getPrecio(n).toFixed(2) + '/' + ub + '</span>';
     });
+    _recResumen();
+}
+// Resumen vivo del editor de recetas (pedido del usuario, COSTEO.md §9):
+// suma de MP por porcion + costo de produccion global (solo lectura, se edita
+// en Admin) contra el precio de la linea activa, con las bandas de Grill
+// Express (§8). Es orientativo por receta: NO sustituye al semaforo del dia
+// (§5), que sigue midiendo el menu completo.
+function _recResumen() {
+    var box = document.getElementById('ei-resumen');
+    if(!box) return;
+    var lista = [];
+    document.querySelectorAll('#ei .ing-row').forEach(function(row){
+        var n = row.querySelector('.ing-n'), c = row.querySelector('.ing-c'), u = row.querySelector('.ing-u');
+        if(!n || !c || !u) return;
+        var cant = parseFloat(c.value) || 0;
+        if(n.value.trim() && cant > 0) lista.push({nombre:n.value.trim(), cantidad:cant, unidad:u.value});
+    });
+    var mp = _costoLista(lista);
+    var sinP = lista.filter(function(i){ return !precioEnBanco(i.nombre); }).length;
+    var prod = (config && config.costo_produccion) || 0;
+    var total = mp + prod;
+    var lin = lineaActiva();
+    var pv = lin ? lin.precio : 0;
+    var margen = pv > 0 ? ((pv - total) / pv) * 100 : null;
+    var sem = semaforoGrill(margen);
+    var clase = {verde:'pill-verde', amarillo:'pill-amarillo', rojo:'pill-rojo'}[sem.estado] || 'pill-sinlinea';
+    var pill = margen != null
+        ? '<span class="pill ' + clase + '"><i></i>' + (margen>=0?'+':'') + margen.toFixed(1) + '% &middot; ' + sem.label + '</span>'
+        : '<span class="pill pill-sinlinea">sin l&iacute;nea de contrato</span>';
+    var avisoSinP = sinP ? ' <span style="color:var(--crit-ink);font-weight:700">&#9888; ' + sinP + ' sin precio</span>' : '';
+    box.innerHTML =
+        '<div class="crow"><span>Suma de ingredientes (MP/porci&oacute;n)' + avisoSinP + '</span><span style="font-variant-numeric:tabular-nums">$' + mp.toFixed(2) + '</span></div>'
+        + '<div class="crow"><span>Costo de producci&oacute;n <small style="color:var(--bl)">(global &mdash; se edita en Admin)</small></span><span style="font-variant-numeric:tabular-nums">$' + prod.toFixed(2) + '</span></div>'
+        + '<div class="crow"><span>Total vs ' + (lin ? lin.nombre + ' ($' + pv.toFixed(2) + ')' : 'precio de venta') + '</span><span style="display:flex;gap:8px;align-items:center;font-variant-numeric:tabular-nums">$' + total.toFixed(2) + ' ' + pill + '</span></div>';
 }
 // defUnidad/defCant permiten que los desechables arranquen en "1 pz" (caja, bolsa,
 // servilleta se cuentan por pieza) en vez de "100 g".
@@ -2421,7 +2485,7 @@ function _acIngRow(ing, defUnidad, defCant) {
         + '<input class="fi ac-in" list="dl-ingredientes" autocomplete="off" value="' + (ing.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Escribe o elige del banco..." style="padding:.4rem .6rem">'
         + '<input class="fi ac-ic" type="number" value="' + (ing.cantidad!=null?ing.cantidad:dc) + '" style="padding:.4rem .6rem">'
         + '<select class="fs ac-iu" style="padding:.4rem">'
-        + ['g','kg','ml','l','pz'].map(function(u){ return '<option value="'+u+'"'+((ing.unidad||du)===u?' selected':'')+'>'+u+'</option>'; }).join('')
+        + UNIDADES_VALIDAS.map(function(u){ return '<option value="'+u+'"'+((ing.unidad||du)===u?' selected':'')+'>'+u+'</option>'; }).join('')
         + '</select>'
         + '<div class="ac-ip" style="display:flex;align-items:center;justify-content:flex-end;font-size:.78rem;color:var(--bm);text-align:right;line-height:1.2">&mdash;</div>'
         + '<button class="btn bsm rmac" style="background:var(--tc);padding:.4rem">&#10005;</button>'
@@ -2492,10 +2556,12 @@ function _editorAlacarta(p) {
                 // Muestra el precio unitario del banco (para verificar contra Egresos) y el costo de esta linea.
                 // Si el precio NO viene del banco, lo marca en rojo para no costear en silencio.
                 if(ip) {
-                    if(precioEnBanco(n)) {
-                        ip.innerHTML = '$' + pkg.toFixed(2) + '/' + pu + ' <span style="color:var(--tc);font-weight:700;margin-left:.2rem">$' + linea.toFixed(2) + '</span>';
-                    } else {
+                    if(!precioEnBanco(n)) {
                         ip.innerHTML = '<span style="color:#C8553D" title="Sin precio validado en Egresos — no suma al costo. Captura este producto en Egresos.">&#9888; sin precio</span>';
+                    } else if(!unidadCompatible(n, u)) {
+                        ip.innerHTML = '<span style="color:#C8553D" title="Este producto se costea por ' + pu + ' en Egresos. Cambia la unidad a ' + pu + ' — mezclar familias inventaria una conversion.">&#9888; usa ' + pu + '</span>';
+                    } else {
+                        ip.innerHTML = '$' + pkg.toFixed(2) + '/' + pu + ' <span style="color:var(--tc);font-weight:700;margin-left:.2rem">$' + linea.toFixed(2) + '</span>';
                     }
                 }
                 tot += linea;

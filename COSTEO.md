@@ -356,6 +356,55 @@ de materia prima y no pinta semáforo hasta que se capture precio de venta.
 
 ---
 
+## 6b. Familias de unidad — no se convierte entre ellas
+
+Egresos define la `unidad_base` de cada producto y en el banco conviven cuatro
+familias: **masa** (g, kg), **volumen** (ml, l, lt), **pieza** (pz) y
+**porción**. Una receta solo puede pedir un ingrediente en una unidad de su
+propia familia.
+
+| unidad_base en Egresos | La receta debe pedirlo en |
+|---|---|
+| kg | g o kg |
+| lt | ml o l |
+| pz | pz |
+| **porción** | **porción** |
+
+Única excepción, que ya existía: pedir en `pz` un producto costeado por masa se
+convierte con la tabla `CONV_PZ` (gramos por pieza).
+
+Si las familias no coinciden, el ingrediente **no se costea** (aporta $0) y el
+editor lo marca con "⚠ usa <unidad>". No se inventa una conversión: no existe
+una equivalencia real entre una porción de spring mix y un kilogramo, y
+adivinarla produciría un costo con cara de válido — justo lo que §3 prohíbe.
+
+Bug corregido el 2026-07-31: `porcion` no existía como unidad en los editores
+de Menú, aunque Egresos ya la usaba. Al elegir `kg` para un producto costeado
+por porción, el sistema multiplicaba la cantidad por el precio de la porción y
+daba un costo silenciosamente incorrecto.
+
+## 8b. Indicador orientativo en el editor de recetas (Catálogo)
+
+Pedido del usuario (2026-07-31). El editor de recetas del Catálogo muestra un
+resumen vivo al pie:
+
+```
+suma_mp     = Σ costo de ingredientes por porción (precios del banco)
+total       = suma_mp + costo_produccion            (§4.2, global)
+margen      = (precio_linea_activa − total) / precio_linea_activa
+```
+
+- Las bandas son las de Grill Express (§8, `semaforoGrill`): rojo pierde,
+  amarillo gana bajo objetivo, verde cumple.
+- El costo de producción y el precio de venta son **globales** (§4): en el
+  editor solo se muestran, nunca se editan — se editan en Admin.
+- Ingredientes sin precio validado no suman y se avisan (§3): el indicador
+  puede ser optimista, igual que el semáforo del día.
+- **Es orientativo por receta y NO sustituye al semáforo del día (§5).** El
+  día se vende completo (guisado 1 + guisado 2 + garnacha por $77): una
+  receta individual "verde" aquí no garantiza nada del día. Sirve para
+  comparar recetas entre sí mientras se editan.
+
 ## 9. Orden de trabajo
 
 1. **§3 Integridad del dato.** Validación al guardar + parsers sin invento +
