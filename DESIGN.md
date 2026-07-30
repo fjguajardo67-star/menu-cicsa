@@ -61,13 +61,13 @@ typography:
   figure:
     fontFamily: "IBM Plex Sans, ui-sans-serif, system-ui, sans-serif"
     fontSize: "20px"
-    fontWeight: 750
+    fontWeight: 700
     lineHeight: 1.1
     letterSpacing: "-0.02em"
   label:
     fontFamily: "IBM Plex Sans, ui-sans-serif, system-ui, sans-serif"
     fontSize: "9.5px"
-    fontWeight: 750
+    fontWeight: 700
     lineHeight: 1.2
     letterSpacing: "0.13em"
   print:
@@ -218,16 +218,27 @@ en oscuro, 4.74:1 en claro.
 
 ## Typography
 
-Una sola familia en toda la interfaz: **IBM Plex Sans**, a auto-hospedar en el
-repo vía `@font-face` — sin build, así que es un archivo `.woff2` y una regla.
-**Pendiente:** el archivo de fuente todavía no está en el repo, así que hasta
-que llegue rige la pila de respaldo (`ui-sans-serif, system-ui`) y la interfaz
-se ve con la fuente del sistema.
+Una sola familia en toda la interfaz: **IBM Plex Sans**, auto-hospedada en
+`fuentes/plex-latin-var.woff2`: fuente variable con eje `wght` 300–700,
+subseteada a latin (cobertura completa del español verificada), 31.9 KB en una
+sola petición. Licencia SIL OFL en `fuentes/OFL-IBMPlexSans.txt`. La regla:
+
+```css
+@font-face{
+  font-family:"IBM Plex Sans";
+  src:url("/fuentes/plex-latin-var.woff2") format("woff2-variations");
+  font-weight:300 700; font-style:normal; font-display:swap;
+}
+```
+
+Sin italic a propósito: el sistema no la usa. El peso máximo del eje es 700.
 
 La elección tiene razones, no gusto: herencia industrial y de ingeniería, que le
-va a un comedor industrial; **cifras tabulares reales**, indispensables para las
-columnas de costo; buena cobertura del español; y no está entre las familias que
-el detector marca como sobreexpuestas — al contrario de Inter, que sí lo está.
+va a un comedor industrial; **cifras tabulares por defecto** — los diez dígitos
+miden 600/1000 em en todo el eje de pesos, medido en la fuente, así que la
+alineación de columnas no depende de activar ninguna feature —; buena cobertura
+del español; y no está entre las familias que el detector marca como
+sobreexpuestas — al contrario de Inter, que sí lo está.
 
 Los cinco generadores de impresión **conservan Arial**. La razón es operativa:
 el documento tiene que salir igual en cualquier impresora de cocina sin depender
@@ -238,9 +249,9 @@ de una fuente instalada o embebida.
 | Rol | Tamaño | Peso | Uso |
 |---|---|---|---|
 | `display` | 19px | 700 | Título de superficie |
-| `figure` | 20–22px | 750 | Costo por pax, precio de línea |
+| `figure` | 20–22px | 700 | Costo por pax, precio de línea |
 | `body` | 13.5–14px | 400–650 | Nombres de platillo, texto corrido |
-| `label` | 9.5–10px | 750 | Etiquetas versalitas, `letter-spacing: 0.13em` |
+| `label` | 9.5–10px | 700 | Etiquetas versalitas, `letter-spacing: 0.13em` |
 | `meta` | 10.5–11px | 600 | Cárnico, unidades, avisos |
 
 ### Named Rules
