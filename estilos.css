@@ -276,6 +276,14 @@ body{
 }
 .edge{color:var(--caution-ink);font-weight:700}
 
+/* La marca de Grill Express llega como raster con fondo blanco: se presenta
+   sobre una placa blanca deliberada, legible en ambos temas. */
+.brand-plate{
+  display:inline-flex;background:#fff;border-radius:9px;padding:3px;
+  border:1px solid var(--border);flex:none;
+}
+.brand-plate img{display:block;border-radius:6px}
+
 /* ── Fichas de resumen y tablas de datos ── */
 .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
 .stat-tile{
