@@ -204,9 +204,9 @@
     </div>
     <div class="fbar">
       <button class="btn bgold bsm" onclick="exportarTxt()">&#128190; Exportar .TXT</button>
-      <button class="btn bsm" style="background:var(--green)" onclick="recalcularCostos()">&#128260; Recalcular Costos</button>
-      <button class="btn bsm" style="background:var(--tc)" onclick="reporteFaltantes()">&#129658; Reporte de faltantes</button>
-      <button class="btn bsm" style="background:var(--bm)" onclick="limpiezaGuiada()">&#129529; Limpieza guiada</button>
+      <button class="btn bok bsm" onclick="recalcularCostos()">&#128260; Recalcular Costos</button>
+      <button class="btn bcrit bsm" onclick="reporteFaltantes()">&#129658; Reporte de faltantes</button>
+      <button class="btn bneutro bsm" onclick="limpiezaGuiada()">&#129529; Limpieza guiada</button>
     </div>
     <div id="catcon"></div>
   </div>
@@ -290,6 +290,7 @@
         <button class="btn bgold bsm" onclick="verificarPin()">&#128275; Entrar</button>
       </div>
       <div id="pin-error" style="color:var(--tc);font-size:.8rem;margin-top:.5rem;min-height:1.2rem"></div>
+      <p id="pin-ayuda" style="color:var(--text-3);font-size:.75rem;margin-top:.5rem"></p>
     </div>
     <!-- CONTENIDO ADMIN (oculto hasta PIN correcto) -->
     <div id="admin-content" style="display:none">
@@ -299,12 +300,25 @@
         <div style="display:flex;gap:.75rem;align-items:center">
           <input type="password" id="apikey-input" class="fi" style="flex:1" placeholder="sk-ant-api03-...">
           <button class="btn bgold bsm" onclick="guardarApiKey()">&#128190; Guardar</button>
-          <button class="btn bsm" style="background:var(--tc)" onclick="borrarApiKey()">&#128465;&#65039;</button>
+          <button class="btn bcrit bsm" onclick="borrarApiKey()">&#128465;&#65039;</button>
         </div>
         <div id="apikey-status" style="margin-top:.75rem;font-size:.85rem"></div>
       </div>
+      <div class="infobox">
+        <h3>PIN de administrador</h3>
+        <p style="margin-bottom:.75rem;font-size:.85rem">Abre este panel. <strong>Se guarda en este navegador</strong>, asi que hay que fijarlo en cada equipo que administre: tu Mac, la maquina de compras, la tablet de cocina.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:.5rem;align-items:end">
+          <div><label class="fl2" for="pin-nuevo">PIN nuevo (4 a 6 digitos)</label>
+            <input type="password" id="pin-nuevo" class="fi" maxlength="6" inputmode="numeric" autocomplete="new-password" placeholder="&bull;&bull;&bull;&bull;"></div>
+          <div><label class="fl2" for="pin-nuevo2">Reptelo</label>
+            <input type="password" id="pin-nuevo2" class="fi" maxlength="6" inputmode="numeric" autocomplete="new-password" placeholder="&bull;&bull;&bull;&bull;" onkeydown="if(event.key==='Enter')cambiarPin()"></div>
+          <button class="btn" onclick="cambiarPin()">Guardar PIN</button>
+        </div>
+        <div id="pin-cambio-msg" style="margin-top:.6rem;font-size:.85rem;min-height:1.2rem"></div>
+        <p style="margin-top:.5rem;font-size:.78rem;color:var(--text-3)">Este PIN solo oculta el panel en la interfaz. Lo que protege los datos en la nube es la sesion de Google con la lista de correos autorizados y las reglas de Firestore.</p>
+      </div>
       <div style="margin-top:1rem;text-align:right">
-        <button class="btn bsm" style="background:var(--bl);color:#fff;font-size:.75rem" onclick="bloquearAdmin()">&#128274; Bloquear</button>
+        <button class="btn bsec bsm" onclick="bloquearAdmin()">&#128274; Bloquear</button>
       </div>
     </div>
   </div>
@@ -1828,18 +1842,18 @@ function renderCat() {
     var html = '<div style="font-size:.8rem;color:var(--bl);margin-bottom:.75rem">' + todos.length + ' platillo' + (todos.length!==1?'s':'') + '</div><div style="display:grid;gap:.75rem">';
     todos.forEach(function(p) {
         var esMia = p.origen === 'mia' || p.origen === 'extra';
-        var b1 = esMia ? '<span style="background:var(--gold);color:var(--bd);padding:.15rem .5rem;border-radius:99px;font-size:.7rem;font-weight:700">&#11088; Mi Receta</span>'
-            : '<span style="background:var(--bl);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem">&#127869;&#65039; Precargado</span>';
-        var b2 = p.tipoPl==='garnacha' ? '<span style="background:var(--tc);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">&#129362; Garnacha</span>'
-            : '<span style="background:var(--green);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">&#127858; Guisado</span>';
-        var b3 = p.carnico ? '<span style="background:var(--bm);color:#fff;padding:.15rem .5rem;border-radius:99px;font-size:.7rem;margin-left:.3rem">' + p.carnico + '</span>' : '';
+        var b1 = esMia ? '<span class="pill pill-amarillo">Mi receta</span>'
+            : '<span class="pill pill-sinlinea">Precargado</span>';
+        var b2 = p.tipoPl==='garnacha' ? '<span class="pill pill-caution" style="margin-left:.3rem">Garnacha</span>'
+            : '<span class="pill pill-verde" style="margin-left:.3rem">Guisado</span>';
+        var b3 = p.carnico ? '<span class="pill pill-sinlinea" style="margin-left:.3rem">' + p.carnico + '</span>' : '';
         var ingP = (p.ingredientes && p.ingredientes.length) ? p.ingredientes.slice(0,3).map(function(i){return (i && i.nombre) ? i.nombre : '';}).filter(function(x){return x;}).join(' · ') + (p.ingredientes.length>3?' +mas':'') : '';
         html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden">'
-            + '<div style="background:linear-gradient(135deg,var(--bd),var(--bm));padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center">'
-            + '<div><div style="color:var(--gold);font-weight:700">' + p.nombre + '</div><div style="margin-top:.2rem">' + b1 + b2 + b3 + '</div></div>'
+            + '<div style="background:var(--surface-2);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center">'
+            + '<div><div style="font-weight:700">' + p.nombre + '</div><div style="margin-top:.2rem">' + b1 + b2 + b3 + '</div></div>'
             + '<div style="display:flex;gap:.4rem">'
             + '<button class="btn bgold bsm" data-ae="' + encodeURIComponent(p.nombre) + '">&#9998;&#65039; Editar</button>'
-            + '<button class="btn bsm" style="background:var(--tc)" data-ad="' + encodeURIComponent(p.nombre) + '" data-ot="' + p.origen + '">&#128465;&#65039;</button>'
+            + '<button class="btn bcrit bsm" data-ad="' + encodeURIComponent(p.nombre) + '" data-ot="' + p.origen + '">&#128465;&#65039;</button>'
             + '</div></div>'
             + '<div style="padding:.5rem 1rem;font-size:.8rem;color:var(--bm)">' + ingP + '</div></div>';
     });
@@ -2452,7 +2466,7 @@ function renderAlacarta() {
             + (p.notas ? '<div style="padding:.25rem 1rem .5rem;font-size:.78rem;color:var(--bm)"><strong>Notas:</strong> ' + p.notas + '</div>' : '')
             + '<div style="display:flex;gap:.4rem;padding:.5rem 1rem;border-top:1px solid var(--cream)">'
             + '<button class="btn bgold bsm" data-ace="' + p.id + '">&#9998;&#65039; Editar</button>'
-            + '<button class="btn bsm" style="background:var(--tc)" data-acd="' + p.id + '">&#128465;&#65039; Eliminar</button>'
+            + '<button class="btn bcrit bsm" data-acd="' + p.id + '">&#128465;&#65039; Eliminar</button>'
             + '</div></div>';
     });
     html += '</div>';
@@ -2474,7 +2488,7 @@ function _recIngRow(ing) {
         + UNIDADES_VALIDAS.map(function(u){ return '<option value="'+u+'"'+((ing.unidad||'g')===u?' selected':'')+'>'+u+'</option>'; }).join('')
         + '</select>'
         + '<div class="ing-ip" style="display:flex;align-items:center;justify-content:flex-end;font-size:.75rem;text-align:right;line-height:1.15">&mdash;</div>'
-        + '<button class="btn bsm rmi" style="background:var(--tc);padding:.4rem">&#10005;</button>'
+        + '<button class="btn bcrit bsm rmi" style="padding:.4rem">&#10005;</button>'
         + '</div>';
 }
 // Refresca el indicador de banco de cada fila del editor de recetas.
@@ -2540,7 +2554,7 @@ function _acIngRow(ing, defUnidad, defCant) {
         + UNIDADES_VALIDAS.map(function(u){ return '<option value="'+u+'"'+((ing.unidad||du)===u?' selected':'')+'>'+u+'</option>'; }).join('')
         + '</select>'
         + '<div class="ac-ip" style="display:flex;align-items:center;justify-content:flex-end;font-size:.78rem;color:var(--bm);text-align:right;line-height:1.2">&mdash;</div>'
-        + '<button class="btn bsm rmac" style="background:var(--tc);padding:.4rem">&#10005;</button>'
+        + '<button class="btn bcrit bsm rmac" style="padding:.4rem">&#10005;</button>'
         + '</div>';
 }
 // Encabezado de columnas reutilizable para las dos secciones de filas
@@ -2808,7 +2822,7 @@ function renderConfigNegocio() {
         return '<div class="cfg-linea" data-id="' + l.id + '" style="display:grid;grid-template-columns:2fr 1fr .4fr;gap:.4rem;margin-bottom:.4rem">'
             + '<input class="fi cfg-ln" value="' + (l.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Nombre de la linea" style="padding:.4rem .6rem">'
             + '<input class="fi cfg-lp" type="number" step="0.01" min="0" value="' + l.precio + '" style="padding:.4rem .6rem">'
-            + '<button class="btn bsm cfg-lx" style="background:var(--tc);padding:.4rem" title="Eliminar linea">&#10005;</button>'
+            + '<button class="btn bcrit bsm cfg-lx" style="padding:.4rem" title="Eliminar linea">&#10005;</button>'
             + '</div>';
     }).join('');
     cont.querySelectorAll('.cfg-lx').forEach(function(b) {
@@ -2829,7 +2843,7 @@ function cfgAgregarLinea() {
     d.innerHTML = '<div class="cfg-linea" data-id="' + id + '" style="display:grid;grid-template-columns:2fr 1fr .4fr;gap:.4rem;margin-bottom:.4rem">'
         + '<input class="fi cfg-ln" placeholder="Nombre de la linea" style="padding:.4rem .6rem">'
         + '<input class="fi cfg-lp" type="number" step="0.01" min="0" placeholder="0.00" style="padding:.4rem .6rem">'
-        + '<button class="btn bsm cfg-lx" style="background:var(--tc);padding:.4rem">&#10005;</button></div>';
+        + '<button class="btn bcrit bsm cfg-lx" style="padding:.4rem">&#10005;</button></div>';
     var el = d.firstChild;
     el.querySelector('.cfg-lx').addEventListener('click', function(){ el.remove(); });
     cont.appendChild(el);
@@ -2911,9 +2925,42 @@ function verificarPin() {
     }
 }
 
+// Cambiar el PIN desde la interfaz. Antes solo se podia por consola del
+// navegador, lo que dejaba la administracion en manos de quien supiera abrir
+// devtools — no sirve cuando administra alguien mas del equipo.
+function cambiarPin() {
+    var a = document.getElementById('pin-nuevo'), b = document.getElementById('pin-nuevo2');
+    var msg = document.getElementById('pin-cambio-msg');
+    var p1 = (a.value||'').trim(), p2 = (b.value||'').trim();
+    function error(t) { msg.style.color = 'var(--crit-ink)'; msg.textContent = t; }
+    if(!/^[0-9]{4,6}$/.test(p1)) return error('El PIN debe ser de 4 a 6 digitos.');
+    if(p1 !== p2)               return error('Los dos PIN no coinciden.');
+    if(p1 === ADMIN_PIN_DEFAULT) return error('Ese es el PIN de fabrica: elige otro.');
+    setAdminPin(p1);
+    if(getAdminPin() !== p1) return error('No se pudo guardar (el navegador bloquea el almacenamiento local).');
+    a.value = ''; b.value = '';
+    msg.style.color = 'var(--ok-ink)';
+    msg.textContent = 'PIN actualizado en este navegador.';
+    setTimeout(function(){ msg.textContent = ''; }, 6000);
+}
+
+// Aviso honesto en la pantalla de bloqueo: si este navegador nunca fijo un PIN,
+// sigue el de fabrica y conviene decirlo en vez de dejar a alguien adivinando.
+function _pintarAyudaPin() {
+    var el = document.getElementById('pin-ayuda');
+    if(!el) return;
+    var sinFijar = false;
+    try { sinFijar = !localStorage.getItem('cicsa_pin'); } catch(e) { sinFijar = true; }
+    el.innerHTML = sinFijar
+        ? 'Este equipo a\u00fan usa el PIN de f\u00e1brica <strong>' + ADMIN_PIN_DEFAULT + '</strong>. Entra y c\u00e1mbialo abajo.'
+        : 'El PIN se guarda en este navegador. Si nadie lo recuerda, se puede restablecer desde otro equipo que s\u00ed entre.';
+}
+_pintarAyudaPin();
+
 function bloquearAdmin() {
     document.getElementById('admin-locked').style.display = 'block';
     document.getElementById('admin-content').style.display = 'none';
+    _pintarAyudaPin();
     clearTimeout(window._adminTimer);
 }
 
@@ -3076,7 +3123,7 @@ function renderRecetaGenerada() {
             + '<div style="font-size:.78rem;color:var(--bl)">' + (cantE<10?cantE.toFixed(1):Math.round(cantE)) + ' ' + u + ' &nbsp;|&nbsp; $' + c.toFixed(2)
             + (ing.sustitucion ? ' &nbsp;|&nbsp; <em>Alt: ' + ing.sustitucion + '</em>' : '') + '</div></div>'
             + '<button class="btn bgold bsm" onclick="editarIngRec(' + idx + ')" style="padding:.3rem .6rem">&#9998;&#65039;</button>'
-            + '<button class="btn bsm" style="background:var(--tc);padding:.3rem .6rem" onclick="sustituirIngRec(' + idx + ')">&#8646; Sust.</button>'
+            + '<button class="btn bcrit bsm" style="padding:.3rem .6rem" onclick="sustituirIngRec(' + idx + ')">&#8646; Sust.</button>'
             + '<button class="btn bsm" style="background:var(--bm);padding:.3rem .6rem" onclick="eliminarIngRec(' + idx + ')">&#10005;</button>'
             + '</div>';
     }).join('');
