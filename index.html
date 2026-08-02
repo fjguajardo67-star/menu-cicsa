@@ -714,8 +714,28 @@ async function sincronizarDesdeFirebase() {
     // Traer platillos a la carta de la nube
     var ac = await fbGet('datos', 'alacarta');
     if(ac && Array.isArray(ac)) {
-        alacarta = ac;
-        try { localStorage.setItem('ac_cicsa', JSON.stringify(alacarta)); } catch(e) {}
+        // La nube manda, PERO no en silencio. Si trae menos platillos de los que
+        // hay aqui, lo que falta desaparece sin dejar rastro. Pasa cuando alguien
+        // guardo sin sesion de administrador —su platillo quedo solo en su
+        // navegador— y despues otro guardo si teniendola. A diferencia de las
+        // recetas, donde el array vacio ES la orden de vaciar (ver arriba), aqui
+        // no hay flujo de limpieza masiva que justifique borrar sin preguntar.
+        var enNube = {};
+        ac.forEach(function(p){ if(p && p.id != null) enNube[p.id] = 1; });
+        var soloLocales = alacarta.filter(function(p){ return p && p.id != null && !enNube[p.id]; });
+        if(soloLocales.length && !confirm(
+                'Sincronizacion de Grill Express\n\n'
+              + 'La nube tiene ' + ac.length + ' platillo(s). Este navegador tiene '
+              + soloLocales.length + ' que no estan alla:\n\n'
+              + soloLocales.map(function(p){ return '  · ' + (p.codigo ? p.codigo + ' ' : '') + p.nombre; }).join('\n')
+              + '\n\nACEPTAR los descarta y se quedan los de la nube.\n'
+              + 'CANCELAR los conserva aqui — inicia sesion como administrador y\n'
+              + 'vuelve a guardar cualquiera para subirlos todos.')) {
+            toast('☁️ Se conservaron ' + soloLocales.length + ' platillo(s) que solo existen aquí');
+        } else {
+            alacarta = ac;
+            try { localStorage.setItem('ac_cicsa', JSON.stringify(alacarta)); } catch(e) {}
+        }
         if(document.getElementById('alacartacon') && document.getElementById('alacarta').classList.contains('on')) renderAlacarta();
     }
     // Configuracion de negocio (lineas de contrato, costos) — §4
@@ -2782,7 +2802,7 @@ function _editorAlacarta(p) {
         if(addDes) addDes.addEventListener('click', function(){ var d = document.createElement('div'); d.innerHTML = _acIngRow(null, 'pz', 1); contDes.appendChild(d.firstChild); recalc(); });
         recalc();
         var save = document.getElementById('ac-save');
-        if(save) save.addEventListener('click', function(){
+        if(save) save.addEventListener('click', async function(){
             var nombre = document.getElementById('ac-n').value.trim();
             if(!nombre) { alert('Ingresa el nombre del platillo'); return; }
             // Mismo criterio que en el Catalogo: avisa y deja decidir.
@@ -2841,19 +2861,35 @@ function _editorAlacarta(p) {
             } else {
                 alacarta.push(Object.assign({id: Date.now()+Math.floor(Math.random()*10000), codigo: siguienteCodigo('grill')}, datos));
             }
-            saveAlacarta();
+            // El guardado local siempre funciona; el de la nube requiere sesion
+            // de administrador. Antes se cantaba "guardado" sin esperar el
+            // resultado, asi que un platillo podia quedar SOLO en este navegador
+            // sin que nadie se enterara — invisible para el resto del equipo y
+            // a un borrado de cache de desaparecer.
             closeModal(); renderAlacarta();
-            toast('"' + nombre + '" guardado');
+            var ok = await saveAlacarta();
+            if(ok) toast('"' + nombre + '" guardado');
+            else alert('"' + nombre + '" se guardo SOLO en este navegador.\n\n'
+                     + 'No subio a la nube: nadie mas lo vera y se pierde si se limpia\n'
+                     + 'el navegador.\n\n'
+                     + 'Inicia sesion como administrador y vuelve a guardarlo.');
         });
     }, 50);
 }
-function delAlacarta(id) {
+async function delAlacarta(id) {
     var p = alacarta.find(function(x){ return x.id === id; });
     if(!p) return;
     if(confirm('Eliminar "' + p.nombre + '"?')) {
         alacarta = alacarta.filter(function(x){ return x.id !== id; });
-        saveAlacarta(); renderAlacarta();
-        toast('"' + p.nombre + '" eliminado');
+        renderAlacarta();
+        // Mismo motivo que al guardar: sin admin el borrado solo ocurre aqui y
+        // la proxima sincronizacion lo revive.
+        var ok = await saveAlacarta();
+        if(ok) toast('"' + p.nombre + '" eliminado');
+        else alert('"' + p.nombre + '" se elimino SOLO en este navegador.\n\n'
+                 + 'Sigue en la nube y volvera a aparecer en la proxima\n'
+                 + 'sincronizacion. Inicia sesion como administrador para\n'
+                 + 'eliminarlo de verdad.');
     }
 }
 
