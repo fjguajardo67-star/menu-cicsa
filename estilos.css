@@ -295,6 +295,16 @@ body{
 }
 .brand-plate img{display:block;border-radius:6px}
 
+/* Código de platillo: se lee y se dicta, así que va en cifras tabulares y con
+   un fondo propio que lo separa del nombre sin competir con él. */
+.codigo{
+  display:inline-block;background:var(--surface-2);color:var(--text-2);
+  border:1px solid var(--border);border-radius:5px;
+  padding:1px 6px;margin-right:2px;
+  font-size:10.5px;font-weight:700;letter-spacing:.04em;
+  font-variant-numeric:tabular-nums;vertical-align:1px;
+}
+
 /* ── Fichas de resumen y tablas de datos ── */
 .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
 .stat-tile{
