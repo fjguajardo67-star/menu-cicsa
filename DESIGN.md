@@ -179,11 +179,16 @@ Cuatro bandas con significado financiero, definido en COSTEO.md:
 | Banda | Relleno | Significa |
 |---|---|---|
 | Verde | `#12A863` | Cumple el margen objetivo |
-| Amarillo | `#F9C043` | Gana, por debajo del objetivo |
-| Naranja | `#EA7630` | Margen mínimo, revisar |
+| Amarillo | `#F9C043` | Cerca del objetivo |
+| Naranja | `#EA7630` | Gana poco, revisar |
 | Rojo | `#D83021` | Pierde dinero |
 
 El verde no existe en el logotipo, y está bien: es señal, no marca.
+
+**Una escala, todas las superficies.** Las mismas cuatro bandas sirven al menú
+del día y a Grill Express. Grill Express usaba tres bandas y las pintaba con
+rellenos sólidos y texto blanco — 2.42:1 en amarillo, 2.97:1 en naranja. Ahora
+usa las píldoras del sistema, con tinta del tema y glifo por banda.
 
 ### Named Rules
 

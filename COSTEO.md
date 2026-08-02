@@ -217,14 +217,37 @@ Reemplaza en su totalidad el mecanismo actual de rangos fijos: los filtros
 
 ### 5.2 Umbrales — calculados, nunca escritos a mano
 
+**Una sola escala para todo el sistema.** El semáforo del día y el de Grill
+Express (§8.3) miden lo mismo — el **margen**, o sea el % del precio de venta
+que queda después de materia prima y costos fijos — con los mismos cortes.
+Antes eran dos escalas distintas (cuatro bandas contra tres) y por eso un día
+no se podía leer como canasta.
+
+Los cortes, en % de margen, se derivan de `margen_objetivo`:
+
+```
+corte_verde    = margen_objetivo
+corte_amarillo = margen_objetivo * 2/3
+corte_naranja  = 0
+```
+
+Para el día esos cortes se traducen a pesos de materia prima — cuánta MP cabe
+antes de caer de banda:
+
 ```
 MP_disponible   = precio_linea - costo_produccion - costo_complementos_por_pax
-umbral_verde    = precio_linea * (1 - margen_objetivo) - costo_produccion - costo_complementos_por_pax
-umbral_amarillo = precio_linea * 0.90                  - costo_produccion - costo_complementos_por_pax
+umbral_verde    = precio_linea * (1 - corte_verde)    - costo_produccion - costo_complementos_por_pax
+umbral_amarillo = precio_linea * (1 - corte_amarillo) - costo_produccion - costo_complementos_por_pax
 umbral_naranja  = MP_disponible
 ```
 
-`margen_objetivo` es configurable en Admin. **Default: 15 %.**
+`margen_objetivo` es configurable en Admin. **Default: 15 %**, que deja el
+corte amarillo en 10 % — exactamente donde estaba el `0.90` fijo anterior.
+
+**El dos tercios no es arbitrario ni sagrado:** se eligió porque reproduce el
+corte que ya existía con el objetivo por omisión. Si el negocio decide que la
+banda amarilla debe ser más ancha o más angosta, se cambia aquí y se mueve
+sola en las dos superficies.
 
 Referencia con `precio = 77.00`, `costo_produccion = 22.81`,
 `complementos = 0` y `margen = 0.15`:
@@ -240,12 +263,18 @@ de producción, los complementos o el margen objetivo, se recalculan solos.
 
 ### 5.3 Bandas
 
-| Condición sobre el MP del día | Color | Significado |
-|---|---|---|
-| `MP <= umbral_verde` | Verde | Cumple el margen objetivo |
-| `MP <= umbral_amarillo` | Amarillo | Gana, por debajo del objetivo |
-| `MP <= umbral_naranja` | Naranja | Margen mínimo, revisar |
-| `MP > umbral_naranja` | Rojo | Pierde dinero |
+| Margen | MP del día | Color | Significado |
+|---|---|---|---|
+| `>= corte_verde` | `MP <= umbral_verde` | Verde | Cumple el margen objetivo |
+| `>= corte_amarillo` | `MP <= umbral_amarillo` | Amarillo | Cerca del objetivo |
+| `>= 0` | `MP <= umbral_naranja` | Naranja | Gana poco, revisar |
+| `< 0` | `MP > umbral_naranja` | Rojo | Pierde dinero |
+
+Las dos columnas son la misma condición escrita de dos formas. La comparación
+lleva una tolerancia de punto flotante: un día clavado en el objetivo calcula
+`14.999999999999996`, el badge lo redondea a `+15.0%`, y sin esa tolerancia se
+vería un "15.0%" pintado de amarillo contra un objetivo de 15 %. No mueve
+ninguna frontera real — 14.99 % sigue siendo amarillo.
 
 ### 5.4 Presentación
 
@@ -327,19 +356,28 @@ comedor prorrateado entre las comidas de contrato. Grill Express es otra
 operación, y además un boneless de 12 minutos de freidora no cuesta lo mismo
 que una ensalada que se arma en 2. Cada platillo captura el suyo.
 
-### 8.3 Semáforo de Grill Express — 3 bandas
+### 8.3 Semáforo de Grill Express — las mismas 4 bandas del día
 
-A diferencia del semáforo del día (§5, cuatro bandas contra el contrato), aquí
-la pregunta es simple: ¿este platillo gana o pierde?
+**Es el semáforo de §5, no otro.** Mismos cortes, misma derivación desde
+`margen_objetivo`, mismas píldoras con glifo. Grill Express tenía tres bandas
+—le faltaba naranja— y eso impedía comparar un platillo a la carta contra un
+día del comedor.
 
-| Condición sobre el margen | Color | Significado |
+| Margen | Color | Etiqueta |
 |---|---|---|
-| `margen < 0` | Rojo | Pierde dinero |
-| `0 <= margen < margen_objetivo` | Amarillo | Gana, por debajo del objetivo |
-| `margen >= margen_objetivo` | Verde | Cumple |
+| `>= margen_objetivo` | Verde | Cumple |
+| `>= margen_objetivo * 2/3` | Amarillo | Cerca |
+| `>= 0` | Naranja | Bajo objetivo |
+| `< 0` | Rojo | Pierde |
 
-`margen_objetivo` es el mismo configurable de Admin (default 15 %). Sin precio
-de venta capturado **no se pinta semáforo** — se muestra "sin precio de venta".
+Sin precio de venta capturado **no se pinta semáforo** — se muestra "sin precio
+de venta".
+
+**Por qué importa que sean la misma escala.** El día no se equilibra platillo
+por platillo: un platillo de bajo margen se sostiene con uno de buen margen y
+la canasta cierra. Con dos escalas distintas esa suma no se podía hacer. Con
+una sola, sí — y es la base de cómo las apps de pre-pedido van a componer el
+menú del día sin ver precios.
 
 ### 8.4 Qué NO aplica a Grill Express
 
@@ -394,8 +432,8 @@ total       = suma_mp + costo_produccion            (§4.2, global)
 margen      = (precio_linea_activa − total) / precio_linea_activa
 ```
 
-- Las bandas son las de Grill Express (§8, `semaforoGrill`): rojo pierde,
-  amarillo gana bajo objetivo, verde cumple.
+- Las bandas son las mismas de todo el sistema (§5.3): verde cumple, amarillo
+  cerca, naranja gana poco, rojo pierde.
 - El costo de producción y el precio de venta son **globales** (§4): en el
   editor solo se muestran, nunca se editan — se editan en Admin.
 - Ingredientes sin precio validado no suman y se avisan (§3): el indicador
