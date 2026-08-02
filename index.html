@@ -337,7 +337,7 @@
       <div class="fg"><label class="fl2">Complementos ($/pax)</label><input type="number" id="cfg-complementos" class="fi" step="0.01" min="0">
         <div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Arroz, frijoles, postre, refresco y tortillas del d&iacute;a &mdash; lo que la comida incluye fuera de las 3 recetas.</div></div>
       <div class="fg"><label class="fl2">Margen objetivo (%)</label><input type="number" id="cfg-margen" class="fi" step="1" min="0" max="90">
-        <div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Default 15%. Define el umbral verde del sem&aacute;foro.</div></div>
+        <div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Default 15%. De aqu&iacute; salen <strong>las cuatro bandas</strong> del sem&aacute;foro, tanto del men&uacute; del d&iacute;a como de Grill Express: verde al objetivo, amarillo a dos tercios, naranja arriba de 0, rojo pierde.</div></div>
     </div>
     <button class="btn bgold bfull" onclick="guardarConfigNegocio()" style="margin-top:.5rem">&#128190; Guardar configuraci&oacute;n</button>
   </div>
@@ -380,7 +380,7 @@
 // tabla de equivalencias. SUBIR ESTO EN CADA PR QUE SE MERGEE A MAIN.
 // Si se olvida, el badge no miente: al comprobar compara contra el archivo
 // realmente servido y ademas muestra su last-modified, que viene del servidor.
-var FORX_VERSION = '2026.07.31';
+var FORX_VERSION = '2026.08.02';
 
 function _pintarBadge(txt, estado) {
     var b = document.getElementById('badge-version');
@@ -813,24 +813,57 @@ function pickFrom(list, used, V, excl, exclCarnico, allDB) {
     return pool.length ? pool[Math.floor(Math.random() * pool.length)] : list[0];
 }
 
-// ── Semaforo del dia (COSTEO.md §5) ──────────────────────────────────────────
-// Umbrales SIEMPRE calculados de la config (linea de contrato + costo de
-// produccion + complementos + margen objetivo). Nunca escritos a mano.
-var SEM_COLORES = {
-    verde:    {bg:'#2E7D32', label:'Verde'},
-    amarillo: {bg:'#C9A227', label:'Amarillo'},
-    naranja:  {bg:'#E07B39', label:'Naranja'},
-    rojo:     {bg:'#C0392B', label:'Rojo'}
+// ── Semaforo unico (COSTEO.md §5 y §8) ───────────────────────────────────────
+// UNA sola escala de 4 bandas sobre el MARGEN — el % del precio de venta que
+// queda despues de materia prima y costos fijos. El menu del dia y Grill
+// Express miden lo mismo con los mismos cortes; antes eran dos escalas
+// distintas (4 bandas contra 3) y un dia no se podia evaluar como canasta.
+// Los cortes se DERIVAN de margen_objetivo. Nunca se escriben a mano.
+// La tinta sale de los tokens del tema (DESIGN.md, Regla de la Tinta por
+// Luminancia), no de hex embebido: los rellenos solidos que usaba Grill
+// Express con texto blanco daban 2.42:1 en amarillo y 2.97:1 en naranja.
+var SEM_BANDAS = {
+    verde:    {ink:'var(--ok-ink)',      label:'Verde',    sentido:'Cumple'},
+    amarillo: {ink:'var(--warn-ink)',    label:'Amarillo', sentido:'Cerca'},
+    naranja:  {ink:'var(--caution-ink)', label:'Naranja',  sentido:'Bajo objetivo'},
+    rojo:     {ink:'var(--crit-ink)',    label:'Rojo',     sentido:'Pierde'}
 };
+// Un margen_objetivo de 0 es valido; solo el campo ausente cae al 15% default.
+function margenObjetivo() {
+    var m = config && config.margen_objetivo;
+    return (typeof m === 'number' && m >= 0) ? m : 0.15;
+}
+// Cortes en % de margen. Amarillo va a dos tercios del objetivo: con el 15%
+// por omision cae en 10%, exactamente donde estaba el corte fijo de antes.
+function cortesMargen() {
+    var obj = margenObjetivo() * 100;
+    return {verde:obj, amarillo:obj * 2 / 3, naranja:0};
+}
+// EPS absorbe el ruido de punto flotante en la frontera exacta: un dia clavado
+// en el objetivo da 14.999999999999996 y el badge redondea a "+15.0%", asi que
+// sin esta tolerancia se veria "15.0%" pintado de amarillo contra un objetivo
+// de 15%. No mueve ninguna frontera real — 14.99% sigue siendo amarillo.
+var SEM_EPS = 1e-9;
+function bandaMargen(margen) {
+    var c = cortesMargen();
+    return margen >= c.verde    - SEM_EPS ? 'verde'
+         : margen >= c.amarillo - SEM_EPS ? 'amarillo'
+         : margen >= c.naranja  - SEM_EPS ? 'naranja'
+         : 'rojo';
+}
+// Los umbrales del dia son los mismos cortes traducidos a pesos de materia
+// prima: cuanta MP cabe antes de caer de banda.
 function umbralesSemaforo() {
     var l = lineaActiva();
     if(!l || !(l.precio > 0)) return null;
     var fijo = (config.costo_produccion || 0) + (config.costo_complementos || 0);
+    var c = cortesMargen();
+    function mpDe(margenPct) { return l.precio * (1 - margenPct / 100) - fijo; }
     return {
         precio:   l.precio,
-        verde:    l.precio * (1 - (config.margen_objetivo || 0)) - fijo,
-        amarillo: l.precio * 0.90 - fijo,
-        naranja:  l.precio - fijo   // MP_disponible: arriba de esto, el dia pierde dinero
+        verde:    mpDe(c.verde),
+        amarillo: mpDe(c.amarillo),
+        naranja:  mpDe(c.naranja)   // MP_disponible: arriba de esto, el dia pierde dinero
     };
 }
 // mp = MP del dia por pax. incompleto = alguna receta del dia tiene ingredientes
@@ -840,14 +873,13 @@ function semaforoDia(mp, incompleto) {
     var u = umbralesSemaforo();
     if(!u) return {estado:'sinlinea', margen:null};
     var margen = ((u.naranja - mp) / u.precio) * 100;  // % del precio que queda tras MP+fijos
-    var color = mp <= u.verde ? 'verde' : mp <= u.amarillo ? 'amarillo' : mp <= u.naranja ? 'naranja' : 'rojo';
-    return {estado:color, margen:margen};
+    return {estado:bandaMargen(margen), margen:margen};
 }
 function badgeSemaforo(s) {
     // Pildoras con glifo por banda (DESIGN.md): el color no es el unico portador.
     if(s.estado === 'incompleto') return '<div class="sem-badge"><span class="pill pill-incompleto" title="Alguna receta del día tiene ingredientes sin precio validado en Egresos — no puede pintar semáforo">&#9888; datos incompletos</span></div>';
     if(s.estado === 'sinlinea') return '<div class="sem-badge"><span class="pill pill-sinlinea" title="Sin línea de contrato asignada — asigna una en el selector del panel lateral">sin l&iacute;nea</span></div>';
-    var c = SEM_COLORES[s.estado];
+    var c = SEM_BANDAS[s.estado];
     return '<div class="sem-badge"><span class="pill pill-' + s.estado + '"><i></i>' + c.label + ' &middot; ' + (s.margen >= 0 ? '+' : '') + s.margen.toFixed(1) + '%</span></div>';
 }
 
@@ -2366,14 +2398,13 @@ function desgloseAlacarta(p) {
     var margen = pv > 0 ? ((pv - total) / pv) * 100 : null;
     return {mp:mp, desechables:des, produccion:prod, total:total, precio_venta:pv, margen:margen};
 }
-// Semaforo de 3 bandas (definido con el usuario): rojo pierde, amarillo gana pero
-// por debajo del objetivo, verde cumple. Sin precio de venta no hay semaforo.
+// Mismas 4 bandas que el dia (§5): una sola escala para todo el sistema, para
+// que un dia se pueda leer como canasta y no platillo por platillo. Sin precio
+// de venta no hay semaforo.
 function semaforoGrill(margen) {
-    if(margen == null) return {estado:'sinprecio', bg:'var(--bl)', label:'sin precio de venta'};
-    var obj = (config.margen_objetivo || 0.15) * 100;
-    if(margen < 0)   return {estado:'rojo',     bg:'#C0392B', label:'Pierde'};
-    if(margen < obj) return {estado:'amarillo', bg:'#C9A227', label:'Bajo objetivo'};
-    return {estado:'verde', bg:'#2E7D32', label:'Cumple'};
+    if(margen == null) return {estado:'sinprecio', ink:'var(--text-3)', label:'sin precio de venta'};
+    var e = bandaMargen(margen), b = SEM_BANDAS[e];
+    return {estado:e, ink:b.ink, label:b.sentido};
 }
 function setFiltAC(f, btn) {
     filtAC = f;
@@ -2414,7 +2445,7 @@ function _htmlMenuAC(conCostos, soloActivos) {
                    var ss = semaforoGrill(dd.margen);
                    return '<div style="text-align:right;white-space:nowrap">' + pv
                        + '<div style="font-size:.75rem;color:var(--tc)">costo $' + dd.total.toFixed(2) + '</div>'
-                       + (dd.margen != null ? '<div style="font-size:.72rem;color:' + ss.bg + ';font-weight:700">' + (dd.margen>=0?'+':'') + dd.margen.toFixed(1) + '%</div>' : '')
+                       + (dd.margen != null ? '<div style="font-size:.72rem;color:' + ss.ink + ';font-weight:700">' + (dd.margen>=0?'+':'') + dd.margen.toFixed(1) + '%</div>' : '')
                        + '</div>';
                  })()
                + '</div>';
@@ -2540,7 +2571,7 @@ function renderAlacarta() {
               + '</div>'
             : '';
         var badgeMargen = d.margen != null
-            ? '<div style="margin-top:.25rem"><span style="background:' + sem.bg + ';color:#fff;padding:.15rem .55rem;border-radius:99px;font-size:.68rem;font-weight:700">' + (d.margen>=0?'+':'') + d.margen.toFixed(1) + '% &middot; ' + sem.label + '</span></div>'
+            ? '<div style="margin-top:.25rem"><span class="pill pill-' + sem.estado + '"><i></i>' + (d.margen>=0?'+':'') + d.margen.toFixed(1) + '% &middot; ' + sem.label + '</span></div>'
             : '';
         var avisoBanco = sinBanco ? '<div style="padding:.35rem 1rem;font-size:.75rem;color:#8a3520;background:#FFF3CD;border-top:1px solid var(--cream)">&#9888; <strong>Costo incompleto</strong>: ' + sinBanco + ' ingrediente' + (sinBanco!==1?'s':'') + ' sin precio validado en Egresos, <strong>no cuenta' + (sinBanco!==1?'n':'') + ' en el total</strong>. Captura' + (sinBanco!==1?'los':'lo') + ' en Egresos.</div>' : '';
         html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden">'
@@ -2620,7 +2651,7 @@ function _recResumen() {
     var pv = lin ? lin.precio : 0;
     var margen = pv > 0 ? ((pv - total) / pv) * 100 : null;
     var sem = semaforoGrill(margen);
-    var clase = {verde:'pill-verde', amarillo:'pill-amarillo', rojo:'pill-rojo'}[sem.estado] || 'pill-sinlinea';
+    var clase = SEM_BANDAS[sem.estado] ? 'pill-' + sem.estado : 'pill-sinlinea';
     var pill = margen != null
         ? '<span class="pill ' + clase + '"><i></i>' + (margen>=0?'+':'') + margen.toFixed(1) + '% &middot; ' + sem.label + '</span>'
         : '<span class="pill pill-sinlinea">sin l&iacute;nea de contrato</span>';
@@ -2734,8 +2765,8 @@ function _editorAlacarta(p) {
             document.getElementById('ac-cprod').textContent = '$' + prod.toFixed(2);
             document.getElementById('ac-ctot').textContent = '$' + total.toFixed(2);
             var s = semaforoGrill(margen), out = document.getElementById('ac-margen');
-            if(margen == null) out.innerHTML = '<span style="opacity:.8">&mdash; captura el precio de venta</span>';
-            else out.innerHTML = '<span style="background:' + s.bg + ';color:#fff;padding:.15rem .6rem;border-radius:99px">' + (margen>=0?'+':'') + margen.toFixed(1) + '% &middot; ' + s.label + '</span>';
+            if(margen == null) out.innerHTML = '<span class="pill pill-sinlinea">&mdash; captura el precio de venta</span>';
+            else out.innerHTML = '<span class="pill pill-' + s.estado + '"><i></i>' + (margen>=0?'+':'') + margen.toFixed(1) + '% &middot; ' + s.label + '</span>';
         }
         [cont, contDes].forEach(function(c){
             if(!c) return;
