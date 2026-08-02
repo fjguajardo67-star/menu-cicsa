@@ -405,6 +405,46 @@ margen      = (precio_linea_activa − total) / precio_linea_activa
   receta individual "verde" aquí no garantiza nada del día. Sirve para
   comparar recetas entre sí mientras se editan.
 
+## 10. Códigos de platillo
+
+Pedido del usuario (2026-07-31): un identificador para clasificar, registrar y
+referirse a un platillo sin depender del nombre.
+
+```
+G-001    guisado
+GN-001   garnacha
+GE-001   Grill Express
+```
+
+Correlativo automático por familia — nadie elige el número, porque un número
+escrito a mano acaba repetido. El prefijo clasifica solo y ordena bien en
+listas.
+
+### Reglas
+
+- **El código no cambia nunca.** Ni al renombrar el platillo, ni al
+  reclasificarlo de guisado a garnacha. Un código que cambia deja de servir
+  para lo único que sirve: que dos personas hablen del mismo platillo.
+- **El nombre sigue siendo la llave** de la receta (`DB["Tinga de Pollo"]`).
+  El código es un atributo. Cambiar la llave habría obligado a reescribir las
+  21 referencias por nombre, la generación del menú y los impresos, sobre un
+  sistema en producción sin pruebas.
+- La asignación es **idempotente**: corre tras cada sync y solo toca lo que no
+  tiene código, así que el catálogo histórico queda cubierto sin migración
+  aparte.
+- Se busca por código o por nombre en el Catálogo.
+
+### Lo que el código NO resuelve
+
+**No evita duplicados por sí solo.** Como el nombre es la llave, un duplicado
+exacto ya era imposible; el problema real son los casi-iguales ("Tinga de
+Pollo" y "tinga de pollo"), y a cada uno se le asignaría su propio código.
+
+Por eso la duplicidad se ataja aparte, al guardar: se comparan los nombres
+**normalizados** (sin acentos, sin mayúsculas, sin espacios de más) y se avisa
+de los parecidos. **Avisa, no bloquea** — dos guisados pueden llamarse parecido
+y ser distintos de verdad, y quien captura sabe cuál es el caso.
+
 ## 9. Orden de trabajo
 
 1. **§3 Integridad del dato.** Validación al guardar + parsers sin invento +

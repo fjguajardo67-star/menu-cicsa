@@ -45,7 +45,7 @@
   --border:#D3DCEC;
   --text:#0B1B3A;
   --text-2:#3C4E73;
-  --text-3:#5F6E8B;
+  --text-3:#59677F;  /* 4.96:1 incluso sobre surface-2, el fondo de los infobox */
   --accent:#0E9FB0;
   --accent-soft:rgba(14,159,176,.12);
   --on-accent:#05122F;
@@ -117,7 +117,9 @@ body{
   padding:8px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;
 }
 .tbtn:hover{background:rgba(255,255,255,.12)}
-.legal{font-size:9.5px;line-height:1.5;color:#5F729B}
+/* El sidebar es oscuro en ambos temas, pero no igual de oscuro: este valor se
+   eligió contra el más claro de los dos (#0C255C), donde da 4.92:1. */
+.legal{font-size:9.5px;line-height:1.5;color:#8496BB}
 .main{min-width:0}
 .wrap{max-width:1400px;margin:0 auto;padding:20px 24px 40px}
 
@@ -176,6 +178,15 @@ body{
 .bsec{background:transparent;color:var(--text);border-color:var(--border)}
 .bsec:hover{background:var(--surface-2);filter:none}
 .bgold{background:var(--warn);color:var(--on-warm)}
+/* Acción destructiva: usa el RELLENO crítico (igual en ambos temas) con tinta
+   blanca, no la tinta de texto — que en claro es un rojo oscuro y dejaba el
+   texto del botón en 2.53:1. */
+.bcrit{background:var(--crit);color:var(--on-crit)}
+/* Mismo criterio para las otras acciones con relleno propio: el RELLENO no
+   cambia entre temas, la tinta de texto sí — usar la tinta como fondo dejaba
+   marino sobre verde oscuro en tema claro. */
+.bok{background:var(--ok);color:var(--on-warm)}
+.bneutro{background:var(--surface-2);color:var(--text);border-color:var(--border)}
 .bsm{padding:6px 10px;font-size:12px}
 .bfull{width:100%;display:block;text-align:center}
 
@@ -283,6 +294,16 @@ body{
   border:1px solid var(--border);flex:none;
 }
 .brand-plate img{display:block;border-radius:6px}
+
+/* Código de platillo: se lee y se dicta, así que va en cifras tabulares y con
+   un fondo propio que lo separa del nombre sin competir con él. */
+.codigo{
+  display:inline-block;background:var(--surface-2);color:var(--text-2);
+  border:1px solid var(--border);border-radius:5px;
+  padding:1px 6px;margin-right:2px;
+  font-size:10.5px;font-weight:700;letter-spacing:.04em;
+  font-variant-numeric:tabular-nums;vertical-align:1px;
+}
 
 /* ── Fichas de resumen y tablas de datos ── */
 .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
