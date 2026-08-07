@@ -213,6 +213,56 @@
   color: #fff3c4;
 }
 
+/* Golden Balls and pending claims ride beside the star count as small
+   chips, so the centre column never grows into the halves. */
+.score-minor {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+}
+.score-chip.minor .n {
+  font-size: clamp(17px, 4.2vw, 25px);
+}
+.score-chip.minor .icon {
+  font-size: clamp(13px, 3.2vw, 17px);
+}
+
+/* Shorter viewports: scale the whole scene down so the centre circle
+   never collides with the halves. */
+@media (max-height: 1080px) {
+  .big-button {
+    min-height: clamp(96px, 15vh, 148px);
+  }
+  .pitch-half {
+    gap: 10px;
+    padding: 14px;
+  }
+  /* The chalk captions are decoration; on short screens they give their
+     room back to the buttons and the centre circle. */
+  .half-label {
+    display: none;
+  }
+  .centre-circle {
+    width: min(38vw, 176px);
+    /* Score lays out as one row so the column can never reach the halves. */
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .score-minor {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .score-chip .n {
+    font-size: clamp(24px, 6.4vw, 36px);
+  }
+  .cabinet {
+    padding: 10px 12px;
+  }
+}
+
 /* --- The two big buttons: TRAIN and WATCH --- */
 .big-button {
   position: relative;

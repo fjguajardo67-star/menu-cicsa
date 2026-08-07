@@ -149,16 +149,20 @@ export function KidHome({ profile, onTrain, onWatch, onOffice }: KidHomeProps) {
           </span>
           <span className="icon twinkle">⭐</span>
         </span>
-        {golden > 0 && (
-          <span className="score-chip golden">
-            <span className="n">{golden}</span>
-            <span className="icon">🥇</span>
-          </span>
-        )}
-        {pending > 0 && (
-          <span className="score-chip pending">
-            <span className="n">+{pending}</span>
-            <span className="icon">⏳</span>
+        {(golden > 0 || pending > 0) && (
+          <span className="score-minor">
+            {golden > 0 && (
+              <span className="score-chip golden minor">
+                <span className="n">{golden}</span>
+                <span className="icon">🥇</span>
+              </span>
+            )}
+            {pending > 0 && (
+              <span className="score-chip pending minor">
+                <span className="n">+{pending}</span>
+                <span className="icon">⏳</span>
+              </span>
+            )}
           </span>
         )}
       </div>
