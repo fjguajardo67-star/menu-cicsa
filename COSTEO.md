@@ -483,6 +483,49 @@ Por eso la duplicidad se ataja aparte, al guardar: se comparan los nombres
 de los parecidos. **Avisa, no bloquea** — dos guisados pueden llamarse parecido
 y ser distintos de verdad, y quien captura sabe cuál es el caso.
 
+### 10.1 `GE-XXX` es el SKU maestro (decidido 2026-08-07)
+
+Grill Express (`~/grill-express`, Express + Supabase) tiene su propia llave
+primaria `clave` — `hamburguesa_res`, `alitas_bbq`, `boneless_casa`… — con 15
+platillos en producción. La pregunta era cuál de los dos identificadores manda
+cuando las dos apps hablan del mismo platillo.
+
+**Manda `GE-XXX`.** Es el SKU único del platillo en toda la cadena.
+
+- Grill Express **conserva `clave` como PK** y agrega una columna
+  `codigo_forx`. No se renombra nada: cambiarle la llave primaria a una tabla
+  con pedidos vivos apuntando a ella no compra nada que `codigo_forx` no dé.
+- Es coherente con la cadena de datos: **ForX es el único generador de costos**
+  y Grill Express los consume. Quien genera el dato lo nombra.
+- `clave` es texto descriptivo, y el texto descriptivo se vuelve mentira
+  (`alitas_casa` sigue llamándose así aunque le cambien la salsa). `GE-XXX` no
+  significa nada, y por eso no puede quedar desactualizado — la misma razón
+  por la que el código no cambia nunca (§10).
+
+El emparejamiento inicial de los 15 lo hace una persona, una sola vez. No hay
+match automático por nombre y no debe haberlo: es justo el tipo de adivinanza
+que §2 prohíbe para los precios.
+
+### 10.2 El grano es la variante, no el platillo genérico
+
+ForX desglosa lo que producción distingue. Las **3 alitas** (BBQ, casa,
+picantes) y los **2 boneless** (BBQ, casa) son cinco platillos con cinco
+códigos, no dos.
+
+La razón es de costeo, no de catálogo: cada salsa lleva ingredientes y precios
+distintos. Un "Alitas" genérico da un costo promedio que no corresponde a
+ningún platillo que se venda de verdad, y el semáforo de §8.3 pintaría verde
+sobre la variante cara escondiéndola detrás de la barata. Un costo que no es de
+nada no sirve para decidir nada.
+
+Consecuencia práctica: son ~15 recetas a capturar, no ~5.
+
+**Excepción — `especial_dia`.** El Especial del Día rota, así que su costo
+cambia con lo que se cocine. No es un platillo con receta fija y **no recibe
+código `GE-XXX` propio**: cuando el especial sea un guisado del comedor, hereda
+el `G-XXX` de esa receta. Forzarlo a un código fijo sería declarar estable un
+costo que no lo es.
+
 ## 9. Orden de trabajo
 
 1. **§3 Integridad del dato.** Validación al guardar + parsers sin invento +

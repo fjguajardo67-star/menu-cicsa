@@ -54,23 +54,24 @@ usuario el link `pull/new/<rama>` → él mergea → verificar deploy → borrar
    en el navegador. Falta además el valor real de **complementos** (hoy $0, lo que
    hace el semáforo optimista).
 
-## SKU / código de platillo — decisión pendiente
+## SKU / código de platillo — DECIDIDO 2026-08-07
 
-ForX **ya asigna** `codigo` = `GE-001`, `GE-002`… (commit `c571740`), con backfill
-y detección de duplicados. Pero:
+**`GE-XXX` es el SKU maestro** y **ForX desglosa por variante**. El razonamiento
+completo quedó en `COSTEO.md` §10.1 y §10.2 — que es la spec y manda sobre el código.
 
-- **Grill Express** (`~/grill-express`, Express+Supabase, deploy Railway) tiene su
-  propia PK `clave` con **15 platillos en producción**: `hamburguesa_res`,
-  `alitas_bbq`, `alitas_casa`, `alitas_picantes`, `boneless_bbq`, `boneless_casa`,
-  `rollo_boneless`, `pechuga_plancha`, `milanesa_pollo`, `filete_pescado`,
-  `ensalada_grill`, `ensalada_atun`, `ensalada_boneless`, `especial_dia`,
-  `hamburguesa_pollo`. Todos a **$77.00**.
-- **No mapean 1:1**: ForX tiene un platillo "Alitas" (`GE-003`); Grill Express tiene
-  3 variantes de alitas con salsas distintas (y por tanto costos distintos).
+En corto: Grill Express (`~/grill-express`, Express+Supabase, deploy Railway) conserva
+su PK `clave` con los **15 platillos en producción** (`hamburguesa_res`, `alitas_bbq`,
+`alitas_casa`, `alitas_picantes`, `boneless_bbq`, `boneless_casa`, `rollo_boneless`,
+`pechuga_plancha`, `milanesa_pollo`, `filete_pescado`, `ensalada_grill`,
+`ensalada_atun`, `ensalada_boneless`, `especial_dia`, `hamburguesa_pollo`, todos a
+**$77.00**) y **agrega una columna `codigo_forx`**. ForX captura las variantes como
+platillos separados, así que son ~15 recetas, no ~5. `especial_dia` no recibe código
+propio: rota, y hereda el `G-XXX` del guisado del día.
 
-**Decidir:** (a) que `GE-XXX` sea el SKU único y Grill Express agregue `codigo_forx`;
-y (b) el **grano** — si ForX desglosa por variante (3 alitas, 2 boneless) en vez de
-platillos genéricos.
+Falta implementar:
+1. SQL de `codigo_forx` en `~/grill-express/schema.sql` (lo pega el dueño en Supabase).
+2. El emparejamiento inicial de los 15 — **a mano, una vez**. Sin match automático por
+   nombre: es la adivinanza que §2 de `COSTEO.md` prohíbe.
 
 ## Pendientes operativos del usuario (no código)
 
