@@ -451,8 +451,16 @@ referirse a un platillo sin depender del nombre.
 ```
 G-001    guisado
 GN-001   garnacha
-GE-001   Grill Express
+GX-001   Grill Express
 ```
+
+**Grill Express es `GX` y no `GE`** (corregido el 2026-08-07). En la app de Grill
+Express `GE-0417` ya es el **folio de un pedido**, y su parser `idDeFolio`
+descarta los ceros de la izquierda: el SKU `GE-003` y el folio `GE-0003`
+resuelven al mismo número. Un SKU escaneado en caja o ventanilla no habría
+fallado — habría abierto el pedido de otra persona. Se renombró mientras
+`datos/alacarta` seguía sin existir en la nube, así que no hubo nada que migrar
+fuera del navegador donde se capturaron.
 
 Correlativo automático por familia — nadie elige el número, porque un número
 escrito a mano acaba repetido. El prefijo clasifica solo y ordena bien en
@@ -483,14 +491,14 @@ Por eso la duplicidad se ataja aparte, al guardar: se comparan los nombres
 de los parecidos. **Avisa, no bloquea** — dos guisados pueden llamarse parecido
 y ser distintos de verdad, y quien captura sabe cuál es el caso.
 
-### 10.1 `GE-XXX` es el SKU maestro (decidido 2026-08-07)
+### 10.1 `GX-XXX` es el SKU maestro (decidido 2026-08-07)
 
 Grill Express (`~/grill-express`, Express + Supabase) tiene su propia llave
 primaria `clave` — `hamburguesa_res`, `alitas_bbq`, `boneless_casa`… — con 15
 platillos en producción. La pregunta era cuál de los dos identificadores manda
 cuando las dos apps hablan del mismo platillo.
 
-**Manda `GE-XXX`.** Es el SKU único del platillo en toda la cadena.
+**Manda `GX-XXX`.** Es el SKU único del platillo en toda la cadena.
 
 - Grill Express **conserva `clave` como PK** y agrega una columna
   `codigo_forx`. No se renombra nada: cambiarle la llave primaria a una tabla
@@ -498,7 +506,7 @@ cuando las dos apps hablan del mismo platillo.
 - Es coherente con la cadena de datos: **ForX es el único generador de costos**
   y Grill Express los consume. Quien genera el dato lo nombra.
 - `clave` es texto descriptivo, y el texto descriptivo se vuelve mentira
-  (`alitas_casa` sigue llamándose así aunque le cambien la salsa). `GE-XXX` no
+  (`alitas_casa` sigue llamándose así aunque le cambien la salsa). `GX-XXX` no
   significa nada, y por eso no puede quedar desactualizado — la misma razón
   por la que el código no cambia nunca (§10).
 
@@ -522,7 +530,7 @@ Consecuencia práctica: son ~15 recetas a capturar, no ~5.
 
 **Excepción — `especial_dia`.** El Especial del Día rota, así que su costo
 cambia con lo que se cocine. No es un platillo con receta fija y **no recibe
-código `GE-XXX` propio**: cuando el especial sea un guisado del comedor, hereda
+código `GX-XXX` propio**: cuando el especial sea un guisado del comedor, hereda
 el `G-XXX` de esa receta. Forzarlo a un código fijo sería declarar estable un
 costo que no lo es.
 

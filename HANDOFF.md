@@ -56,7 +56,7 @@ usuario el link `pull/new/<rama>` → él mergea → verificar deploy → borrar
 
 ## SKU / código de platillo — DECIDIDO 2026-08-07
 
-**`GE-XXX` es el SKU maestro** y **ForX desglosa por variante**. El razonamiento
+**`GX-XXX` es el SKU maestro** y **ForX desglosa por variante**. El razonamiento
 completo quedó en `COSTEO.md` §10.1 y §10.2 — que es la spec y manda sobre el código.
 
 En corto: Grill Express (`~/grill-express`, Express+Supabase, deploy Railway) conserva
