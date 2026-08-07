@@ -1,0 +1,55 @@
+name: GOAL TIME CI
+
+# Scoped to goal-time/ — the ForX menu app at the repo root has no build
+# step and is deliberately left alone.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'goal-time/**'
+      - '.github/workflows/goal-time-ci.yml'
+  pull_request:
+    paths:
+      - 'goal-time/**'
+      - '.github/workflows/goal-time-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Typecheck, build, verify dist
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: goal-time
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: goal-time/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc -b --noEmit
+
+      - name: Build
+        run: npm run build
+
+      # dist/ is committed so GitHub Pages serves the app with no build step.
+      # That only works if dist/ actually matches src/ — a source edit without
+      # a rebuild would silently deploy stale code. The build is reproducible
+      # (verified: same inputs, byte-identical output), so any diff here means
+      # someone forgot to rebuild.
+      - name: Verify committed dist/ is up to date
+        run: |
+          if ! git diff --exit-code --stat -- dist; then
+            echo ''
+            echo '::error::goal-time/dist is stale. Run `npm run build` in goal-time/ and commit the result.'
+            exit 1
+          fi
