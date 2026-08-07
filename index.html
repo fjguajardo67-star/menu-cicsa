@@ -1633,7 +1633,13 @@ function getUnidadPrecio(n) {
 // El nombre sigue siendo la LLAVE de la receta; el codigo es un atributo.
 // Regla dura: una vez asignado NO cambia, ni al renombrar ni al reclasificar.
 // Si cambiara, dejaria de servir para lo unico que sirve — referirse a algo.
-var COD_PREFIJO = {guisado:'G', garnacha:'GN', grill:'GE'};
+// Grill Express es 'GX' y no 'GE' a proposito. En la app de Grill Express
+// 'GE-0417' ya es el FOLIO de un pedido, y su parser (idDeFolio) descarta los
+// ceros de la izquierda: el SKU 'GE-003' y el folio 'GE-0003' resuelven al mismo
+// numero. Un SKU escaneado en caja habria abierto el pedido de otra persona en
+// vez de fallar. Se renombro el 7/ago/2026, cuando ningun codigo de platillo
+// habia llegado a la nube todavia y cambiarlo no costaba nada.
+var COD_PREFIJO = {guisado:'G', garnacha:'GN', grill:'GX'};
 
 // Normaliza un nombre para comparar: sin acentos, sin mayusculas, sin espacios
 // de mas. "Tinga de Pollo" y "tinga  de pollo" colapsan al mismo texto.
@@ -1679,10 +1685,23 @@ function asignarCodigosFaltantes() {
         if(DB_EXTRA[nombre]) DB_EXTRA[nombre].codigo = r.codigo;
         n++;
     });
+    var migrados = 0;
     (typeof alacarta !== 'undefined' ? alacarta : []).forEach(function(p){
-        if(p && !p.codigo) { p.codigo = siguienteCodigo('grill'); n++; }
+        if(!p) return;
+        // Migracion GE- -> GX- (7/ago/2026, ver COD_PREFIJO). Los codigos viejos
+        // solo existen en localStorage porque datos/alacarta nunca subio a la
+        // nube, asi que basta reescribir el prefijo conservando el numero: nadie
+        // mas los ha visto. Idempotente — lo que ya es GX no se toca.
+        if(typeof p.codigo === 'string' && /^GE-\d+$/.test(p.codigo)) {
+            p.codigo = 'GX-' + p.codigo.slice(3);
+            migrados++;
+        }
+        if(!p.codigo) { p.codigo = siguienteCodigo('grill'); n++; }
     });
-    return n;
+    // Persistir la migracion: si no, se rehace en cada carga y el numero se
+    // conserva pero el usuario nunca ve el cambio asentado en su navegador.
+    if(migrados) { try { localStorage.setItem('ac_cicsa', JSON.stringify(alacarta)); } catch(e) {} }
+    return n + migrados;
 }
 
 // Busca platillos cuyo nombre normalizado coincide o casi. Devuelve los
