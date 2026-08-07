@@ -39,6 +39,21 @@
   pointer-events: none;
 }
 
+.pitch::after {
+  /* Floodlight and vignette — what turns flat stripes into a stadium at
+     night. Sits above the markings but below the content (z-index 1+). */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 70% at 50% -8%, rgba(255, 251, 220, 0.14), transparent 55%),
+    radial-gradient(85% 60% at 50% 46%, rgba(255, 255, 255, 0.05), transparent 70%),
+    radial-gradient(150% 110% at 50% 112%, rgba(2, 26, 13, 0.5), transparent 55%),
+    linear-gradient(180deg, transparent 78%, rgba(2, 26, 13, 0.3) 100%);
+}
+
 .halfway {
   position: absolute;
   left: 10px;
@@ -47,6 +62,92 @@
   height: 3px;
   background: var(--chalk-faint);
   pointer-events: none;
+}
+
+/* --- Chalk markings: penalty areas, goal boxes, spots, corner arcs --- */
+.marking {
+  position: absolute;
+  pointer-events: none;
+  border: 3px solid var(--chalk-faint);
+}
+.penalty-box {
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(62%, 360px);
+  height: 12%;
+}
+.penalty-box.top {
+  top: 10px;
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+}
+.penalty-box.bottom {
+  bottom: 10px;
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+}
+.goal-box {
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(30%, 170px);
+  height: 5.5%;
+}
+.goal-box.top {
+  top: 10px;
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+}
+.goal-box.bottom {
+  bottom: 10px;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+}
+.penalty-spot {
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--chalk-faint);
+  transform: translateX(-50%);
+}
+.penalty-spot.top {
+  top: 15.5%;
+}
+.penalty-spot.bottom {
+  bottom: 15.5%;
+}
+.corner-arc {
+  width: 30px;
+  height: 30px;
+}
+.corner-arc.tl {
+  top: 10px;
+  left: 10px;
+  border-top: 0;
+  border-left: 0;
+  border-radius: 0 0 100% 0;
+}
+.corner-arc.tr {
+  top: 10px;
+  right: 10px;
+  border-top: 0;
+  border-right: 0;
+  border-radius: 0 0 0 100%;
+}
+.corner-arc.bl {
+  bottom: 10px;
+  left: 10px;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0 100% 0 0;
+}
+.corner-arc.br {
+  bottom: 10px;
+  right: 10px;
+  border-bottom: 0;
+  border-right: 0;
+  border-radius: 100% 0 0 0;
 }
 
 .centre-circle {
@@ -62,6 +163,9 @@
   place-content: center;
   gap: 2px;
   pointer-events: none;
+  z-index: 1;
+  /* A hint of mown grass inside the circle so the score sits on a stage. */
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.05), transparent 72%);
 }
 
 .pitch-half {
@@ -122,9 +226,26 @@
   gap: 6px;
   padding: 18px 24px;
   font-family: var(--display);
-  box-shadow: var(--shadow-card);
+  border: 3px solid rgba(255, 255, 255, 0.28);
+  /* Candy depth: top highlight, pressed-clay bottom edge, drop shadow. */
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.38),
+    inset 0 -4px 0 rgba(0, 0, 0, 0.14),
+    0 7px 0 rgba(0, 0, 0, 0.24),
+    0 18px 34px rgba(0, 0, 0, 0.28);
   overflow: hidden;
   isolation: isolate;
+  transition: transform var(--t-press) var(--ease-out),
+    box-shadow var(--t-press) var(--ease-out), filter var(--t-press) var(--ease-out);
+}
+.big-button:active {
+  /* The 3D edge compresses — the button physically goes down. */
+  transform: translateY(5px) scale(0.985);
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.38),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.14),
+    0 2px 0 rgba(0, 0, 0, 0.24),
+    0 8px 18px rgba(0, 0, 0, 0.28);
 }
 
 .big-button .title {
@@ -132,6 +253,10 @@
   letter-spacing: 0.02em;
   line-height: 1.05;
   text-align: center;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.22);
+}
+.big-button.watch .title {
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.28);
 }
 .big-button .sub {
   font-family: var(--body);
@@ -184,6 +309,27 @@
 }
 
 /* --- Watch meter: a draining sun. Visual, not numeric — he is five. --- */
+.sun-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.sun-wrap > * {
+  grid-area: 1 / 1;
+}
+.sun-rays {
+  width: 165%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    rgba(255, 220, 100, 0.4) 0deg 9deg,
+    transparent 9deg 30deg
+  );
+  opacity: 0.75;
+  pointer-events: none;
+}
+
 .sun-meter {
   --fill: 100%;
   position: relative;
@@ -202,12 +348,6 @@
   /* clip-path animates on the GPU and reads as a liquid level. */
   clip-path: inset(calc(100% - var(--fill)) 0 0 0);
   transition: clip-path 600ms var(--ease-out);
-}
-.sun-meter .rays {
-  position: absolute;
-  inset: -18%;
-  background: radial-gradient(circle, var(--gold-glow) 0%, transparent 62%);
-  pointer-events: none;
 }
 .sun-meter.empty .level {
   background: linear-gradient(180deg, #7b8aa0 0%, #4a5a72 100%);
@@ -262,12 +402,15 @@
   margin-top: 6px;
 }
 .fill-meter .bar {
+  display: block;
+  width: 100%;
   height: 100%;
   border-radius: var(--r-pill);
   background: linear-gradient(90deg, var(--gold) 0%, #fff0b8 100%);
-  /* Width is the honest property here (a meter, not a moving object), and
-     it only changes on a star payout — a handful of times per session. */
-  transition: width 700ms var(--ease-out);
+  /* scaleX from the left keeps the fill on the GPU; the pill clips it. */
+  transform: scaleX(var(--p, 0));
+  transform-origin: left center;
+  transition: transform 700ms var(--ease-out);
 }
 .cabinet .count {
   font-family: var(--display);
@@ -548,9 +691,15 @@
   border-color: rgba(53, 200, 138, 0.55);
 }
 .station-card[data-next='true'] {
-  background: var(--gold);
+  background: linear-gradient(160deg, #ffd66a, var(--gold-deep));
   color: #3a2500;
-  box-shadow: var(--shadow-card);
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.4),
+    0 5px 0 rgba(0, 0, 0, 0.2),
+    0 12px 26px rgba(0, 0, 0, 0.24);
+  /* The one card the child should tap next gently breathes. */
+  animation: breathe 2.8s var(--ease-in-out) infinite;
 }
 
 /* --- Penalty shootout --- */

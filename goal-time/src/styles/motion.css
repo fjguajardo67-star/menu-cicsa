@@ -111,7 +111,10 @@
   transition: opacity var(--t-panel) var(--ease-out);
 }
 
-/* --- Ambient life. Idle motion that makes the pitch feel alive. --- */
+/* --- Ambient life. Idle motion that makes the pitch feel alive. ---
+ * These are Idle animations in the vocabulary sense: rare-tier surfaces
+ * (the home pitch), decorative purpose, transform/opacity only, long
+ * periods so they read as life rather than noise. */
 @keyframes float-soft {
   50% {
     transform: translateY(-6px);
@@ -128,11 +131,79 @@
   }
 }
 
+/* A ball that gets kicked every ~5s, then settles. */
+@keyframes kick-idle {
+  0%,
+  76% {
+    transform: translateY(0) rotate(0deg);
+  }
+  81% {
+    transform: translateY(-12px) rotate(-14deg);
+  }
+  86% {
+    transform: translateY(2px) rotate(8deg);
+  }
+  91% {
+    transform: translateY(-5px) rotate(-4deg);
+  }
+  96%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+/* A star that twinkles every ~4s. */
+@keyframes twinkle {
+  0%,
+  84%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  89% {
+    transform: scale(1.25) rotate(10deg);
+  }
+  94% {
+    transform: scale(0.94) rotate(-5deg);
+  }
+}
+
+/* Sun rays turning slowly behind the watch meter. Constant motion → linear. */
+@keyframes rays-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A sheen that sweeps the primary button every ~6s, then rests. */
+@keyframes sheen-loop {
+  0% {
+    transform: translateX(-140%);
+  }
+  16% {
+    transform: translateX(340%);
+  }
+  100% {
+    transform: translateX(340%);
+  }
+}
+
 .float {
   animation: float-soft 3.4s var(--ease-in-out) infinite;
 }
 .breathe {
   animation: breathe 2.6s var(--ease-in-out) infinite;
+}
+.kick-idle {
+  animation: kick-idle 5.4s var(--ease-out) infinite;
+}
+.twinkle {
+  animation: twinkle 4.2s var(--ease-out) infinite;
+}
+.rays-spin {
+  animation: rays-spin 28s linear infinite;
+}
+.sheen-loop {
+  animation: sheen-loop 6.5s var(--ease-out) 1.8s infinite;
 }
 
 /* --- Feedback --- */
@@ -229,7 +300,13 @@
   .breathe,
   .wiggle,
   .confetti-piece,
-  .ring-out {
+  .ring-out,
+  .kick-idle,
+  .twinkle,
+  .rays-spin,
+  .sheen-loop,
+  .sun-rays,
+  .station-card[data-next='true'] {
     animation: none !important;
   }
 

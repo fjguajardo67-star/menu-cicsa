@@ -133,7 +133,7 @@ export function CoachChat({ profile, onDone }: CoachChatProps) {
       </div>
 
       <div className="coach">
-        <div className="coach-avatar" data-speaking={busy} aria-hidden="true">
+        <div className="coach-avatar float" data-speaking={busy} aria-hidden="true">
           🧑‍🏫
         </div>
         <div className="coach-bubble">

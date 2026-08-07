@@ -97,23 +97,38 @@ export function KidHome({ profile, onTrain, onWatch, onOffice }: KidHomeProps) {
     <div className="pitch">
       <span className="halfway" aria-hidden="true" />
 
+      {/* Chalk markings — what makes the pitch read as a pitch. */}
+      <span aria-hidden="true">
+        <i className="marking penalty-box top" />
+        <i className="marking goal-box top" />
+        <i className="marking penalty-spot top" />
+        <i className="marking penalty-box bottom" />
+        <i className="marking goal-box bottom" />
+        <i className="marking penalty-spot bottom" />
+        <i className="marking corner-arc tl" />
+        <i className="marking corner-arc tr" />
+        <i className="marking corner-arc bl" />
+        <i className="marking corner-arc br" />
+      </span>
+
       <button className="office-key press" onClick={onOffice} aria-label="Manager’s Office" type="button">
         🔑
       </button>
 
       {/* ---- Top half: TRAIN ---- */}
-      <div className="pitch-half">
+      <div className="pitch-half stagger">
         <span className="half-label">Train</span>
 
         <button
-          className={`big-button train press ${questDone ? 'done' : ''}`}
+          className={`big-button train ${questDone ? 'done' : ''}`}
           onClick={() => {
             sfx.whistle()
             onTrain()
           }}
           type="button"
         >
-          <span className="glyph float" aria-hidden="true">
+          {!questDone && <span className="sheen sheen-loop" aria-hidden="true" />}
+          <span className={`glyph ${questDone ? 'float' : 'kick-idle'}`} aria-hidden="true">
             {questDone ? '🏆' : '⚽'}
           </span>
           <span className="title">{questDone ? 'MATCH WON!' : "TODAY'S MATCH"}</span>
@@ -128,8 +143,11 @@ export function KidHome({ profile, onTrain, onWatch, onOffice }: KidHomeProps) {
       {/* ---- Centre circle: the score ---- */}
       <div className="centre-circle" aria-hidden="true">
         <span className="score-chip">
-          <span className="n">{Number.isInteger(stars) ? stars : stars.toFixed(2)}</span>
-          <span className="icon">⭐</span>
+          {/* Keyed so the number pops whenever it changes. */}
+          <span key={stars} className="n pop-in">
+            {Number.isInteger(stars) ? stars : stars.toFixed(2)}
+          </span>
+          <span className="icon twinkle">⭐</span>
         </span>
         {golden > 0 && (
           <span className="score-chip golden">
@@ -150,11 +168,11 @@ export function KidHome({ profile, onTrain, onWatch, onOffice }: KidHomeProps) {
       </span>
 
       {/* ---- Bottom half: WATCH ---- */}
-      <div className="pitch-half">
+      <div className="pitch-half stagger">
         <span className="half-label">Watch</span>
 
         <button
-          className={`big-button watch press ${status.locked ? 'locked' : 'unlocked'} ${
+          className={`big-button watch ${status.locked ? 'locked' : 'unlocked'} ${
             justUnlocked ? 'just-unlocked' : ''
           }`}
           onClick={() => {
@@ -175,13 +193,14 @@ export function KidHome({ profile, onTrain, onWatch, onOffice }: KidHomeProps) {
             </span>
           )}
           <div className="row" style={{ gap: 16 }}>
-            <span
-              className={`sun-meter${status.left <= 0 ? ' empty' : ''}`}
-              style={{ ['--fill' as string]: `${fillPct}%` }}
-              aria-hidden="true"
-            >
-              <span className="rays" />
-              <span className="level" />
+            <span className="sun-wrap" aria-hidden="true">
+              {!status.locked && status.left > 0 && <span className="sun-rays rays-spin" />}
+              <span
+                className={`sun-meter${status.left <= 0 ? ' empty' : ''}`}
+                style={{ ['--fill' as string]: `${fillPct}%` }}
+              >
+                <span className="level" />
+              </span>
             </span>
             <span style={{ textAlign: 'left' }}>
               <span className="title" style={{ display: 'block' }}>
@@ -214,7 +233,10 @@ export function KidHome({ profile, onTrain, onWatch, onOffice }: KidHomeProps) {
                 <span
                   className="bar"
                   style={{
-                    width: `${Math.min(100, (wish.savedStars / Math.max(1, wish.priceStars)) * 100)}%`,
+                    ['--p' as string]: Math.min(
+                      1,
+                      wish.savedStars / Math.max(1, wish.priceStars),
+                    ),
                   }}
                 />
               </div>

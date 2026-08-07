@@ -90,14 +90,14 @@ export function WatchTime({ profile, onExit }: WatchTimeProps) {
       />
 
       <div style={{ display: 'grid', justifyItems: 'center', gap: 18, marginTop: 10 }}>
-        <div
-          className={`sun-meter${done ? ' empty' : ''}`}
-          style={{ ['--fill' as string]: `${fillPct}%`, width: 190 }}
-          role="img"
-          aria-label={`${mins} minutes left`}
-        >
-          <span className="rays" aria-hidden="true" />
-          <span className="level" />
+        <div className="sun-wrap" role="img" aria-label={`${mins} minutes left`}>
+          {!done && running && <span className="sun-rays rays-spin" aria-hidden="true" />}
+          <div
+            className={`sun-meter${done ? ' empty' : ''}`}
+            style={{ ['--fill' as string]: `${fillPct}%`, width: 190 }}
+          >
+            <span className="level" />
+          </div>
         </div>
 
         <div

@@ -58,7 +58,7 @@ export function Progress({ profile }: { profile: Profile }) {
                   </span>
                 </div>
                 <div className="bar">
-                  <i style={{ width: `${pct}%` }} />
+                  <i style={{ ['--p' as string]: pct / 100 }} />
                 </div>
               </div>
             )

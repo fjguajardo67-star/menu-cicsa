@@ -97,6 +97,9 @@ export function App() {
 
   return (
     <div className="kid-root">
+      {/* Keyed fade so screen changes never teleport. Opacity only — fixed
+          overlays (payout, celebrations, toasts) stay viewport-anchored. */}
+      <div key={screen} className="fade-in">
       {screen === 'home' && (
         <>
           <KidHome
@@ -121,6 +124,7 @@ export function App() {
 
       {screen === 'match' && <MatchDay profile={profile} onExit={() => setScreen('home')} />}
       {screen === 'watch' && <WatchTime profile={profile} onExit={() => setScreen('home')} />}
+      </div>
     </div>
   )
 }

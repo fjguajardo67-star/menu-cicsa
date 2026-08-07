@@ -105,7 +105,7 @@ export function Today({ profile }: TabProps) {
             </span>
           </div>
           <div className="bar gold">
-            <i style={{ width: `${capPct}%` }} />
+            <i style={{ ['--p' as string]: capPct / 100 }} />
           </div>
           {economy.weeklyCapOverride && (
             <p className="help" style={{ marginTop: 6, color: 'var(--warn)' }}>

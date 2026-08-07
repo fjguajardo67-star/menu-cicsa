@@ -39,7 +39,8 @@ export function Coach({ line, cue, emoji = '🧑‍🏫' }: CoachProps) {
 
   return (
     <div className="coach">
-      <div className="coach-avatar" data-speaking={speaking} aria-hidden="true">
+      {/* Idle bob always; the speaking rule overrides it with a breathe. */}
+      <div className="coach-avatar float" data-speaking={speaking} aria-hidden="true">
         {emoji}
       </div>
       <div className="coach-bubble">

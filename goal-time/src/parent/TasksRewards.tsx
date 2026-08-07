@@ -200,7 +200,10 @@ export function TasksRewards({ profile }: { profile: Profile }) {
               <span className="bar" style={{ display: 'block', marginTop: 6 }}>
                 <i
                   style={{
-                    width: `${Math.min(100, (current.savedStars / Math.max(1, current.priceStars)) * 100)}%`,
+                    ['--p' as string]: Math.min(
+                      1,
+                      current.savedStars / Math.max(1, current.priceStars),
+                    ),
                   }}
                 />
               </span>

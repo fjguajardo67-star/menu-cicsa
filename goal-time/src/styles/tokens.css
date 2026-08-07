@@ -13,8 +13,8 @@
   --pitch-mid: #0f7d45;
   --pitch-light: #17924f;
   --chalk: #f2f7f1;
-  --chalk-dim: rgba(242, 247, 241, 0.62);
-  --chalk-faint: rgba(242, 247, 241, 0.24);
+  --chalk-dim: rgba(242, 247, 241, 0.74);
+  --chalk-faint: rgba(242, 247, 241, 0.26);
   --gold: #ffc531;
   --gold-deep: #e09a00;
   --gold-glow: rgba(255, 197, 49, 0.42);
@@ -118,6 +118,33 @@ textarea {
 
 .parent-root :focus-visible {
   outline-color: var(--accent);
+}
+
+/* Browser surfaces carry the design too — selection, caret, scrollbars are
+   part of the club colours, not whatever the platform ships. */
+::selection {
+  background: var(--gold);
+  color: #3a2500;
+}
+input,
+textarea {
+  caret-color: var(--gold);
+}
+.parent-root {
+  scrollbar-width: thin;
+  scrollbar-color: var(--navy-line) transparent;
+}
+.parent-root ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.parent-root ::-webkit-scrollbar-thumb {
+  background: var(--navy-line);
+  border-radius: var(--r-pill);
+  border: 2px solid var(--navy-deep);
+}
+.parent-root ::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* Screen-reader-only text, used for live regions and icon-only controls. */
