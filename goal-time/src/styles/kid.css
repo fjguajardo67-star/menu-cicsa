@@ -315,7 +315,7 @@
   opacity: 0.9;
 }
 .big-button .glyph {
-  font-size: clamp(34px, 9vw, 52px);
+  font-size: clamp(40px, 10vw, 62px);
   line-height: 1;
 }
 
@@ -500,15 +500,13 @@
   margin: 0 auto;
 }
 .coach-avatar {
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background: linear-gradient(160deg, #ffd98a, #f0a43c);
-  display: grid;
-  place-content: center;
-  font-size: 32px;
+  width: 64px;
+  height: 64px;
   flex: none;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.28));
+}
+.coach-avatar svg {
+  display: block;
 }
 .coach-avatar[data-speaking='true'] {
   animation: breathe 900ms var(--ease-in-out) infinite;

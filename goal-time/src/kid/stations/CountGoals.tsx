@@ -67,7 +67,7 @@ export function CountGoals({ progress, served, onServed, onAnswer, onDone }: Sta
         ))}
       </div>
 
-      <Coach line={round.item.prompt} cue={round.item.id} emoji="⚽" />
+      <Coach line={round.item.prompt} cue={round.item.id} />
 
       <div style={{ display: 'grid', gap: 10, justifyItems: 'center' }}>
         {round.item.rows.map((row, r) => (

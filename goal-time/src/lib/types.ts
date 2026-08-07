@@ -36,16 +36,6 @@ export const FIELD_LABEL: Record<SkillField, string> = {
   english: 'English Academy',
 }
 
-export const FIELD_ICON: Record<SkillField, string> = {
-  flags: '🚩',
-  counting: '⚽',
-  letters: '🔤',
-  story: '📖',
-  art: '🎨',
-  fairplay: '🤝',
-  english: '🗣️',
-}
-
 /** A theme is a skin. Structure never depends on which one is active. */
 export type ThemeId = 'soccer' | 'space' | 'dino'
 

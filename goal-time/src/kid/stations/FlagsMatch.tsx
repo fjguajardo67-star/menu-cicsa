@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { AnswerPad, type PadChoice } from '../../components/AnswerPad'
+import { Jersey } from '../../components/art'
 import { Coach } from '../../components/Coach'
 import { TEAMS, type Team } from '../../content/flags'
 import { pickN, sampleContent } from '../../lib/mastery'
@@ -57,34 +58,12 @@ export function FlagsMatch({ progress, served, onServed, onAnswer, onDone }: Sta
         ))}
       </div>
 
-      <Coach
-        line={`Which flag is ${round.item.country}?`}
-        cue={round.item.id}
-        emoji="🚩"
-      />
+      <Coach line={`Which flag is ${round.item.country}?`} cue={round.item.id} />
 
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          gap: 10,
-          fontSize: 40,
-        }}
-        aria-hidden="true"
-      >
-        <span
-          className="float"
-          style={{
-            width: 62,
-            height: 62,
-            borderRadius: 14,
-            display: 'grid',
-            placeContent: 'center',
-            background: `linear-gradient(150deg, ${round.item.kit[0]}, ${round.item.kit[1]})`,
-            boxShadow: 'var(--shadow-card)',
-          }}
-        >
-          👕
+      {/* The team's real kit, drawn — the clue the flag colours rhyme with. */}
+      <div style={{ display: 'flex', justifyContent: 'center' }} aria-hidden="true">
+        <span className="float" style={{ display: 'inline-flex', filter: 'drop-shadow(0 6px 12px rgba(0,0,0,0.28))' }}>
+          <Jersey kit={round.item.kit} size={74} />
         </span>
       </div>
 

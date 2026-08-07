@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { KeyIcon } from '../components/art'
 import { hashPin } from '../lib/db'
 import { sfx } from '../lib/sfx'
 
@@ -35,8 +36,20 @@ export function PinGate({ expectedHash, onPass, onCancel }: PinGateProps) {
     <div className="parent-root">
       <div className="pin-screen">
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 40 }} aria-hidden="true">
-            🔑
+          <div style={{ display: 'flex', justifyContent: 'center' }} aria-hidden="true">
+            <span
+              style={{
+                width: 76,
+                height: 76,
+                borderRadius: '50%',
+                background: '#F2F7F1',
+                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.4)',
+                display: 'grid',
+                placeContent: 'center',
+              }}
+            >
+              <KeyIcon size={46} />
+            </span>
           </div>
           <h1 style={{ fontFamily: 'var(--display)', fontSize: 22, margin: '8px 0 4px' }}>
             Manager’s Office

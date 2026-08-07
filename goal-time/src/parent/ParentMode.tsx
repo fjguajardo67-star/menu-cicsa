@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { TabGlyph } from '../components/art'
 import { sfx } from '../lib/sfx'
 import { useStore } from '../lib/store'
 import { Catalog } from './Catalog'
@@ -8,11 +9,11 @@ import { TasksRewards } from './TasksRewards'
 import { Today } from './Today'
 
 const TABS = [
-  { id: 'today', label: 'Today', glyph: '📋' },
-  { id: 'plan', label: 'Plan', glyph: '⚙️' },
-  { id: 'catalog', label: 'Catalog', glyph: '📺' },
-  { id: 'rewards', label: 'Rewards', glyph: '⭐' },
-  { id: 'progress', label: 'Progress', glyph: '📈' },
+  { id: 'today', label: 'Today' },
+  { id: 'plan', label: 'Plan' },
+  { id: 'catalog', label: 'Catalog' },
+  { id: 'rewards', label: 'Rewards' },
+  { id: 'progress', label: 'Progress' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -83,7 +84,7 @@ export function ParentMode({ onExit }: { onExit: () => void }) {
             type="button"
           >
             <span className="glyph" aria-hidden="true">
-              {t.glyph}
+              <TabGlyph kind={t.id} size={20} />
             </span>
             {t.label}
           </button>

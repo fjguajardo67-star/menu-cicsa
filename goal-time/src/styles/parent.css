@@ -27,20 +27,22 @@
   gap: 12px;
 }
 .office-head::before {
-  /* The club scarf: alternating pitch-green and gold blocks. The same two
-     colours as Kid Mode, so both modes read as one club — the office is
-     just a different room. */
+  /* The club scarf: alternating pitch-green and gold blocks with a
+     triangular fringe, in the same two colours as Kid Mode — both modes
+     read as one club, the office is just a different room. */
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 6px;
+  height: 13px;
   background: repeating-linear-gradient(
     90deg,
     var(--pitch) 0 36px,
     var(--gold) 36px 72px
   );
+  -webkit-mask: conic-gradient(from -45deg at 50% 100%, #000 90deg, #0000 0) 50% / 18px 100%;
+  mask: conic-gradient(from -45deg at 50% 100%, #000 90deg, #0000 0) 50% / 18px 100%;
 }
 .office-head h1::before {
   content: '';

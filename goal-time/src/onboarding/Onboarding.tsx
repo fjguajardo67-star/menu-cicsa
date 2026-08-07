@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Ball, Mic, StarInline } from '../components/art'
 import { SwitchRow, parseTime, timeLabel } from '../components/Bits'
 import { hashPin, uid } from '../lib/db'
 import { sfx } from '../lib/sfx'
@@ -88,8 +89,8 @@ export function Onboarding() {
 
         {step === 0 && (
           <div className="rise-in" style={{ display: 'grid', gap: 18 }}>
-            <div style={{ fontSize: 60 }} aria-hidden="true">
-              ⚽
+            <div style={{ display: 'flex', justifyContent: 'center' }} aria-hidden="true">
+              <Ball size={72} />
             </div>
             <h1>GOAL TIME</h1>
             <p className="lede">
@@ -255,7 +256,9 @@ export function Onboarding() {
                     }
                     style={{ width: 80 }}
                   />
-                  <span>⭐ =</span>
+                  <span>
+                    <StarInline /> =
+                  </span>
                   <input
                     type="number"
                     min={5}
@@ -309,7 +312,9 @@ export function Onboarding() {
               </div>
 
               <div className="field">
-                <label htmlFor="gb">Golden Ball value: {economy.goldenBallStars} ⭐</label>
+                <label htmlFor="gb">
+                  Golden Ball value: {economy.goldenBallStars} <StarInline />
+                </label>
                 <input
                   id="gb"
                   type="range"
@@ -379,7 +384,8 @@ export function Onboarding() {
                   }}
                   type="button"
                 >
-                  🎤 Allow the microphone
+                  <Mic size={15} style={{ verticalAlign: '-0.14em', marginRight: 6 }} />
+                  Allow the microphone
                 </button>
               </div>
               {micNote && (
@@ -390,7 +396,8 @@ export function Onboarding() {
             </div>
 
             <button className="btn ok" onClick={finish} type="button">
-              Start playing ⚽
+              Start playing
+              <Ball size="1.05em" style={{ verticalAlign: '-0.18em', marginLeft: 8 }} />
             </button>
           </div>
         )}

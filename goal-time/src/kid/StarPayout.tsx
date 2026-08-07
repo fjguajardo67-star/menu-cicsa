@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Gift, KitBag, StarRow, SunIcon } from '../components/art'
 import { todayKey } from '../lib/db'
 import { activeWish, canTrade, minutesForStars, weeklyBonusRemaining } from '../lib/economy'
 import { sfx } from '../lib/sfx'
@@ -50,7 +51,7 @@ export function StarPayout({ profileId, childName, stars, onDone }: StarPayoutPr
   return (
     <div className="payout rise-in" role="dialog" aria-label="You earned stars">
       <div className="earned pop-in" aria-hidden="true">
-        {'⭐'.repeat(Math.min(5, Math.max(1, Math.round(stars))))}
+        <StarRow count={Math.round(stars)} size="1em" />
       </div>
       <p
         style={{
@@ -66,7 +67,7 @@ export function StarPayout({ profileId, childName, stars, onDone }: StarPayoutPr
       <div className="payout-choices stagger">
         <button className="payout-choice save press" onClick={save} type="button">
           <span className="glyph" aria-hidden="true">
-            {wish ? '🎁' : '🏦'}
+            {wish ? <Gift size={46} /> : <KitBag size={46} />}
           </span>
           <span>
             {wish ? 'Save for my prize' : 'Keep my stars'}
@@ -93,7 +94,7 @@ export function StarPayout({ profileId, childName, stars, onDone }: StarPayoutPr
           type="button"
         >
           <span className="glyph" aria-hidden="true">
-            ☀️
+            <SunIcon size={46} />
           </span>
           <span>
             Trade for minutes

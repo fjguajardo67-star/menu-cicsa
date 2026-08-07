@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { sfx } from '../lib/sfx'
 import { speak } from '../lib/speech'
+import { GoldenBall, Star5 } from './art'
 
 const CONFETTI_COLOURS = ['#FFC531', '#E63946', '#2D9CDB', '#35C88A', '#FFFFFF', '#FF8FB1']
 
@@ -43,7 +44,7 @@ interface CelebrationProps {
   kind: CelebrationKind
   headline: string
   sub?: string
-  glyph: string
+  glyph: ReactNode
   /** Spoken aloud in English, like everything else Coach says. */
   say?: string
   onDone: () => void
@@ -125,12 +126,12 @@ export function StarBurst({ x, y, golden }: { x: number; y: number; golden?: boo
         position: 'fixed',
         left: x,
         top: y,
-        fontSize: golden ? 56 : 40,
         pointerEvents: 'none',
         zIndex: 95,
+        display: 'inline-flex',
       }}
     >
-      {golden ? '🥇' : '⭐'}
+      {golden ? <GoldenBall size={56} /> : <Star5 size={40} />}
     </span>
   )
 }

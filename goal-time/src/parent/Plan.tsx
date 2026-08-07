@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Mic, StarInline } from '../components/art'
 import { Card, SwitchRow, parseTime, timeLabel } from '../components/Bits'
 import { testKey } from '../lib/coach'
 import { exportJSON, hashPin, importJSON } from '../lib/db'
@@ -115,7 +116,9 @@ export function Plan({ profile }: { profile: Profile }) {
               onChange={(e) => set({ starsPerBlock: Number(e.target.value) || 1 })}
               style={{ width: 80 }}
             />
-            <span>⭐ =</span>
+            <span>
+              <StarInline /> =
+            </span>
             <input
               type="number"
               min={5}
@@ -130,7 +133,9 @@ export function Plan({ profile }: { profile: Profile }) {
         </div>
 
         <div className="field">
-          <label htmlFor="gb">Golden Ball value: {economy.goldenBallStars} ⭐</label>
+          <label htmlFor="gb">
+            Golden Ball value: {economy.goldenBallStars} <StarInline />
+          </label>
           <input
             id="gb"
             type="range"
@@ -192,7 +197,8 @@ export function Plan({ profile }: { profile: Profile }) {
             }}
             type="button"
           >
-            🎤 Check the microphone
+            <Mic size={15} style={{ verticalAlign: '-0.14em', marginRight: 6 }} />
+            Check the microphone
           </button>
         </div>
         <p className="help" style={{ marginTop: 10 }}>
@@ -335,10 +341,10 @@ export function Plan({ profile }: { profile: Profile }) {
         </p>
         <div className="row wrap" style={{ marginTop: 12 }}>
           <button className="btn" onClick={download} type="button">
-            ⬇️ Export JSON
+            Export JSON
           </button>
           <button className="btn ghost" onClick={() => fileInput.current?.click()} type="button">
-            ⬆️ Import JSON
+            Import JSON
           </button>
           <input
             ref={fileInput}

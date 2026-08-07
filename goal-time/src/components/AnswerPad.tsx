@@ -4,6 +4,7 @@ import { sfx } from '../lib/sfx'
 import { capabilities, listen, speak, stopListening } from '../lib/speech'
 import { useStore } from '../lib/store'
 import { emptyEnglish } from '../lib/types'
+import { Mic } from './art'
 
 export interface PadChoice {
   label: string
@@ -157,7 +158,7 @@ export function AnswerPad({
             aria-label={phase === 'listening' ? 'Listening' : 'Tap and say your answer'}
             type="button"
           >
-            {phase === 'listening' ? '👂' : '🎤'}
+            <Mic size="56%" listening={phase === 'listening'} />
             {phase === 'listening' && <span className="ring ring-out" aria-hidden="true" />}
           </button>
           <p className="mic-hint" aria-live="polite">

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Ball, CrossMark, Keeper, Target } from '../components/art'
 import { Coach } from '../components/Coach'
 import { sfx } from '../lib/sfx'
 import { speak } from '../lib/speech'
@@ -85,7 +86,6 @@ export function PenaltyShootout({ childName, onDone }: PenaltyShootoutProps) {
             : `Kick number ${kick + 1}. Where will it go?`
         }
         cue={kick}
-        emoji="🥅"
       />
 
       <div className="goal-frame">
@@ -99,7 +99,7 @@ export function PenaltyShootout({ childName, onDone }: PenaltyShootoutProps) {
               aria-label={['Aim left', 'Aim middle', 'Aim right'][z]}
               type="button"
             >
-              {busy ? '' : '🎯'}
+              {!busy && <Target size="1em" style={{ opacity: 0.75 }} />}
             </button>
           ))}
         </div>
@@ -109,7 +109,7 @@ export function PenaltyShootout({ childName, onDone }: PenaltyShootoutProps) {
           style={{ transform: `translateX(calc(-50% + ${keeperX}))` }}
           aria-hidden="true"
         >
-          🧤
+          <Keeper size="1em" />
         </span>
 
         {ball && (
@@ -123,15 +123,25 @@ export function PenaltyShootout({ childName, onDone }: PenaltyShootoutProps) {
             }}
             aria-hidden="true"
           >
-            ⚽
+            <Ball size="1em" />
           </span>
         )}
       </div>
 
       <div className="kick-marks" aria-label={`${results.filter(Boolean).length} goals`}>
         {Array.from({ length: KICKS }, (_, i) => (
-          <span key={i} className={results[i] !== undefined ? 'pop-in' : undefined}>
-            {results[i] === undefined ? '⚪' : results[i] ? '⚽' : '❌'}
+          <span
+            key={i}
+            className={results[i] !== undefined ? 'pop-in' : undefined}
+            style={{ display: 'inline-flex' }}
+          >
+            {results[i] === undefined ? (
+              <Ball tone="gray" size="1em" style={{ opacity: 0.4 }} />
+            ) : results[i] ? (
+              <Ball size="1em" />
+            ) : (
+              <CrossMark size="1em" />
+            )}
           </span>
         ))}
       </div>

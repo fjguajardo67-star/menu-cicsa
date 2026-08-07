@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { CoachMascot, Mic, Speaker } from '../components/art'
 import { askCoach, offlineOpening, resetOffline } from '../lib/coach'
 import { todayKey, uid } from '../lib/db'
 import { sfx } from '../lib/sfx'
@@ -134,7 +135,7 @@ export function CoachChat({ profile, onDone }: CoachChatProps) {
 
       <div className="coach">
         <div className="coach-avatar float" data-speaking={busy} aria-hidden="true">
-          🧑‍🏫
+          <CoachMascot size="100%" talking={busy} />
         </div>
         <div className="coach-bubble">
           <span aria-live="polite">{last?.text ?? '…'}</span>
@@ -144,7 +145,7 @@ export function CoachChat({ profile, onDone }: CoachChatProps) {
             aria-label="Hear it again"
             type="button"
           >
-            🔊
+            <Speaker size={17} />
           </button>
         </div>
       </div>
@@ -192,7 +193,7 @@ export function CoachChat({ profile, onDone }: CoachChatProps) {
               aria-label="Tap and talk to Coach"
               type="button"
             >
-              {listening ? '👂' : '🎤'}
+              <Mic size="56%" listening={listening} />
               {listening && <span className="ring ring-out" aria-hidden="true" />}
             </button>
             <p className="mic-hint">{listening ? 'I’m listening…' : 'Tap and TALK!'}</p>

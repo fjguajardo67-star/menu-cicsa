@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { TvIcon } from '../components/art'
 import { Card, Switch, SwitchRow } from '../components/Bits'
 import { uid } from '../lib/db'
 import { useStore } from '../lib/store'
@@ -97,7 +98,7 @@ export function Catalog({ profile }: { profile: Profile }) {
             {channels.map((c) => (
               <div className="list-item" key={c.id}>
                 <span className="glyph" aria-hidden="true">
-                  📺
+                  <TvIcon size={26} />
                 </span>
                 <span className="grow">
                   <strong>{c.name}</strong>

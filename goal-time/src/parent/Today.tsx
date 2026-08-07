@@ -1,3 +1,4 @@
+import { GoldenBall, Medal, Star5, StarInline } from '../components/art'
 import { Card, Stat, clock } from '../components/Bits'
 import { todayKey } from '../lib/db'
 import {
@@ -63,18 +64,19 @@ export function Today({ profile }: TabProps) {
       <Card title="Award right now">
         <div className="award-row">
           <button className="award-button star" onClick={() => award(1, false)} type="button">
-            <span aria-hidden="true">⭐</span> +1 Star
+            <Star5 size={22} aria-hidden="true" /> +1 Star
           </button>
           <button
             className="award-button golden"
             onClick={() => award(economy.goldenBallStars, true)}
             type="button"
           >
-            <span aria-hidden="true">🥇</span> Golden Ball
+            <GoldenBall size={22} aria-hidden="true" /> Golden Ball
           </button>
         </div>
         <p className="help" style={{ marginTop: 10 }}>
-          A Golden Ball is worth {economy.goldenBallStars}⭐ and has no fixed trigger — it is
+          A Golden Ball is worth {economy.goldenBallStars}
+          <StarInline /> and has no fixed trigger — it is
           your judgment for something exceptional. It gets the biggest celebration in the app.
         </p>
       </Card>
@@ -140,15 +142,16 @@ export function Today({ profile }: TabProps) {
           <div className="list">
             {claims.map((c) => (
               <div className="claim" key={c.id}>
-                <span style={{ fontSize: 22 }} aria-hidden="true">
-                  🏅
+                <span style={{ display: 'inline-flex' }} aria-hidden="true">
+                  <Medal size={26} />
                 </span>
                 <div className="grow" style={{ flex: 1 }}>
                   <strong style={{ display: 'block', fontSize: 14 }}>
                     {c.note ?? 'Stopped on time'}
                   </strong>
                   <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>
-                    {new Date(c.at).toLocaleString()} — {c.amount}⭐
+                    {new Date(c.at).toLocaleString()} — {c.amount}
+                    <StarInline />
                   </span>
                 </div>
                 <button
@@ -173,7 +176,8 @@ export function Today({ profile }: TabProps) {
         )}
         {pendingStars(state, profile.id) > 0 && (
           <p className="help" style={{ marginTop: 10 }}>
-            {pendingStars(state, profile.id)}⭐ pending — shown grey in your child’s count until
+            {pendingStars(state, profile.id)}
+            <StarInline /> pending — shown grey in your child’s count until
             you decide.
           </p>
         )}
@@ -206,7 +210,10 @@ export function Today({ profile }: TabProps) {
                 <span className="grow">
                   <strong>{t.label}</strong>
                 </span>
-                <span style={{ color: 'var(--warn)', fontWeight: 800 }}>+{t.stars}⭐</span>
+                <span style={{ color: 'var(--warn)', fontWeight: 800 }}>
+                  +{t.stars}
+                  <StarInline />
+                </span>
               </button>
             ))}
         </div>

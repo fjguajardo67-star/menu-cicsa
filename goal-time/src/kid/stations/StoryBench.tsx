@@ -133,7 +133,6 @@ export function StoryBench({
       <Coach
         line={fillName(question.q, profile.name)}
         cue={`${story.item.id}-${qIndex}`}
-        emoji="📖"
       />
 
       <AnswerPad

@@ -87,7 +87,6 @@ export function EnglishAcademy({
         <Coach
           line={`Listen. ${listenItem.item.word}. Which one is ${listenItem.item.word}?`}
           cue={listenItem.item.id}
-          emoji="👂"
         />
         <AnswerPad
           key={listenItem.item.id}
@@ -121,7 +120,6 @@ export function EnglishAcademy({
         <Coach
           line={`Repeat with me. ${repeatItem.item.phrase}.`}
           cue={repeatItem.item.id}
-          emoji="🗣️"
         />
         <AnswerPad
           key={repeatItem.item.id}

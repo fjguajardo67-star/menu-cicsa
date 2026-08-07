@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { capabilities, speak, stopSpeaking } from '../lib/speech'
+import { CoachMascot, Speaker } from './art'
 
 /**
  * Speak a line aloud when it appears. Every screen in Kid Mode uses this —
@@ -31,17 +32,16 @@ interface CoachProps {
   line: string
   /** Re-speak whenever this changes. */
   cue?: unknown
-  emoji?: string
 }
 
-export function Coach({ line, cue, emoji = '🧑‍🏫' }: CoachProps) {
+export function Coach({ line, cue }: CoachProps) {
   const { speaking, replay } = useSpeak(line, [line, cue])
 
   return (
     <div className="coach">
       {/* Idle bob always; the speaking rule overrides it with a breathe. */}
       <div className="coach-avatar float" data-speaking={speaking} aria-hidden="true">
-        {emoji}
+        <CoachMascot size="100%" talking={speaking} />
       </div>
       <div className="coach-bubble">
         <span aria-live="polite">{line}</span>
@@ -52,7 +52,7 @@ export function Coach({ line, cue, emoji = '🧑‍🏫' }: CoachProps) {
             aria-label="Hear it again"
             type="button"
           >
-            🔊
+            <Speaker size={17} />
           </button>
         )}
       </div>

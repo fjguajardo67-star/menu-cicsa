@@ -49,7 +49,7 @@ export function LettersField({ progress, served, onServed, onAnswer, onDone }: S
         ))}
       </div>
 
-      <Coach line={round.item.prompt} cue={round.item.id} emoji="🔤" />
+      <Coach line={round.item.prompt} cue={round.item.id} />
 
       <div
         className="pop-in"

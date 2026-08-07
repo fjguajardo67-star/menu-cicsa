@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Ball, Gift, GoldenBall, Hourglass, KeyIcon, Medal, Padlock, Star5, Trophy } from '../components/art'
 import { useToast } from '../components/Bits'
 import { useSpeak } from '../components/Coach'
 import { todayKey } from '../lib/db'
@@ -90,7 +91,7 @@ export function KidHome({ profile, onTrain, onWatch, onOffice }: KidHomeProps) {
       pending: true,
       note: 'Stopped on time',
     })
-    toast('Sent to your grown-up to check! ⭐')
+    toast('Sent to your grown-up to check!')
   }
 
   return (
@@ -112,7 +113,7 @@ export function KidHome({ profile, onTrain, onWatch, onOffice }: KidHomeProps) {
       </span>
 
       <button className="office-key press" onClick={onOffice} aria-label="Manager’s Office" type="button">
-        🔑
+        <KeyIcon size={22} />
       </button>
 
       {/* ---- Top half: TRAIN ---- */}
@@ -129,7 +130,7 @@ export function KidHome({ profile, onTrain, onWatch, onOffice }: KidHomeProps) {
         >
           {!questDone && <span className="sheen sheen-loop" aria-hidden="true" />}
           <span className={`glyph ${questDone ? 'float' : 'kick-idle'}`} aria-hidden="true">
-            {questDone ? '🏆' : '⚽'}
+            {questDone ? <Trophy size="1em" /> : <Ball size="1em" />}
           </span>
           <span className="title">{questDone ? 'MATCH WON!' : "TODAY'S MATCH"}</span>
           <span className="sub">
@@ -147,20 +148,26 @@ export function KidHome({ profile, onTrain, onWatch, onOffice }: KidHomeProps) {
           <span key={stars} className="n pop-in">
             {Number.isInteger(stars) ? stars : stars.toFixed(2)}
           </span>
-          <span className="icon twinkle">⭐</span>
+          <span className="icon twinkle">
+            <Star5 size="1em" />
+          </span>
         </span>
         {(golden > 0 || pending > 0) && (
           <span className="score-minor">
             {golden > 0 && (
               <span className="score-chip golden minor">
                 <span className="n">{golden}</span>
-                <span className="icon">🥇</span>
+                <span className="icon">
+                  <GoldenBall size="1em" />
+                </span>
               </span>
             )}
             {pending > 0 && (
               <span className="score-chip pending minor">
                 <span className="n">+{pending}</span>
-                <span className="icon">⏳</span>
+                <span className="icon">
+                  <Hourglass size="1em" />
+                </span>
               </span>
             )}
           </span>
@@ -193,7 +200,7 @@ export function KidHome({ profile, onTrain, onWatch, onOffice }: KidHomeProps) {
           <span className="sheen" aria-hidden="true" />
           {status.locked && (
             <span className="padlock" aria-hidden="true">
-              🔒
+              <Padlock size={30} />
             </span>
           )}
           <div className="row" style={{ gap: 16 }}>
@@ -222,7 +229,7 @@ export function KidHome({ profile, onTrain, onWatch, onOffice }: KidHomeProps) {
               <img className="photo" src={wish.photo} alt="" />
             ) : (
               <span className="photo" aria-hidden="true">
-                🎁
+                <Gift size={40} />
               </span>
             )}
             <div className="info">
@@ -245,7 +252,8 @@ export function KidHome({ profile, onTrain, onWatch, onOffice }: KidHomeProps) {
                 />
               </div>
               <div className="count">
-                {wish.savedStars} / {wish.priceStars} ⭐
+                {wish.savedStars} / {wish.priceStars}{' '}
+                <Star5 size="0.9em" style={{ verticalAlign: '-0.1em' }} />
               </div>
             </div>
           </div>
@@ -259,7 +267,9 @@ export function KidHome({ profile, onTrain, onWatch, onOffice }: KidHomeProps) {
           disabled={claimedToday}
           type="button"
         >
-          <span aria-hidden="true">{claimedToday ? '⏳' : '🏅'}</span>
+          <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+            {claimedToday ? <Hourglass size={26} /> : <Medal size={26} />}
+          </span>
           {claimedToday ? 'Waiting to be checked' : 'I STOPPED ON TIME!'}
         </button>
       </div>

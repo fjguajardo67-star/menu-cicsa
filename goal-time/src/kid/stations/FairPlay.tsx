@@ -73,7 +73,7 @@ export function FairPlay({ progress, served, onServed, onAnswer, onDone }: Stati
         {round.item.emoji}
       </div>
 
-      <Coach line={round.item.scene} cue={round.item.id} emoji="🤝" />
+      <Coach line={round.item.scene} cue={round.item.id} />
 
       <AnswerPad
         key={round.item.id}

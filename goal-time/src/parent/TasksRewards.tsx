@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Gift, Medal, StarInline } from '../components/art'
 import { Card } from '../components/Bits'
 import { uid } from '../lib/db'
 import { activeWish } from '../lib/economy'
@@ -59,7 +60,11 @@ export function TasksRewards({ profile }: { profile: Profile }) {
               </span>
               <span className="grow">
                 <strong>{t.label}</strong>
-                <span>{t.stars}⭐{t.retired ? ' — retired' : ''}</span>
+                <span>
+                  {t.stars}
+                  <StarInline />
+                  {t.retired ? ' — retired' : ''}
+                </span>
               </span>
               <button
                 className="btn ghost small"
@@ -125,7 +130,9 @@ export function TasksRewards({ profile }: { profile: Profile }) {
           </div>
         </div>
         <div className="field">
-          <label htmlFor="tstars">Worth: {draft.stars} ⭐</label>
+          <label htmlFor="tstars">
+            Worth: {draft.stars} <StarInline />
+          </label>
           <input
             id="tstars"
             type="range"
@@ -155,7 +162,9 @@ export function TasksRewards({ profile }: { profile: Profile }) {
 
       <Card title="Golden Ball">
         <div className="field">
-          <label htmlFor="gbv">Worth: {economy.goldenBallStars} ⭐</label>
+          <label htmlFor="gbv">
+            Worth: {economy.goldenBallStars} <StarInline />
+          </label>
           <input
             id="gbv"
             type="range"
@@ -189,13 +198,13 @@ export function TasksRewards({ profile }: { profile: Profile }) {
               />
             ) : (
               <span className="glyph" aria-hidden="true">
-                🎁
+                <Gift size={30} />
               </span>
             )}
             <span className="grow">
               <strong>{current.name}</strong>
               <span>
-                {current.savedStars} / {current.priceStars} ⭐ saved
+                {current.savedStars} / {current.priceStars} <StarInline /> saved
               </span>
               <span className="bar" style={{ display: 'block', marginTop: 6 }}>
                 <i
@@ -216,7 +225,7 @@ export function TasksRewards({ profile }: { profile: Profile }) {
               }
               type="button"
             >
-              Delivered 🎁
+              Delivered
             </button>
           </div>
         ) : (
@@ -245,7 +254,9 @@ export function TasksRewards({ profile }: { profile: Profile }) {
               />
             </div>
             <div className="field">
-              <label htmlFor="wprice">Price: {wishDraft.priceStars} ⭐</label>
+              <label htmlFor="wprice">
+                Price: {wishDraft.priceStars} <StarInline />
+              </label>
               <input
                 id="wprice"
                 type="range"
@@ -259,7 +270,11 @@ export function TasksRewards({ profile }: { profile: Profile }) {
               />
               <p className="help">
                 Aim for a 2–4 week save. At this child’s current pace that is roughly{' '}
-                <strong>{suggested}–{suggested * 2}⭐</strong>.
+                <strong>
+                  {suggested}–{suggested * 2}
+                  <StarInline />
+                </strong>
+                .
               </p>
             </div>
             <div className="field">
@@ -270,7 +285,7 @@ export function TasksRewards({ profile }: { profile: Profile }) {
                   onClick={() => photoInput.current?.click()}
                   type="button"
                 >
-                  📷 Choose a photo
+                  Choose a photo
                 </button>
                 {wishDraft.photo && (
                   <img
@@ -325,12 +340,13 @@ export function TasksRewards({ profile }: { profile: Profile }) {
                 .map((w) => (
                   <div className="list-item" key={w.id}>
                     <span className="glyph" aria-hidden="true">
-                      🏅
+                      <Medal size={26} />
                     </span>
                     <span className="grow">
                       <strong>{w.name}</strong>
                       <span>
-                        {w.priceStars}⭐ ·{' '}
+                        {w.priceStars}
+                        <StarInline /> ·{' '}
                         {w.deliveredAt ? new Date(w.deliveredAt).toLocaleDateString() : ''}
                       </span>
                     </span>

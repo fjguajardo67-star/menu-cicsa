@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Medal, PauseIcon, PlayBadge } from '../components/art'
 import { Coach } from '../components/Coach'
 import { todayKey } from '../lib/db'
 import { watchStatus } from '../lib/economy'
@@ -86,7 +87,6 @@ export function WatchTime({ profile, onExit }: WatchTimeProps) {
               : `You earned this, ${profile.name}. Ready?`
         }
         cue={`${running}-${done}`}
-        emoji="📺"
       />
 
       <div style={{ display: 'grid', justifyItems: 'center', gap: 18, marginTop: 10 }}>
@@ -122,7 +122,8 @@ export function WatchTime({ profile, onExit }: WatchTimeProps) {
             }}
             type="button"
           >
-            ▶️ Start my show
+            <PlayBadge size="1.1em" style={{ verticalAlign: '-0.24em', marginRight: 8 }} />
+            Start my show
           </button>
         )}
 
@@ -135,13 +136,15 @@ export function WatchTime({ profile, onExit }: WatchTimeProps) {
             }}
             type="button"
           >
-            ⏸️ Pause
+            <PauseIcon size="0.9em" style={{ verticalAlign: '-0.12em', marginRight: 6 }} />
+            Pause
           </button>
         )}
 
         {done && (
           <button className="cta press" onClick={onExit} type="button">
-            I stopped! 🏅
+            I stopped!
+            <Medal size="1.1em" style={{ verticalAlign: '-0.24em', marginLeft: 8 }} />
           </button>
         )}
       </div>

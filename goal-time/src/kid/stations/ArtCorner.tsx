@@ -127,7 +127,7 @@ export function ArtCorner({ profile, progress, served, onServed, onAnswer, onDon
 
   return (
     <>
-      <Coach line={art.item.prompt} cue={art.item.id} emoji="🎨" />
+      <Coach line={art.item.prompt} cue={art.item.id} />
 
       <div className="art-stage">
         <canvas
@@ -172,14 +172,14 @@ export function ArtCorner({ profile, progress, served, onServed, onAnswer, onDon
             </button>
           ))}
           <button className="tap-instead press" onClick={clear} type="button">
-            🧽 Clear
+            Clear
           </button>
         </div>
       </div>
 
       <div style={{ display: 'grid', justifyItems: 'center' }}>
         <button className="cta press" onClick={finish} disabled={!touched} type="button">
-          {touched ? "I'm finished! ⭐" : 'Draw something first'}
+          {touched ? "I'm finished!" : 'Draw something first'}
         </button>
       </div>
     </>

@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
+import { CheckMark, FieldBadge, Gift, Gloves, Medal, Padlock, PlayBadge, Trophy } from '../components/art'
 import { Celebration } from '../components/Celebration'
 import { todayKey } from '../lib/db'
 import { activeWish } from '../lib/economy'
 import { progressFor } from '../lib/mastery'
 import { sfx } from '../lib/sfx'
 import { useStore } from '../lib/store'
-import { FIELD_ICON, FIELD_LABEL, SKILL_FIELDS, type Profile, type SkillField } from '../lib/types'
+import { FIELD_LABEL, SKILL_FIELDS, type Profile, type SkillField } from '../lib/types'
 import { PenaltyShootout } from './PenaltyShootout'
 import { StarPayout } from './StarPayout'
 import { ArtCorner } from './stations/ArtCorner'
@@ -140,11 +141,17 @@ export function MatchDay({ profile, onExit }: MatchDayProps) {
               type="button"
             >
               <span className="glyph" aria-hidden="true">
-                {FIELD_ICON[s.field]}
+                <FieldBadge field={s.field} size={38} />
               </span>
               <span className="name">{FIELD_LABEL[s.field]}</span>
-              <span style={{ fontSize: 22 }} aria-hidden="true">
-                {s.done ? '✅' : s.field === nextField ? '▶️' : '🔒'}
+              <span style={{ display: 'inline-flex' }} aria-hidden="true">
+                {s.done ? (
+                  <CheckMark size={26} />
+                ) : s.field === nextField ? (
+                  <PlayBadge size={26} />
+                ) : (
+                  <Padlock size={26} />
+                )}
               </span>
             </button>
           ))}
@@ -158,18 +165,24 @@ export function MatchDay({ profile, onExit }: MatchDayProps) {
             type="button"
           >
             <span className="glyph" aria-hidden="true">
-              🥅
+              <Gloves size={38} />
             </span>
             <span className="name">Penalty Shootout</span>
-            <span style={{ fontSize: 22 }} aria-hidden="true">
-              {quest.shootoutGoals !== null ? '✅' : allDone ? '▶️' : '🔒'}
+            <span style={{ display: 'inline-flex' }} aria-hidden="true">
+              {quest.shootoutGoals !== null ? (
+                <CheckMark size={26} />
+              ) : allDone ? (
+                <PlayBadge size={26} />
+              ) : (
+                <Padlock size={26} />
+              )}
             </span>
           </button>
         </div>
 
         {quest.won && (
           <div style={{ marginTop: 'auto', display: 'grid', justifyItems: 'center', gap: 10 }}>
-            <p className="mic-hint">Match won! Watch Time is unlocked. 🔓</p>
+            <p className="mic-hint">Match won! Watch Time is unlocked.</p>
             <button className="cta press" onClick={onExit} type="button">
               Back to the pitch
             </button>
@@ -197,8 +210,8 @@ export function MatchDay({ profile, onExit }: MatchDayProps) {
             ←
           </button>
           <h1 className="station-title">{FIELD_LABEL[view.field]}</h1>
-          <span style={{ fontSize: 24 }} aria-hidden="true">
-            {FIELD_ICON[view.field]}
+          <span style={{ display: 'inline-flex' }} aria-hidden="true">
+            <FieldBadge field={view.field} size={30} />
           </span>
         </div>
 
@@ -243,7 +256,7 @@ export function MatchDay({ profile, onExit }: MatchDayProps) {
     return (
       <Celebration
         kind="station"
-        glyph="💪"
+        glyph={<Medal size="1em" />}
         headline="Great practice!"
         sub="You already know these. Coach will bring harder ones."
         say={`Great practice, ${profile.name}!`}
@@ -280,7 +293,7 @@ export function MatchDay({ profile, onExit }: MatchDayProps) {
     return (
       <Celebration
         kind="prize"
-        glyph="🎁"
+        glyph={<Gift size="1em" />}
         headline="YOUR PRIZE!"
         sub={`You saved every star for ${wish?.name ?? 'your prize'}. Go and tell your grown-up!`}
         say={`${profile.name}, you did it! Your prize is ready!`}
@@ -301,7 +314,7 @@ export function MatchDay({ profile, onExit }: MatchDayProps) {
   return (
     <Celebration
       kind="match"
-      glyph="🏆"
+      glyph={<Trophy size="1em" />}
       headline="MATCH WON!"
       sub="Watch Time is unlocked. Great work today!"
       say={`Match won, ${profile.name}! You unlocked your watch time.`}

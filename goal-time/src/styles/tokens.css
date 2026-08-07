@@ -36,9 +36,13 @@
   --warn: #ffb02e;
   --danger: #ff6b6b;
 
-  /* Type */
-  --display: 'Lilita One', 'Trebuchet MS', system-ui, sans-serif;
+  /* Type: jersey-condensed display (scoreboard DNA), rounded body for
+     early readers. Both self-hosted. */
+  --display: 'Staatliches', 'Arial Narrow', system-ui, sans-serif;
   --body: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Sticker-world ink: every drawn asset and chrome outline uses this. */
+  --ink-line: #17301f;
 
   /* Space + shape */
   --r-sm: 10px;

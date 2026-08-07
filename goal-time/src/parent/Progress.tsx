@@ -1,3 +1,4 @@
+import { FieldBadge, GoldenBall, Trophy } from '../components/art'
 import { Card, Stat, clock } from '../components/Bits'
 import { ART_PROMPTS } from '../content/art'
 import { COUNT_ITEMS } from '../content/counting'
@@ -10,7 +11,6 @@ import { dayLogs } from '../lib/economy'
 import { masteryPercent, progressFor } from '../lib/mastery'
 import { useStore } from '../lib/store'
 import {
-  FIELD_ICON,
   FIELD_LABEL,
   SKILL_FIELDS,
   emptyEnglish,
@@ -50,8 +50,8 @@ export function Progress({ profile }: { profile: Profile }) {
             return (
               <div className="mastery-row" key={field}>
                 <div className="top">
-                  <span>
-                    {FIELD_ICON[field]} {FIELD_LABEL[field]}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <FieldBadge field={field} size={20} /> {FIELD_LABEL[field]}
                   </span>
                   <span className="lvl">
                     Level {p.level} · {pct}% · {accuracy(p.attempts, p.hits)}
@@ -107,7 +107,7 @@ export function Progress({ profile }: { profile: Profile }) {
               {english.phrasesSaid.slice(-14).reverse().map((p) => (
                 <div className="list-item" key={p}>
                   <span className="glyph" aria-hidden="true">
-                    🗣️
+                    <FieldBadge field="english" size={22} />
                   </span>
                   <span className="grow">
                     <strong>{p}</strong>
@@ -172,14 +172,26 @@ export function Progress({ profile }: { profile: Profile }) {
                   <th>Earned</th>
                   <th>Saved</th>
                   <th>Traded</th>
-                  <th>🥇</th>
+                  <th>
+                    <GoldenBall size={15} style={{ verticalAlign: '-0.14em' }} />
+                    <span className="sr">Golden balls</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {logs.map((l) => (
                   <tr key={l.day}>
                     <td>{l.day.slice(5)}</td>
-                    <td>{l.questWon ? '🏆' : '—'}</td>
+                    <td>
+                      {l.questWon ? (
+                        <>
+                          <Trophy size={15} style={{ verticalAlign: '-0.14em' }} />
+                          <span className="sr">won</span>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                     <td>{clock(l.minutesWatched)}</td>
                     <td>{l.starsEarned}</td>
                     <td>{l.starsSaved}</td>
