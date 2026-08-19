@@ -608,15 +608,32 @@ function actualizarUIAuth() {
 function loginAdmin() {
     try {
         var prov = new firebase.auth.GoogleAuthProvider();
+        // SIEMPRE mostrar el selector de cuentas de Google.
+        //
+        // Sin esto, Google reutiliza en silencio la sesion que ya tenga abierta.
+        // Si esa cuenta no esta en ADMIN_EMAILS, la app la rechaza y hace signOut
+        // de Firebase — pero NO de Google. Volver a pulsar "Iniciar sesion" repite
+        // exactamente lo mismo, y como el boton "Salir" solo existe cuando ya eres
+        // admin, no queda ninguna via desde la app para elegir otra cuenta. Ciclo
+        // cerrado. Con select_account el selector aparece siempre y se puede
+        // cambiar a la cuenta del dominio.
+        prov.setCustomParameters({ prompt: 'select_account' });
         firebase.auth().signInWithPopup(prov).then(function(res){
             var mail = (res.user && res.user.email || '').toLowerCase();
             if(ADMIN_EMAILS.indexOf(mail) < 0) {
-                toast('⚠ ' + (res.user ? res.user.email : 'Esa cuenta') + ' no tiene permiso de administrador');
+                // Decir CUALES sirven: "no tienes permiso" a secas deja adivinando,
+                // y las cuentas validas no se ven en ninguna parte de la interfaz.
+                toast('⚠ ' + (res.user ? res.user.email : 'Esa cuenta') + ' no tiene permiso de administrador. '
+                    + 'Vuelve a intentar con ' + ADMIN_EMAILS.join(' o ') + '.');
                 firebase.auth().signOut();
             } else {
                 toast('✓ Sesión de administrador iniciada');
             }
-        }).catch(function(e){ toast('No se pudo iniciar sesión: ' + (e.message || e.code || '')); });
+        }).catch(function(e){
+            // popup-closed-by-user es cancelar, no un error que valga la pena gritar
+            if(e && (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request')) return;
+            toast('No se pudo iniciar sesión: ' + (e.message || e.code || ''));
+        });
     } catch(e) { toast('Autenticación no disponible'); }
 }
 function logoutAdmin() {
