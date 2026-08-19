@@ -132,6 +132,27 @@ validar en Egresos), sin cantidad/unidad, o basura de parser. Se construye
 sobre `precioEnBanco` y la validación de §3.1. Es la herramienta con la que
 se decide el borrado de §3.3 y con la que se persigue la cobertura del banco.
 
+**Exporta la lista de trabajo a CSV** (`exportarFaltantes`). La pantalla solo
+alcanza a mostrar los 15 genéricos de mayor impacto y el resto queda invisible,
+justo cuando lo que se persigue es la cobertura *completa* del banco. El CSV
+lleva los genéricos, ordenados por recetas afectadas, con las variantes tal como
+están escritas y hasta tres recetas de ejemplo para poder verificar el match.
+
+Dos criterios de agrupación, ambos para que la lista sea de trabajo real y no
+un inventario inflado:
+
+- **Se agrupa con `_normIng`, la misma normalización de `resolverClaveBanco`.**
+  Agrupar por el nombre tal cual partía a "Ajo" y "ajo" en dos pendientes con
+  las cuentas divididas, cuando validar uno solo en Egresos apaga los dos.
+- **Se cuentan recetas distintas, no renglones.** Una receta que lista "Ajo" y
+  "ajo picado" es una receta afectada, no dos.
+
+Marca para revisión lo que §4.4 excluye —agua y hielo, que ya viven dentro del
+costo de producción— pero solo cuando el ingrediente **es** agua (`agua`,
+`taza de agua`), nunca cuando la menciona (`chiles remojados en agua caliente`
+sí necesita precio). Un falso positivo aquí manda a no costear algo real, que es
+peor que no avisar.
+
 ---
 
 ## 4. Precio de venta y costo de producción

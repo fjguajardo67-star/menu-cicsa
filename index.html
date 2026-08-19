@@ -2214,7 +2214,10 @@ function _diagnosticarIngredientes(ings) {
     });
     return d;
 }
-function reporteFaltantes() {
+// Recorre catalogo + Grill Express y devuelve una fila por receta con problemas,
+// peor primero. Lo usan la pantalla y la exportacion: si cada una lo calculara
+// por su lado, el CSV podria no coincidir con lo que el usuario tiene enfrente.
+function _filasFaltantes() {
     var allDB = Object.assign({}, DB, DB_EXTRA);
     var filas = [];
     Object.keys(allDB).forEach(function(nombre) {
@@ -2232,25 +2235,123 @@ function reporteFaltantes() {
         var pb = b.d.basura.length*100 + b.d.invalidos.length*10 + b.d.sinPrecio.length;
         return pb - pa;
     });
-    var totalRecetas = Object.keys(allDB).length + (alacarta||[]).filter(function(p){return p && p.nombre;}).length;
+    return {
+        filas: filas,
+        totalRecetas: Object.keys(allDB).length + (alacarta||[]).filter(function(p){return p && p.nombre;}).length
+    };
+}
+
+// Los genericos sin precio, agrupados: es la lista de trabajo para Egresos.
+//
+// Agrupa con _normIng, la MISMA normalizacion que usa resolverClaveBanco. Antes
+// se agrupaba por el nombre tal cual, asi que "Ajo" y "ajo" salian como dos
+// pendientes distintos con sus cuentas partidas — cuando validar uno solo en
+// Egresos apaga los dos, porque el matcher ya los ve iguales. Eso inflaba el
+// total y descuadraba el orden de prioridad.
+//
+// Cuenta RECETAS distintas, no renglones: una receta que lista "Ajo" y "ajo
+// picado" es una sola receta afectada, no dos.
+var _RE_NO_INGREDIENTE = /^(agua|hielo)$|^[a-zñ]+ de (agua|hielo)$/;
+function _genericosFaltantes(filas) {
+    var porGen = {};
+    (filas||[]).forEach(function(f){
+        var vistos = {};
+        f.d.sinPrecio.forEach(function(n){
+            var k = _normIng(n);
+            if(!k) return;
+            if(!porGen[k]) porGen[k] = {recetas:0, variantes:{}, ejemplos:[]};
+            porGen[k].variantes[n] = (porGen[k].variantes[n]||0) + 1;
+            if(vistos[k]) return;              // esta receta ya conto para este generico
+            vistos[k] = 1;
+            porGen[k].recetas++;
+            if(porGen[k].ejemplos.length < 3) porGen[k].ejemplos.push(f.nombre);
+        });
+    });
+    return Object.keys(porGen).map(function(k){
+        var g = porGen[k];
+        // Etiqueta = la variante mas escrita; es la forma que el usuario reconoce
+        var vs = Object.keys(g.variantes).sort(function(a,b){
+            return (g.variantes[b] - g.variantes[a]) || a.localeCompare(b);
+        });
+        return {
+            clave: k,
+            etiqueta: vs[0],
+            variantes: vs,
+            conteoVariantes: g.variantes,
+            recetas: g.recetas,
+            ejemplos: g.ejemplos,
+            // COSTEO §4.4: hielo y agua NO son ingredientes, ya viven dentro del
+            // costo de produccion. Validarlos en Egresos los cobraria dos veces.
+            //
+            // La regla exige que el ingrediente SEA agua ("agua", "taza de agua"),
+            // no que la mencione. Con _palabraEn se colaba "chiles pasilla sin
+            // semillas y remojados en agua caliente", que si necesita precio — y un
+            // falso positivo aqui es peor que no avisar: manda a NO costear un
+            // ingrediente real.
+            revisar: _RE_NO_INGREDIENTE.test(k)
+                ? 'Revisar: agua/hielo ya están en el costo de producción (COSTEO §4.4)' : ''
+        };
+    }).sort(function(a,b){ return (b.recetas - a.recetas) || a.etiqueta.localeCompare(b.etiqueta); });
+}
+
+// Un campo CSV seguro: los nombres traen comas ("Chile guajillo, seco") y comillas.
+function _csvCampo(v) {
+    var s = String(v == null ? '' : v);
+    return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+// La lista de trabajo para Egresos, en CSV. Va TODA: la pantalla solo cabe con
+// los 15 de mayor impacto y el resto queda invisible justo cuando lo que se
+// persigue es la cobertura completa del banco.
+function exportarFaltantes() {
+    var r = _filasFaltantes();
+    var gens = _genericosFaltantes(r.filas);
+    if(!gens.length) { toast('No hay ingredientes sin precio'); return; }
+    var csv = '﻿';   // BOM para que Excel no rompa los acentos
+    csv += ['Prioridad','Ingrediente','Recetas afectadas','Variantes en las recetas','Ejemplos de receta','Nota']
+        .map(_csvCampo).join(',') + '\n';
+    gens.forEach(function(g, i){
+        csv += [
+            i + 1,
+            g.etiqueta,
+            g.recetas,
+            g.variantes.map(function(v){ return v + ' (' + g.conteoVariantes[v] + ')'; }).join('; '),
+            g.ejemplos.join('; '),
+            g.revisar
+        ].map(_csvCampo).join(',') + '\n';
+    });
+    dl(csv, 'Faltantes_Egresos_' + new Date().toISOString().slice(0,10) + '.csv', 'text/csv;charset=utf-8');
+    toast('📤 ' + gens.length + ' ingredientes exportados');
+}
+
+function reporteFaltantes() {
+    var _r = _filasFaltantes();
+    var filas = _r.filas, totalRecetas = _r.totalRecetas;
     if(!filas.length) {
         openModal('&#129658; Reporte de faltantes',
             '<div style="text-align:center;padding:2rem;color:var(--green)"><div style="font-size:3rem">&#9989;</div><h3 style="margin-top:.75rem">Todo limpio</h3><p style="margin-top:.5rem;color:var(--bl)">Las ' + totalRecetas + ' recetas tienen ingredientes completos y con precio en el banco.</p></div>');
         return;
     }
     // Genericos sin precio agregados (para saber que validar en Egresos primero)
-    var porGenerico = {};
-    filas.forEach(function(f){ f.d.sinPrecio.forEach(function(n){ porGenerico[n] = (porGenerico[n]||0) + 1; }); });
-    var topGen = Object.keys(porGenerico).sort(function(a,b){ return porGenerico[b]-porGenerico[a]; }).slice(0, 15);
+    var gens = _genericosFaltantes(filas);
+    var topGen = gens.slice(0, 15);
     var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;text-align:center;margin-bottom:1rem">'
         + '<div style="background:var(--cream);padding:.75rem;border-radius:6px"><div style="font-size:1.6rem;font-weight:700;color:var(--tc)">' + filas.length + '</div><div style="font-size:.75rem;color:var(--bl)">Con problemas (de ' + totalRecetas + ')</div></div>'
-        + '<div style="background:var(--cream);padding:.75rem;border-radius:6px"><div style="font-size:1.6rem;font-weight:700;color:#8a6200">' + Object.keys(porGenerico).length + '</div><div style="font-size:.75rem;color:var(--bl)">Ingredientes sin precio</div></div>'
+        + '<div style="background:var(--cream);padding:.75rem;border-radius:6px"><div style="font-size:1.6rem;font-weight:700;color:#8a6200">' + gens.length + '</div><div style="font-size:.75rem;color:var(--bl)">Ingredientes sin precio</div></div>'
         + '<div style="background:var(--cream);padding:.75rem;border-radius:6px"><div style="font-size:1.6rem;font-weight:700;color:var(--bm)">' + filas.reduce(function(s,f){return s+f.d.basura.length;},0) + '</div><div style="font-size:.75rem;color:var(--bl)">Basura de parser</div></div>'
         + '</div>';
-    if(topGen.length) {
-        html += '<div style="background:#FFF3CD;border-left:4px solid var(--gold);padding:.75rem 1rem;border-radius:6px;margin-bottom:1rem;font-size:.82rem">'
-            + '<strong>Qu&eacute; validar primero en Egresos</strong> (ingrediente &times; recetas afectadas): '
-            + topGen.map(function(n){ return n + ' (' + porGenerico[n] + ')'; }).join(' &middot; ') + '</div>';
+    if(gens.length) {
+        // El color del texto va explicito: el fondo crema esta fijo, asi que en tema
+        // oscuro el texto heredaba el claro del tema y quedaba blanco sobre crema.
+        html += '<div style="background:#FFF3CD;color:#5c4400;border-left:4px solid var(--gold);padding:.75rem 1rem;border-radius:6px;margin-bottom:1rem;font-size:.82rem">'
+            + '<div style="display:flex;gap:.75rem;align-items:flex-start;justify-content:space-between">'
+            + '<div style="flex:1;min-width:0"><strong>Qu&eacute; validar primero en Egresos</strong> (ingrediente &times; recetas afectadas): '
+            + topGen.map(function(g){ return g.etiqueta + ' (' + g.recetas + ')'; }).join(' &middot; ')
+            + (gens.length > topGen.length
+                ? ' <span style="color:#8a6200">&hellip; y ' + (gens.length - topGen.length) + ' m&aacute;s &mdash; est&aacute;n todos en el CSV</span>' : '')
+            + '</div>'
+            + '<button class="btn bgold bsm" style="white-space:nowrap" onclick="exportarFaltantes()">&#128228; Exportar lista (.csv)</button>'
+            + '</div></div>';
     }
     filas.forEach(function(f) {
         html += '<div style="border:1.5px solid rgba(212,175,55,.25);border-radius:8px;padding:.6rem .9rem;margin-bottom:.5rem">'
