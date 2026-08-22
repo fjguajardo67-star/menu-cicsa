@@ -812,11 +812,16 @@ var CONV_PZ = {
     'pan bolillo':         {pz_por_kg: null, g_por_pz: 60},
 };
 
-function getPzGramos(nombre) {
-    var n = (nombre || '').toLowerCase().trim();
+function conversionPz(nombre) {
+    var n = (nombre || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
     for (var key in CONV_PZ) {
-        if (n.indexOf(key) !== -1) return CONV_PZ[key].g_por_pz;
+        if (n.indexOf(key) !== -1) return CONV_PZ[key];
     }
+    return null;
+}
+function getPzGramos(nombre) {
+    var conversion = conversionPz(nombre);
+    if(conversion) return conversion.g_por_pz;
     return 30; // default: 30g por pieza si no se reconoce
 }
 
@@ -1865,7 +1870,12 @@ function familiaUnidad(u) { return UNIDAD_FAMILIA[String(u||'').toLowerCase()] |
 
 // True si la unidad de la receta se puede costear con la unidad_base del banco.
 function unidadCompatible(nombreIng, unidadReceta) {
-    return familiaUnidad(unidadReceta) === familiaUnidad(getUnidadPrecio(nombreIng));
+    var familiaReceta = familiaUnidad(unidadReceta);
+    var familiaBanco = familiaUnidad(getUnidadPrecio(nombreIng));
+    if(familiaReceta === familiaBanco) return true;
+    // Tortillas y panes con gramaje real sí pueden pedirse en piezas aunque el banco esté en kg.
+    // La conversión debe existir en CONV_PZ; nunca se usa aquí el default genérico de 30 g.
+    return familiaReceta === 'pieza' && familiaBanco === 'masa' && !!conversionPz(nombreIng);
 }
 
 function costoIngrediente(ing, factor) {

@@ -73,6 +73,14 @@ function extraerFuncion(nombre) {
 
 const contexto = {
   precios: {},
+  CONV_PZ: {
+    "tortilla de maiz": { pz_por_kg: 45, g_por_pz: 22.2 },
+    "tortilla": { pz_por_kg: 45, g_por_pz: 22.2 }
+  },
+  UNIDAD_FAMILIA: {
+    g: "masa", kg: "masa", ml: "volumen", l: "volumen", lt: "volumen",
+    pz: "pieza", porcion: "porcion"
+  },
   descarga: null,
   dl: (contenido, nombre, tipo) => { contexto.descarga = { contenido, nombre, tipo }; },
   toast: () => {}
@@ -80,7 +88,8 @@ const contexto = {
 vm.createContext(contexto);
 vm.runInContext(
   ["_csvCampo", "_normIng", "_palabraEn", "_palabrasEquivalentes", "_nombreEquivalente",
-    "_partesAliasHistorico", "resolverClaveBanco", "exportarPrecios"]
+    "_partesAliasHistorico", "resolverClaveBanco", "getUnidadPrecio", "conversionPz",
+    "getPzGramos", "familiaUnidad", "unidadCompatible", "exportarPrecios"]
     .map(extraerFuncion).join("\n"),
   contexto
 );
@@ -109,6 +118,19 @@ prueba("recupera tortilla plural desde una llave histórica separada con punto",
 prueba("una llave independiente tolera plural simple y el conector de", () => {
   contexto.precios = { "Tortilla Maiz": { precio: 27.78 } };
   assert.equal(contexto.resolverClaveBanco("Tortillas de maíz"), "Tortilla Maiz");
+});
+
+prueba("tortilla por pieza es compatible con precio por kg usando su gramaje real", () => {
+  contexto.precios = {
+    "Tortilla Maiz. Tortilla": { precio: 27.78, unidad_base: "kg" }
+  };
+  assert.equal(contexto.conversionPz("tortillas de maiz").g_por_pz, 22.2);
+  assert.equal(contexto.unidadCompatible("tortillas de maiz", "pz"), true);
+});
+
+prueba("una pieza sin conversión explícita sigue bloqueada contra kg", () => {
+  contexto.precios = { "Pechuga Fileteada": { precio: 110, unidad_base: "kg" } };
+  assert.equal(contexto.unidadCompatible("Pechuga Fileteada", "pz"), false);
 });
 
 prueba("no extiende una llave histórica por aproximación culinaria", () => {

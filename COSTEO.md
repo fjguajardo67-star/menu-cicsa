@@ -65,6 +65,9 @@ construye **encima** de esto:
 - Las variantes verificadas toleran plural simple y el conector `de` cuando las
   demás palabras coinciden en el mismo orden (`Tortilla maíz` ↔
   `Tortillas de maíz`). Si hay más de una coincidencia posible, queda sin precio.
+- Una receta puede usar `pz` contra un precio por kilogramo únicamente cuando
+  existe un gramaje explícito en `CONV_PZ` (por ejemplo, tortilla: 22.2 g/pz).
+  Sin esa conversión se bloquea el costo para evitar inventar pesos por pieza.
 - **Menú no inventa precios.** Sin precio validado en el banco ⇒ `$0` y marca
   visible "⚠ sin precio" (`precioEnBanco`). No existe default de $50 ni
   adivinanza por palabra clave.
