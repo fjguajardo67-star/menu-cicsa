@@ -90,7 +90,8 @@ vm.runInContext(
   ["_csvCampo", "_normIng", "_palabraEn", "_palabrasEquivalentes", "_nombreEquivalente",
     "_partesAliasHistorico", "resolverClaveBanco", "getUnidadPrecio", "conversionPz",
     "getPzGramos", "familiaUnidad", "unidadCompatible", "costoIngrediente",
-    "precioEnBanco", "getPrecio", "costoIngredienteEnReceta", "exportarPrecios"]
+    "precioEnBanco", "getPrecio", "costoIngredienteEnReceta", "calcularTopeCostoPlatillo",
+    "exportarPrecios"]
     .map(extraerFuncion).join("\n"),
   contexto
 );
@@ -151,6 +152,15 @@ prueba("muestra el costo de piezas convertidas con gramaje explícito", () => {
 prueba("sin precio validado no inventa un costo de fila", () => {
   contexto.precios = {};
   assert.equal(contexto.costoIngredienteEnReceta("sal", 2.5, "g"), null);
+});
+
+prueba("calcula el tope por platillo después de utilidad, producción, tortillas y refresco", () => {
+  const tope = contexto.calcularTopeCostoPlatillo(77, 0.15, 22.81, 6.16716, 9.77, 2.5);
+  assert.ok(Math.abs(tope - 10.681136) < 1e-9);
+});
+
+prueba("no calcula un tope con un divisor inválido", () => {
+  assert.equal(contexto.calcularTopeCostoPlatillo(77, 0.15, 22.81, 6.17, 9.77, 0), null);
 });
 
 prueba("no extiende una llave histórica por aproximación culinaria", () => {

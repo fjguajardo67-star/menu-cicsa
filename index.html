@@ -380,7 +380,7 @@
 // tabla de equivalencias. SUBIR ESTO EN CADA PR QUE SE MERGEE A MAIN.
 // Si se olvida, el badge no miente: al comprobar compara contra el archivo
 // realmente servido y ademas muestra su last-modified, que viene del servidor.
-var FORX_VERSION = '2026.08.21';
+var FORX_VERSION = '2026.08.21.1';
 
 function _pintarBadge(txt, estado) {
     var b = document.getElementById('badge-version');
@@ -2891,11 +2891,47 @@ function _recRecalcBanco() {
     });
     _recResumen();
 }
-// Resumen vivo del editor de recetas (pedido del usuario, COSTEO.md §9):
-// suma de MP por porcion + costo de produccion global (solo lectura, se edita
-// en Admin) contra el precio de la linea activa, con las bandas de Grill
-// Express (§8). Es orientativo por receta: NO sustituye al semaforo del dia
-// (§5), que sigue midiendo el menu completo.
+// Referencias verificadas para repartir el presupuesto de la comida completa.
+// Los importes NO se escriben aqui: salen del banco de Productos sincronizado
+// desde Egresos y respetan su unidad base (10 tortillas se convierten de pz a kg).
+var COSTEO_REFERENCIA_PLATILLO = {
+    tortillas: {nombre:'tortillas de maiz', cantidad:10, unidad:'pz'},
+    refresco: {nombre:'PEPSI 12 OZ LATA 24', cantidad:1, unidad:'pz'},
+    porciones: 2.5
+};
+
+function calcularTopeCostoPlatillo(precioVenta, margenMinimo, produccion, tortillas, refresco, porciones) {
+    var valores = [precioVenta, margenMinimo, produccion, tortillas, refresco, porciones];
+    if(valores.some(function(v){ return !isFinite(v); }) || precioVenta <= 0 || margenMinimo < 0 ||
+       produccion < 0 || tortillas < 0 || refresco < 0 || porciones <= 0) return null;
+    return (precioVenta * (1 - margenMinimo) - produccion - tortillas - refresco) / porciones;
+}
+
+function referenciaCostoPlatillo() {
+    var lin = lineaActiva();
+    var pv = lin && Number(lin.precio);
+    var margen = margenObjetivo();
+    var prod = Number(config && config.costo_produccion) || 0;
+    var rt = COSTEO_REFERENCIA_PLATILLO.tortillas;
+    var rr = COSTEO_REFERENCIA_PLATILLO.refresco;
+    var costoTortillas = costoIngredienteEnReceta(rt.nombre, rt.cantidad, rt.unidad);
+    var costoRefresco = costoIngredienteEnReceta(rr.nombre, rr.cantidad, rr.unidad);
+    var faltantes = [];
+    if(costoTortillas == null) faltantes.push('10 tortillas de maíz');
+    if(costoRefresco == null) faltantes.push('1 refresco');
+    var tope = (!lin || faltantes.length) ? null : calcularTopeCostoPlatillo(
+        pv, margen, prod, costoTortillas, costoRefresco, COSTEO_REFERENCIA_PLATILLO.porciones
+    );
+    return {
+        linea:lin, precioVenta:pv || 0, margen:margen, utilidad:(pv || 0) * margen,
+        produccion:prod, costoTortillas:costoTortillas, costoRefresco:costoRefresco,
+        porciones:COSTEO_REFERENCIA_PLATILLO.porciones, faltantes:faltantes, tope:tope
+    };
+}
+
+// Resumen vivo del editor de recetas (COSTEO.md §8b). Una receta individual
+// no se vende en $77 y por eso no tiene margen propio. Se compara su MP contra
+// el tope que queda despues de reservar utilidad, produccion, tortillas y refresco.
 function _recResumen() {
     var box = document.getElementById('ei-resumen');
     if(!box) return;
@@ -2907,22 +2943,40 @@ function _recResumen() {
         if(n.value.trim() && cant > 0) lista.push({nombre:n.value.trim(), cantidad:cant, unidad:u.value});
     });
     var mp = _costoLista(lista);
-    var sinP = lista.filter(function(i){ return !precioEnBanco(i.nombre); }).length;
-    var prod = (config && config.costo_produccion) || 0;
-    var total = mp + prod;
-    var lin = lineaActiva();
-    var pv = lin ? lin.precio : 0;
-    var margen = pv > 0 ? ((pv - total) / pv) * 100 : null;
-    var sem = semaforoGrill(margen);
-    var clase = SEM_BANDAS[sem.estado] ? 'pill-' + sem.estado : 'pill-sinlinea';
-    var pill = margen != null
-        ? '<span class="pill ' + clase + '"><i></i>' + (margen>=0?'+':'') + margen.toFixed(1) + '% &middot; ' + sem.label + '</span>'
-        : '<span class="pill pill-sinlinea">sin l&iacute;nea de contrato</span>';
-    var avisoSinP = sinP ? ' <span style="color:var(--crit-ink);font-weight:700">&#9888; ' + sinP + ' sin precio</span>' : '';
+    var incompletos = lista.filter(function(i){
+        return !precioEnBanco(i.nombre) || !unidadCompatible(i.nombre, i.unidad);
+    }).length;
+    var ref = referenciaCostoPlatillo();
+    var avisoSinP = incompletos ? ' <span style="color:var(--crit-ink);font-weight:700">&#9888; ' + incompletos + ' sin costo</span>' : '';
+    var estado = '';
+    if(!ref.linea) {
+        estado = '<span class="pill pill-sinlinea">sin l&iacute;nea de contrato</span>';
+    } else if(ref.faltantes.length) {
+        estado = '<span class="pill pill-incompleto">&#9888; faltan productos</span>';
+    } else if(incompletos) {
+        estado = '<span class="pill pill-incompleto">&#9888; receta incompleta</span>';
+    } else {
+        var diferencia = ref.tope - mp;
+        var dentro = diferencia >= -SEM_EPS;
+        estado = '<span class="pill ' + (dentro ? 'pill-verde' : 'pill-rojo') + '"><i></i>'
+            + (dentro ? 'Dentro por $' : 'Excede por $') + Math.abs(diferencia).toFixed(2) + '</span>';
+    }
+    var valorTope = ref.tope == null ? '&mdash;' : '$' + ref.tope.toFixed(2);
+    var detalle = '';
+    if(ref.linea && !ref.faltantes.length) {
+        detalle = 'Venta $' + ref.precioVenta.toFixed(2)
+            + ' &minus; utilidad m&iacute;nima $' + ref.utilidad.toFixed(2)
+            + ' &minus; producci&oacute;n $' + ref.produccion.toFixed(2)
+            + ' &minus; 10 tortillas $' + ref.costoTortillas.toFixed(2)
+            + ' &minus; refresco $' + ref.costoRefresco.toFixed(2)
+            + '; restante &divide; ' + ref.porciones + ' porciones.';
+    } else if(ref.faltantes.length) {
+        detalle = 'Falta precio en Productos para ' + ref.faltantes.join(' y ') + '. Sin esos datos no se calcula el tope.';
+    }
     box.innerHTML =
-        '<div class="crow"><span>Suma de ingredientes (MP/porci&oacute;n)' + avisoSinP + '</span><span style="font-variant-numeric:tabular-nums">$' + mp.toFixed(2) + '</span></div>'
-        + '<div class="crow"><span>Costo de producci&oacute;n <small style="color:var(--bl)">(global &mdash; se edita en Admin)</small></span><span style="font-variant-numeric:tabular-nums">$' + prod.toFixed(2) + '</span></div>'
-        + '<div class="crow"><span>Total vs ' + (lin ? lin.nombre + ' ($' + pv.toFixed(2) + ')' : 'precio de venta') + '</span><span style="display:flex;gap:8px;align-items:center;font-variant-numeric:tabular-nums">$' + total.toFixed(2) + ' ' + pill + '</span></div>';
+        '<div class="crow rec-cost-row"><span>Costo de ingredientes de esta porci&oacute;n' + avisoSinP + '</span><span class="rec-cost-result">$' + mp.toFixed(2) + '</span></div>'
+        + '<div class="crow rec-cost-row"><span>Tope de costo por platillo</span><span class="rec-cost-result">' + valorTope + ' ' + estado + '</span></div>'
+        + (detalle ? '<div class="rec-cost-detail">' + detalle + '</div>' : '');
 }
 // defUnidad/defCant permiten que los desechables arranquen en "1 pz" (caja, bolsa,
 // servilleta se cuentan por pieza) en vez de "100 g".

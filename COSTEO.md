@@ -457,30 +457,35 @@ de Menú, aunque Egresos ya la usaba. Al elegir `kg` para un producto costeado
 por porción, el sistema multiplicaba la cantidad por el precio de la porción y
 daba un costo silenciosamente incorrecto.
 
-## 8b. Indicador orientativo en el editor de recetas (Catálogo)
+## 8b. Tope de costo en el editor de recetas (Catálogo)
 
-Pedido del usuario (2026-07-31). El editor de recetas del Catálogo muestra un
-resumen vivo al pie:
+Decisión de negocio (2026-08-21). Una receta individual no se vende en $77 y
+por eso **no tiene margen propio**. El editor muestra su costo de ingredientes
+por porción y lo compara contra el presupuesto que le corresponde dentro de la
+comida completa:
 
 ```
-suma_mp     = Σ costo de ingredientes por porción (precios del banco)
-total       = suma_mp + costo_produccion            (§4.2, global)
-margen      = (precio_linea_activa − total) / precio_linea_activa
+utilidad_minima       = precio_linea × margen_objetivo
+presupuesto_restante  = precio_linea − utilidad_minima − costo_produccion
+                       − costo_10_tortillas − costo_1_refresco
+tope_por_platillo     = presupuesto_restante / 2.5
 ```
 
-- Las bandas son las mismas de todo el sistema (§5.3): verde cumple, amarillo
-  cerca, naranja gana poco, rojo pierde.
-- El costo de producción y el precio de venta son **globales** (§4): en el
-  editor solo se muestran, nunca se editan — se editan en Admin.
-- Ingredientes sin precio validado no suman y se avisan (§3): el indicador
-  puede ser optimista, igual que el semáforo del día.
+Con la configuración y el banco vigentes al decidirlo: `$77 × 15% = $11.55`
+de utilidad mínima, producción `$22.81`, 10 tortillas `$6.17` y refresco
+`$9.77`; el tope resultante es `$10.68` por platillo. Son una referencia del
+momento, **no valores hardcodeados**: precio de venta, margen y producción salen
+de Configuración; tortillas y refresco salen de Productos.
+
+- El editor muestra **"Dentro"** o **"Excede"** en pesos contra ese tope; no
+  muestra porcentaje de utilidad ni semáforo de margen por receta.
+- Si falta el precio de tortillas, refresco o algún ingrediente de la receta,
+  muestra datos incompletos y no presenta una comparación con apariencia válida.
 - Cada fila muestra tanto el precio base de Egresos como el costo de la cantidad
   usada en esa receta. Este segundo importe usa `costoIngrediente(ing, 1)` y se
   redondea a dos decimales solo al mostrarlo; no existe una fórmula paralela.
-- **Es orientativo por receta y NO sustituye al semáforo del día (§5).** El
-  día se vende completo (guisado 1 + guisado 2 + garnacha por $77): una
-  receta individual "verde" aquí no garantiza nada del día. Sirve para
-  comparar recetas entre sí mientras se editan.
+- El tope sirve para costear y comparar recetas mientras se editan. El resultado
+  real de la comida completa sigue perteneciendo al día (§5).
 
 ## 10. Códigos de platillo
 

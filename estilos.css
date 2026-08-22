@@ -254,6 +254,12 @@ body{
 }
 .crow{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)}
 .crow:last-child{border-bottom:none;font-size:15px;font-weight:700}
+.rec-cost-row{gap:12px;align-items:center}
+.rec-cost-result{
+  display:flex;gap:8px;align-items:center;justify-content:flex-end;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+.rec-cost-detail{padding-top:10px;color:var(--text-3);font-size:11px;line-height:1.45}
 
 /* ── Semáforo: píldoras con glifo por banda ─────────────────────────────
    El glifo (círculo/cuadro/triángulo/rombo) hace redundante al color, que es
@@ -393,6 +399,10 @@ body{
   .tab{width:auto;font-size:14px;padding:11px 13px}
   .wrap{padding:16px}
   .grid{grid-template-columns:1fr}
+}
+@media (max-width:480px){
+  .rec-cost-row{display:grid;grid-template-columns:1fr;gap:5px}
+  .rec-cost-result{justify-content:flex-start;flex-wrap:wrap;white-space:normal}
 }
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
