@@ -1611,10 +1611,38 @@ function _palabraEn(nl, clave) {
     var esc = clave.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return new RegExp('(^|\\s)' + esc + '(s|es)?($|\\s)').test(nl);
 }
+
+// Equivalencia nominal conservadora para variantes verificadas: permite plural simple y el
+// conector "de", pero exige el mismo número y orden de palabras útiles. Así
+// "Tortilla maiz" conecta con "Tortillas de maiz" sin convertir "pollo" en "pechuga de pollo".
+function _palabrasEquivalentes(a, b) {
+    if(a === b) return true;
+    var corto = a.length <= b.length ? a : b;
+    var largo = a.length <= b.length ? b : a;
+    return corto.length >= 3 && (largo === corto + 's' || largo === corto + 'es');
+}
+function _nombreEquivalente(a, b) {
+    var limpiar = function(s) {
+        return _normIng(s).split(' ').filter(function(p){ return p && p !== 'de'; });
+    };
+    var aa = limpiar(a), bb = limpiar(b);
+    if(!aa.length || aa.length !== bb.length) return false;
+    for(var i=0; i<aa.length; i++) if(!_palabrasEquivalentes(aa[i], bb[i])) return false;
+    return true;
+}
+
+// Algunos nombres históricos usaron punto en lugar de coma para separar alias. El punto solo
+// cuenta como separador si tiene espacio después, para no partir presentaciones como 3.8lt.
+function _partesAliasHistorico(nombre) {
+    var s = String(nombre || '');
+    if(!/[,;\n]|\.\s/.test(s)) return [];
+    return s.split(/[,;\n]+|\.\s+(?=\S)/).map(function(p){ return p.trim(); }).filter(Boolean);
+}
 // Resuelve el nombre de un ingrediente de receta a su llave en el banco:
 //   1) coincidencia exacta  -> gana siempre
-//   2) alias exacto dentro de una llave histórica separada por comas
-//   3) generico que aparezca como palabra completa -> gana el MAS ESPECIFICO (mas largo),
+//   2) variante nominal segura (plural simple y "de")
+//   3) alias dentro de una llave histórica separada por coma o punto
+//   4) generico que aparezca como palabra completa -> gana el MAS ESPECIFICO (mas largo),
 //      para que un generico corto no le robe a uno especifico (Tomate vs Pasta de tomate).
 // Devuelve la llave del banco, o null si no hay.
 function resolverClaveBanco(n) {
@@ -1626,16 +1654,26 @@ function resolverClaveBanco(n) {
         if(_normIng(exacta) === nl) return exacta;
     }
 
-    // 2) Compatibilidad con datos históricos de Egresos: algunos productos guardaron varias
-    // formas dentro de UNA llave ("Alitas, Alitas IQF, Alitas de Pollo"). Solo se aceptan como
-    // alias si la coincidencia es EXACTA. Si el mismo alias pertenece a dos productos distintos,
-    // se deja sin precio en vez de elegir uno y costear mal.
+    // 2) Una llave independiente puede diferir solo por plural simple o por el conector "de".
+    // Si hay más de una posibilidad, se conserva el "sin precio" en lugar de adivinar.
+    var equivalentes = {};
+    for(var equivalente in precios) {
+        if(_partesAliasHistorico(equivalente).length) continue;
+        if(_nombreEquivalente(equivalente, n)) equivalentes[_normIng(equivalente)] = equivalente;
+    }
+    var nombresEquivalentes = Object.keys(equivalentes);
+    if(nombresEquivalentes.length === 1) return equivalentes[nombresEquivalentes[0]];
+    if(nombresEquivalentes.length > 1) return null;
+
+    // 3) Compatibilidad con datos históricos de Egresos: algunos productos guardaron varias
+    // formas dentro de UNA llave ("Tortilla Maiz. Tortilla"). Se permite la misma equivalencia
+    // nominal conservadora. Si el alias pertenece a dos productos distintos, se deja sin precio.
     var gruposAlias = {};
     for(var antigua in precios) {
-        if(String(antigua).indexOf(',') < 0) continue;
-        var partes = String(antigua).split(',');
+        var partes = _partesAliasHistorico(antigua);
+        if(!partes.length) continue;
         for(var i=0; i<partes.length; i++) {
-            if(_normIng(partes[i]) !== nl) continue;
+            if(!_nombreEquivalente(partes[i], n)) continue;
             var grupo = _normIng(antigua); // agrupa duplicados que solo cambian mayúsculas/acento
             if(!gruposAlias[grupo]) gruposAlias[grupo] = antigua;
         }
@@ -1644,12 +1682,12 @@ function resolverClaveBanco(n) {
     if(aliasEncontrados.length === 1) return gruposAlias[aliasEncontrados[0]];
     if(aliasEncontrados.length > 1) return null;
 
-    // 3) Compatibilidad original: un genérico validado ("Elote") puede aparecer dentro de una
-    // variante de receta ("elote en grano"). Las llaves históricas con comas NO participan aquí:
+    // 4) Compatibilidad original: un genérico validado ("Elote") puede aparecer dentro de una
+    // variante de receta ("elote en grano"). Las llaves históricas con separadores NO participan aquí:
     // partir "Consomé, Caldo de Pollo" y aproximar habría costeado Consomé de res como pollo.
     var mejor = null, mejorLen = 0;
     for(var k in precios) {
-        if(String(k).indexOf(',') >= 0) continue;
+        if(_partesAliasHistorico(k).length) continue;
         var kl = _normIng(k);
         if(!kl) continue;
         if(_palabraEn(nl, kl) && kl.length > mejorLen) { mejor = k; mejorLen = kl.length; }

@@ -62,6 +62,9 @@ construye **encima** de esto:
   no cambian la identidad del ingrediente. Esta normalización sirve para
   comparar texto, no para adivinar equivalencias culinarias: "pollo" no
   autoriza pechuga↔pierna y "consomé" no autoriza pollo↔res.
+- Las variantes verificadas toleran plural simple y el conector `de` cuando las
+  demás palabras coinciden en el mismo orden (`Tortilla maíz` ↔
+  `Tortillas de maíz`). Si hay más de una coincidencia posible, queda sin precio.
 - **Menú no inventa precios.** Sin precio validado en el banco ⇒ `$0` y marca
   visible "⚠ sin precio" (`precioEnBanco`). No existe default de $50 ni
   adivinanza por palabra clave.

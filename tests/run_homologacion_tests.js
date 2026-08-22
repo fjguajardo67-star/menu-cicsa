@@ -79,7 +79,8 @@ const contexto = {
 };
 vm.createContext(contexto);
 vm.runInContext(
-  ["_csvCampo", "_normIng", "_palabraEn", "resolverClaveBanco", "exportarPrecios"]
+  ["_csvCampo", "_normIng", "_palabraEn", "_palabrasEquivalentes", "_nombreEquivalente",
+    "_partesAliasHistorico", "resolverClaveBanco", "exportarPrecios"]
     .map(extraerFuncion).join("\n"),
   contexto
 );
@@ -98,6 +99,16 @@ prueba("normaliza guiones, puntuación, mayúsculas y acentos", () => {
 prueba("recupera un alias exacto dentro de una llave histórica", () => {
   contexto.precios = { "Tomate, Jitomate, Tomate rojo": { precio: 31 } };
   assert.equal(contexto.resolverClaveBanco("JITOMATE"), "Tomate, Jitomate, Tomate rojo");
+});
+
+prueba("recupera tortilla plural desde una llave histórica separada con punto", () => {
+  contexto.precios = { "Tortilla Maiz. Tortilla": { precio: 27.78 } };
+  assert.equal(contexto.resolverClaveBanco("tortillas de maiz"), "Tortilla Maiz. Tortilla");
+});
+
+prueba("una llave independiente tolera plural simple y el conector de", () => {
+  contexto.precios = { "Tortilla Maiz": { precio: 27.78 } };
+  assert.equal(contexto.resolverClaveBanco("Tortillas de maíz"), "Tortilla Maiz");
 });
 
 prueba("no extiende una llave histórica por aproximación culinaria", () => {
