@@ -53,6 +53,15 @@ construye **encima** de esto:
   recetas de Menú" en Egresos) con coincidencia exacta primero y por palabra
   completa después (`resolverClaveBanco`). "Elote" captura "elote en grano";
   "Tomate" no se come a "Jitomate".
+- Ese nombre genérico contiene **un solo nombre, nunca una lista**. Las otras
+  formas verificadas por una persona viven en `sinonimos_menu`. Egresos separa
+  automáticamente los registros históricos que juntaron varias formas con
+  comas; Menú acepta esas listas viejas solo por coincidencia exacta durante la
+  transición, nunca por aproximación.
+- Mayúsculas, acentos, espacios, puntuación y guiones usados como separadores
+  no cambian la identidad del ingrediente. Esta normalización sirve para
+  comparar texto, no para adivinar equivalencias culinarias: "pollo" no
+  autoriza pechuga↔pierna y "consomé" no autoriza pollo↔res.
 - **Menú no inventa precios.** Sin precio validado en el banco ⇒ `$0` y marca
   visible "⚠ sin precio" (`precioEnBanco`). No existe default de $50 ni
   adivinanza por palabra clave.

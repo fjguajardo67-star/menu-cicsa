@@ -1598,7 +1598,12 @@ async function parsearRecetaIA(txt, pax) {
 // no por substring crudo: asi "Elote" captura "elote en grano" pero "Tomate" NO se
 // come a "Jitomate" (ni "Papa" a "Papaya"), que era un error real de costeo.
 function _normIng(s) {
-    return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+    return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+        // Un guion o una coma de captura no convierten al ingrediente en otro producto.
+        // Se normalizan SOLO separadores; no se quitan letras ni se hace búsqueda difusa.
+        .replace(/[‐‑‒–—-]+/g, ' ')
+        .replace(/[.,;:()[\]{}]+/g, ' ')
+        .replace(/\s+/g, ' ').trim();
 }
 // true si "clave" aparece dentro de "nl" como palabra completa (tolera plural simple)
 function _palabraEn(nl, clave) {
@@ -1608,17 +1613,45 @@ function _palabraEn(nl, clave) {
 }
 // Resuelve el nombre de un ingrediente de receta a su llave en el banco:
 //   1) coincidencia exacta  -> gana siempre
-//   2) generico que aparezca como palabra completa -> gana el MAS ESPECIFICO (mas largo),
+//   2) alias exacto dentro de una llave histórica separada por comas
+//   3) generico que aparezca como palabra completa -> gana el MAS ESPECIFICO (mas largo),
 //      para que un generico corto no le robe a uno especifico (Tomate vs Pasta de tomate).
 // Devuelve la llave del banco, o null si no hay.
 function resolverClaveBanco(n) {
     var nl = _normIng(n);
     if(!nl) return null;
+
+    // 1) Gana siempre la llave completa. Es el formato normal del banco actual.
+    for(var exacta in precios) {
+        if(_normIng(exacta) === nl) return exacta;
+    }
+
+    // 2) Compatibilidad con datos históricos de Egresos: algunos productos guardaron varias
+    // formas dentro de UNA llave ("Alitas, Alitas IQF, Alitas de Pollo"). Solo se aceptan como
+    // alias si la coincidencia es EXACTA. Si el mismo alias pertenece a dos productos distintos,
+    // se deja sin precio en vez de elegir uno y costear mal.
+    var gruposAlias = {};
+    for(var antigua in precios) {
+        if(String(antigua).indexOf(',') < 0) continue;
+        var partes = String(antigua).split(',');
+        for(var i=0; i<partes.length; i++) {
+            if(_normIng(partes[i]) !== nl) continue;
+            var grupo = _normIng(antigua); // agrupa duplicados que solo cambian mayúsculas/acento
+            if(!gruposAlias[grupo]) gruposAlias[grupo] = antigua;
+        }
+    }
+    var aliasEncontrados = Object.keys(gruposAlias);
+    if(aliasEncontrados.length === 1) return gruposAlias[aliasEncontrados[0]];
+    if(aliasEncontrados.length > 1) return null;
+
+    // 3) Compatibilidad original: un genérico validado ("Elote") puede aparecer dentro de una
+    // variante de receta ("elote en grano"). Las llaves históricas con comas NO participan aquí:
+    // partir "Consomé, Caldo de Pollo" y aproximar habría costeado Consomé de res como pollo.
     var mejor = null, mejorLen = 0;
     for(var k in precios) {
+        if(String(k).indexOf(',') >= 0) continue;
         var kl = _normIng(k);
         if(!kl) continue;
-        if(kl === nl) return k;
         if(_palabraEn(nl, kl) && kl.length > mejorLen) { mejor = k; mejorLen = kl.length; }
     }
     return mejor;
@@ -3110,9 +3143,15 @@ function updPStats() {
 // Antes vivian aqui importarCSV/agregarPrecio/editPrecio/delPrecio — se removieron para
 // que Menu no tenga ningun path para modificar precios. Se capturan/corrigen en Egresos.
 function exportarPrecios() {
-    var csv = 'Ingrediente,Precio por Kg/L,Ultima Actualizacion\n';
-    Object.keys(precios).sort().forEach(function(n){ csv += n + ',' + precios[n].precio + ',' + precios[n].fecha + '\n'; });
-    dl(csv, 'Precios_CICSA.csv', 'text/csv');
+    var csv = '\ufeff'; // BOM: Excel abre bien los acentos
+    csv += ['Ingrediente','Precio por unidad base','Unidad base','Última actualización']
+        .map(_csvCampo).join(',') + '\n';
+    Object.keys(precios).sort().forEach(function(n){
+        var p = precios[n] || {};
+        csv += [n, p.precio, p.unidad_base || p.unidad || 'kg', p.fecha]
+            .map(_csvCampo).join(',') + '\n';
+    });
+    dl(csv, 'Precios_CICSA.csv', 'text/csv;charset=utf-8');
     toast('Precios exportados');
 }
 
