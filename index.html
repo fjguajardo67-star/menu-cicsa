@@ -2842,7 +2842,7 @@ function _recIngRow(ing) {
     ing = ing || {nombre:'', cantidad:0.1, unidad:'g'};
     var cant = (ing.cantidad!=null) ? Number(ing.cantidad).toFixed(3) : '0.100';
     return '<div class="ing-row rec-ing-grid" style="' + REC_GRID + ';margin-bottom:.4rem">'
-        + '<input class="fi ing-n" list="dl-ingredientes" autocomplete="off" value="' + (ing.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Buscar en Egresos..." style="padding:.4rem .6rem">'
+        + '<input class="fi ing-n" list="dl-ingredientes" autocomplete="off" value="' + (ing.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Buscar producto..." style="padding:.4rem .6rem">'
         + '<input class="fi ing-c" type="number" value="' + cant + '" style="padding:.4rem .6rem">'
         + '<select class="fs ing-u" style="padding:.4rem">'
         + UNIDADES_VALIDAS.map(function(u){ return '<option value="'+u+'"'+((ing.unidad||'g')===u?' selected':'')+'>'+u+'</option>'; }).join('')
@@ -2930,7 +2930,7 @@ function _acIngRow(ing, defUnidad, defCant) {
     var du = defUnidad || 'g', dc = (defCant != null ? defCant : 100);
     ing = ing || {nombre:'', cantidad:dc, unidad:du};
     return '<div class="ing-row" style="' + AC_GRID + ';margin-bottom:.4rem">'
-        + '<input class="fi ac-in" list="dl-ingredientes" autocomplete="off" value="' + (ing.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Escribe o elige del banco..." style="padding:.4rem .6rem">'
+        + '<input class="fi ac-in" list="dl-ingredientes" autocomplete="off" value="' + (ing.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Buscar producto..." style="padding:.4rem .6rem">'
         + '<input class="fi ac-ic" type="number" value="' + (ing.cantidad!=null?ing.cantidad:dc) + '" style="padding:.4rem .6rem">'
         + '<select class="fs ac-iu" style="padding:.4rem">'
         + UNIDADES_VALIDAS.map(function(u){ return '<option value="'+u+'"'+((ing.unidad||du)===u?' selected':'')+'>'+u+'</option>'; }).join('')
