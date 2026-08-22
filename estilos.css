@@ -220,6 +220,7 @@ body{
   max-width:860px;width:92%;max-height:90vh;overflow-y:auto;position:relative;
   box-shadow:var(--shadow-modal);
 }
+.mc.mc-recipe{max-width:1040px}
 .mh{
   background:var(--surface-2);color:var(--text);border-bottom:1px solid var(--border);
   padding:16px 20px;border-radius:14px 14px 0 0;
@@ -235,6 +236,13 @@ body{
 
 /* ── Listas y resúmenes ── */
 .ing-row{display:grid;grid-template-columns:2fr 1fr 1fr .5fr;gap:6px;margin-bottom:6px}
+.rec-ing-scroll{overflow-x:auto;overscroll-behavior-inline:contain;padding-bottom:2px}
+.rec-ing-grid{min-width:760px}
+.ing-line-cost{
+  display:flex;align-items:center;justify-content:flex-end;text-align:right;
+  color:var(--text);font-size:13px;font-weight:700;line-height:1.15;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
 .ibox{
   background:var(--surface-2);border:1px solid var(--border);border-radius:7px;
   padding:9px 12px;margin-bottom:7px;

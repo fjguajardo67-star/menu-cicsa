@@ -474,6 +474,9 @@ margen      = (precio_linea_activa − total) / precio_linea_activa
   editor solo se muestran, nunca se editan — se editan en Admin.
 - Ingredientes sin precio validado no suman y se avisan (§3): el indicador
   puede ser optimista, igual que el semáforo del día.
+- Cada fila muestra tanto el precio base de Egresos como el costo de la cantidad
+  usada en esa receta. Este segundo importe usa `costoIngrediente(ing, 1)` y se
+  redondea a dos decimales solo al mostrarlo; no existe una fórmula paralela.
 - **Es orientativo por receta y NO sustituye al semáforo del día (§5).** El
   día se vende completo (guisado 1 + guisado 2 + garnacha por $77): una
   receta individual "verde" aquí no garantiza nada del día. Sirve para

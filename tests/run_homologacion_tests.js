@@ -89,7 +89,8 @@ vm.createContext(contexto);
 vm.runInContext(
   ["_csvCampo", "_normIng", "_palabraEn", "_palabrasEquivalentes", "_nombreEquivalente",
     "_partesAliasHistorico", "resolverClaveBanco", "getUnidadPrecio", "conversionPz",
-    "getPzGramos", "familiaUnidad", "unidadCompatible", "exportarPrecios"]
+    "getPzGramos", "familiaUnidad", "unidadCompatible", "costoIngrediente",
+    "precioEnBanco", "getPrecio", "costoIngredienteEnReceta", "exportarPrecios"]
     .map(extraerFuncion).join("\n"),
   contexto
 );
@@ -131,6 +132,25 @@ prueba("tortilla por pieza es compatible con precio por kg usando su gramaje rea
 prueba("una pieza sin conversión explícita sigue bloqueada contra kg", () => {
   contexto.precios = { "Pechuga Fileteada": { precio: 110, unidad_base: "kg" } };
   assert.equal(contexto.unidadCompatible("Pechuga Fileteada", "pz"), false);
+});
+
+prueba("muestra el costo de los gramos usados en la receta", () => {
+  contexto.precios = { "Cebolla": { precio: 27.78, unidad_base: "kg" } };
+  const costo = contexto.costoIngredienteEnReceta("cebolla", 25, "g");
+  assert.ok(Math.abs(costo - 0.6945) < 1e-9);
+});
+
+prueba("muestra el costo de piezas convertidas con gramaje explícito", () => {
+  contexto.precios = {
+    "Tortilla Maiz. Tortilla": { precio: 27.78, unidad_base: "kg" }
+  };
+  const costo = contexto.costoIngredienteEnReceta("tortillas de maiz", 2, "pz");
+  assert.ok(Math.abs(costo - 1.233432) < 1e-9);
+});
+
+prueba("sin precio validado no inventa un costo de fila", () => {
+  contexto.precios = {};
+  assert.equal(contexto.costoIngredienteEnReceta("sal", 2.5, "g"), null);
 });
 
 prueba("no extiende una llave histórica por aproximación culinaria", () => {
