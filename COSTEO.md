@@ -225,8 +225,8 @@ precio del insumo:
 | Renglón | Cantidad | Origen |
 |---|---|---|
 | Tortilla | 10 pz (45 pz/kg) | banco |
-| Arroz | 85 g | banco |
-| Frijol | 110 g | banco |
+| Arroz | 85 g **servidos** | banco ÷ rendimiento (§4.5) |
+| Frijol | 110 g **servidos** | banco ÷ rendimiento (§4.5) |
 | Refresco | 1 pz | banco |
 | Postre | $3.00 | costo fijo |
 
@@ -258,6 +258,39 @@ por receta: el día tiene tres recetas pero se sirve una sola comida.
 En la receta va **solo lo que esa porción consume**: ingredientes; tortillas
 cuando el platillo las lleva; desechable solo cuando es para llevar. Hielo y
 agua no son ingredientes — ya están dentro del costo de producción.
+
+### 4.5 Rendimiento: el banco cotiza seco, la cocina sirve elaborado
+
+Egresos cotiza el **grano seco** —así se compra y así viene en la factura—
+pero tanto las recetas como la canasta piden **producto servido**. Un kilo de
+arroz crudo sale de la olla convertido en varios kilos. Cotizar gramos
+servidos contra el precio del grano crudo **cobra de más**.
+
+```
+costo = (gramos_servidos ÷ 1000 ÷ rendimiento) × precio_seco_por_kg
+```
+
+Se aplica dentro de `costoIngrediente()`, la única fórmula de costeo del
+sistema, así que vale igual para la canasta, para las recetas del día y para
+Grill Express. El factor vive en `config.rendimientos` y se edita en Admin.
+
+| Ingrediente | Factor | Origen del número |
+|---|---:|---|
+| Arroz | 2.5 | operación, 2026-09-02 |
+| Frijol | 2.5 | operación, 2026-09-02 |
+
+**Por qué 2.5 y no 3.** El rendimiento medido cae entre 2.5 y 3. Se toma el
+extremo conservador a propósito: el sobrante absorbe los condimentos que no se
+desglosan renglón por renglón. Es una decisión de negocio, no una medición —
+cuando se pesen las ollas, se corrige en Admin sin desplegar.
+
+**Coincidencia por palabra completa.** El factor aplica a cualquier renglón que
+contenga esa palabra: `Frijoles refritos` y `Arroz rojo` rinden, pero
+`pasta de tomate` y `pasta de achiote` no. Un cambio de fondo de esta regla se
+prueba contra esos cuatro nombres.
+
+**Un gramo en una receta es de producto servido**, nunca de grano crudo. Quien
+capture recetas se atiene a eso.
 
 ---
 
@@ -310,14 +343,14 @@ sola en las dos superficies.
 banco de Egresos — no un número que se teclea.
 
 Referencia con `precio = 77.00`, `costo_produccion = 22.81`, `margen = 0.15` y
-la canasta de §4.3 **cotizada sin arroz** en $22.83 (tortillas $6.17 + frijol
-$3.91 + refresco $9.75 + postre $3.00):
+la canasta de §4.3 **cotizada sin arroz** en $20.48 (tortillas $6.17 + frijol
+$1.56 ya con rendimiento + refresco $9.75 + postre $3.00):
 
 | Umbral | Valor |
 |---|---:|
-| Verde | $19.81 |
-| Amarillo | $23.66 |
-| Naranja | $31.36 |
+| Verde | $22.16 |
+| Amarillo | $26.01 |
+| Naranja | $33.71 |
 
 **Estos umbrales son provisionales y van a bajar.** El arroz todavía no existe
 en Egresos, así que la canasta está incompleta y mientras tanto el día no pinta
@@ -511,7 +544,7 @@ el mismo día.
 
 Con la configuración y el banco vigentes: `$77 × 15% = $11.55` de utilidad
 mínima, producción `$22.81`, `2.5` porciones y la canasta **incompleta** de
-§4.3 en `$22.83` — daría `$7.92` por platillo. Hoy el editor **no muestra ese
+§4.3 en `$20.48` — daría `$8.86` por platillo. Hoy el editor **no muestra ese
 número**: falta el arroz en Egresos, así que reporta datos incompletos en vez
 de un tope que se ve válido y no lo es. Cuando el arroz entre, el tope baja.
 
