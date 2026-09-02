@@ -310,14 +310,19 @@ sola en las dos superficies.
 banco de Egresos — no un número que se teclea.
 
 Referencia con `precio = 77.00`, `costo_produccion = 22.81`, `margen = 0.15` y
-la canasta de §4.3 cotizada en $25.55 (tortillas $6.17 + arroz $2.72 + frijol
+la canasta de §4.3 **cotizada sin arroz** en $22.83 (tortillas $6.17 + frijol
 $3.91 + refresco $9.75 + postre $3.00):
 
 | Umbral | Valor |
 |---|---:|
-| Verde | $17.09 |
-| Amarillo | $20.94 |
-| Naranja | $28.64 |
+| Verde | $19.81 |
+| Amarillo | $23.66 |
+| Naranja | $31.36 |
+
+**Estos umbrales son provisionales y van a bajar.** El arroz todavía no existe
+en Egresos, así que la canasta está incompleta y mientras tanto el día no pinta
+color (§5.4). No se escribe aquí un precio estimado de arroz: los precios los
+pone Egresos contra factura, nunca esta especificación.
 
 Los valores anteriores ($42.64 / $46.49 / $54.19) salían de `complementos = 0`,
 es decir de suponer que el arroz, los frijoles, el postre, el refresco y las
@@ -505,10 +510,14 @@ que el semáforo del día, las dos pantallas darían presupuestos distintos para
 el mismo día.
 
 Con la configuración y el banco vigentes: `$77 × 15% = $11.55` de utilidad
-mínima, producción `$22.81`, complementos `$25.55` y `2.5` porciones; el tope
-resultante es `$6.84` por platillo. Son una referencia del momento, **no
-valores hardcodeados**: precio de venta, margen, producción, la canasta y las
-porciones salen de Configuración; los importes de la canasta, de Productos.
+mínima, producción `$22.81`, `2.5` porciones y la canasta **incompleta** de
+§4.3 en `$22.83` — daría `$7.92` por platillo. Hoy el editor **no muestra ese
+número**: falta el arroz en Egresos, así que reporta datos incompletos en vez
+de un tope que se ve válido y no lo es. Cuando el arroz entre, el tope baja.
+
+Son una referencia del momento, **no valores hardcodeados**: precio de venta,
+margen, producción, la canasta y las porciones salen de Configuración; los
+importes de la canasta, de Productos.
 
 - El editor muestra **"Dentro"** o **"Excede"** en pesos contra ese tope; no
   muestra porcentaje de utilidad ni semáforo de margen por receta.
