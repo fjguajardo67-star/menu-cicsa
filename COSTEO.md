@@ -210,24 +210,45 @@ Las comidas servidas salen de la estimación quincenal del contrato; por eso
 el campo debe ser editable sin tocar código. Rango esperado: **$17 a $33**.
 Fuera de eso, revisar el denominador antes de aceptarlo.
 
-### 4.3 Complementos del día — hueco real, decisión pendiente
+### 4.3 Complementos del día — canasta cotizada, no un número a mano
 
 La comida completa incluye arroz, frijoles, postre, refresco y tortillas,
-pero el MP del día que calcula la app hoy es **solo guisado 1 + guisado 2 +
+pero el MP del día que calcula la app es **solo guisado 1 + guisado 2 +
 garnacha**. Esos complementos consumen materia prima real y no están en
 ninguna receta.
 
-Default propuesto: un campo global `costo_complementos_por_pax` (MXN,
-editable en Admin, misma mecánica que 4.2) que se **suma una vez por día** al
-MP. Alternativa más fina para después: modelarlos como recetas fijas del día.
-Sin este número, el semáforo compara contra $77 un costo que no incluye todo
-lo que el servicio regala.
+Se resuelven con una **canasta por pax** en `config.complementos`, editable en
+Admin. Cada renglón se cotiza contra el banco de Egresos con la misma fórmula
+que un ingrediente de receta, así que se actualiza solo cuando cambia el
+precio del insumo:
+
+| Renglón | Cantidad | Origen |
+|---|---|---|
+| Tortilla | 10 pz (45 pz/kg) | banco |
+| Arroz | 85 g **servidos** | banco ÷ rendimiento (§4.5) |
+| Frijol | 110 g **servidos** | banco ÷ rendimiento (§4.5) |
+| Refresco | 1 pz | banco |
+| Postre | $3.00 | costo fijo |
+
+**Un solo número, dos pantallas.** La misma canasta la deducen el semáforo del
+día (§5.2) y el tope por platillo (§8b). Se descartó el campo único
+`costo_complementos` justamente por eso: convivía con un tope que
+deducía tortillas y refresco por su cuenta, y los dos números se contradecían.
+
+**Renglones de costo fijo.** Un complemento sin producto en el catálogo (el
+postre, que no va en el menú pero cuesta) se captura con unidad `$ fijo`. No
+se inventan precios de insumos: si algo debe salir del banco y no está ahí, se
+da de alta en Egresos.
+
+**Complemento sin precio ⇒ dato incompleto.** Mientras un renglón de banco no
+resuelva, el tope no se calcula y el día **no pinta color** (§5.4). Un fijo
+subestimado pintaría verde de más, que es peor que no pintar.
 
 ### 4.4 La fórmula del día
 
 ```
 costo_total_dia_por_pax = MP_guisado1 + MP_guisado2 + MP_garnacha
-                        + costo_complementos_por_pax   (una vez)
+                        + costo_complementos   (una vez)
                         + costo_produccion             (una vez)
 ```
 
@@ -237,6 +258,39 @@ por receta: el día tiene tres recetas pero se sirve una sola comida.
 En la receta va **solo lo que esa porción consume**: ingredientes; tortillas
 cuando el platillo las lleva; desechable solo cuando es para llevar. Hielo y
 agua no son ingredientes — ya están dentro del costo de producción.
+
+### 4.5 Rendimiento: el banco cotiza seco, la cocina sirve elaborado
+
+Egresos cotiza el **grano seco** —así se compra y así viene en la factura—
+pero tanto las recetas como la canasta piden **producto servido**. Un kilo de
+arroz crudo sale de la olla convertido en varios kilos. Cotizar gramos
+servidos contra el precio del grano crudo **cobra de más**.
+
+```
+costo = (gramos_servidos ÷ 1000 ÷ rendimiento) × precio_seco_por_kg
+```
+
+Se aplica dentro de `costoIngrediente()`, la única fórmula de costeo del
+sistema, así que vale igual para la canasta, para las recetas del día y para
+Grill Express. El factor vive en `config.rendimientos` y se edita en Admin.
+
+| Ingrediente | Factor | Origen del número |
+|---|---:|---|
+| Arroz | 2.5 | operación, 2026-09-02 |
+| Frijol | 2.5 | operación, 2026-09-02 |
+
+**Por qué 2.5 y no 3.** El rendimiento medido cae entre 2.5 y 3. Se toma el
+extremo conservador a propósito: el sobrante absorbe los condimentos que no se
+desglosan renglón por renglón. Es una decisión de negocio, no una medición —
+cuando se pesen las ollas, se corrige en Admin sin desplegar.
+
+**Coincidencia por palabra completa.** El factor aplica a cualquier renglón que
+contenga esa palabra: `Frijoles refritos` y `Arroz rojo` rinden, pero
+`pasta de tomate` y `pasta de achiote` no. Un cambio de fondo de esta regla se
+prueba contra esos cuatro nombres.
+
+**Un gramo en una receta es de producto servido**, nunca de grano crudo. Quien
+capture recetas se atiene a eso.
 
 ---
 
@@ -271,9 +325,9 @@ Para el día esos cortes se traducen a pesos de materia prima — cuánta MP cab
 antes de caer de banda:
 
 ```
-MP_disponible   = precio_linea - costo_produccion - costo_complementos_por_pax
-umbral_verde    = precio_linea * (1 - corte_verde)    - costo_produccion - costo_complementos_por_pax
-umbral_amarillo = precio_linea * (1 - corte_amarillo) - costo_produccion - costo_complementos_por_pax
+MP_disponible   = precio_linea - costo_produccion - costo_complementos
+umbral_verde    = precio_linea * (1 - corte_verde)    - costo_produccion - costo_complementos
+umbral_amarillo = precio_linea * (1 - corte_amarillo) - costo_produccion - costo_complementos
 umbral_naranja  = MP_disponible
 ```
 
@@ -285,14 +339,23 @@ corte que ya existía con el objetivo por omisión. Si el negocio decide que la
 banda amarilla debe ser más ancha o más angosta, se cambia aquí y se mueve
 sola en las dos superficies.
 
-Referencia con `precio = 77.00`, `costo_produccion = 22.81`,
-`complementos = 0` y `margen = 0.15`:
+`costo_complementos` es el total de la canasta de §4.3, cotizado en vivo del
+banco de Egresos — no un número que se teclea.
+
+Referencia con `precio = 77.00`, `costo_produccion = 22.81`, `margen = 0.15` y
+la canasta **completa** de §4.3 en $21.16 (tortillas $6.17 + arroz $0.68 +
+frijol $1.56 —los dos granos ya con rendimiento— + refresco $9.75 + postre
+$3.00):
 
 | Umbral | Valor |
 |---|---:|
-| Verde | $42.64 |
-| Amarillo | $46.49 |
-| Naranja | $54.19 |
+| Verde | $21.48 |
+| Amarillo | $25.33 |
+| Naranja | $33.03 |
+
+Los valores anteriores ($42.64 / $46.49 / $54.19) salían de `complementos = 0`,
+es decir de suponer que el arroz, los frijoles, el postre, el refresco y las
+tortillas no cuestan nada. Pintaban verde días que ya perdían dinero.
 
 **No hardcodear estos números.** Si cambia el precio del contrato, el costo
 de producción, los complementos o el margen objetivo, se recalculan solos.
@@ -467,19 +530,25 @@ comida completa:
 ```
 utilidad_minima       = precio_linea × margen_objetivo
 presupuesto_restante  = precio_linea − utilidad_minima − costo_produccion
-                       − costo_10_tortillas − costo_1_refresco
-tope_por_platillo     = presupuesto_restante / 2.5
+                       − costo_complementos            (la canasta de §4.3)
+tope_por_platillo     = presupuesto_restante / porciones_platillo
 ```
 
-Con la configuración y el banco vigentes al decidirlo: `$77 × 15% = $11.55`
-de utilidad mínima, producción `$22.81`, 10 tortillas `$6.17` y refresco
-`$9.77`; el tope resultante es `$10.68` por platillo. Son una referencia del
-momento, **no valores hardcodeados**: precio de venta, margen y producción salen
-de Configuración; tortillas y refresco salen de Productos.
+Deduce la canasta **completa**, no solo tortillas y refresco. Si dedujera menos
+que el semáforo del día, las dos pantallas darían presupuestos distintos para
+el mismo día.
+
+Con la configuración y el banco vigentes: `$77 × 15% = $11.55` de utilidad
+mínima, producción `$22.81`, `2.5` porciones y la canasta de §4.3 en `$21.16`;
+el tope resultante es **`$8.59`** por platillo.
+
+Son una referencia del momento, **no valores hardcodeados**: precio de venta,
+margen, producción, la canasta y las porciones salen de Configuración; los
+importes de la canasta, de Productos.
 
 - El editor muestra **"Dentro"** o **"Excede"** en pesos contra ese tope; no
   muestra porcentaje de utilidad ni semáforo de margen por receta.
-- Si falta el precio de tortillas, refresco o algún ingrediente de la receta,
+- Si falta el precio de un complemento o de algún ingrediente de la receta,
   muestra datos incompletos y no presenta una comparación con apariencia válida.
 - Cada fila muestra tanto el precio base de Egresos como el costo de la cantidad
   usada en esa receta. Este segundo importe usa `costoIngrediente(ing, 1)` y se

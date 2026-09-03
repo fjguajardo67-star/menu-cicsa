@@ -334,11 +334,20 @@
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
       <div class="fg"><label class="fl2">Costo de producci&oacute;n ($/porci&oacute;n)</label><input type="number" id="cfg-costo-prod" class="fi" step="0.01" min="0">
         <div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Fijo por porci&oacute;n (n&oacute;mina, gas, agua...). Rango esperado: $17&ndash;$33. Se recalcula cada mes.</div></div>
-      <div class="fg"><label class="fl2">Complementos ($/pax)</label><input type="number" id="cfg-complementos" class="fi" step="0.01" min="0">
-        <div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Arroz, frijoles, postre, refresco y tortillas del d&iacute;a &mdash; lo que la comida incluye fuera de las 3 recetas.</div></div>
+      <div class="fg"><label class="fl2">Porciones por platillo</label><input type="number" id="cfg-porciones" class="fi" step="0.1" min="0.1">
+        <div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Entre cu&aacute;ntas porciones se reparte el presupuesto que queda para las recetas del d&iacute;a. Default 2.5.</div></div>
       <div class="fg"><label class="fl2">Margen objetivo (%)</label><input type="number" id="cfg-margen" class="fi" step="1" min="0" max="90">
         <div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Default 15%. De aqu&iacute; salen <strong>las cuatro bandas</strong> del sem&aacute;foro, tanto del men&uacute; del d&iacute;a como de Grill Express: verde al objetivo, amarillo a dos tercios, naranja arriba de 0, rojo pierde.</div></div>
     </div>
+    <div class="fl2" style="margin-top:1.2rem">Complementos de la comida ($/pax)</div>
+    <div style="font-size:.72rem;color:var(--bl);margin:.15rem 0 .5rem">Lo que la comida incluye <strong>fuera de las 3 recetas</strong>. Cada rengl&oacute;n se cotiza contra el banco de Egresos y se actualiza solo; usa la unidad <strong>$ fijo</strong> para lo que no pasa por el cat&aacute;logo de insumos.</div>
+    <div id="cfg-complementos"></div>
+    <button class="btn bsec bsm" onclick="cfgAgregarComplemento()" style="margin:.4rem 0">&#10133; Agregar complemento</button>
+    <div id="cfg-comp-total" style="font-size:.8rem;margin:.3rem 0 .2rem"></div>
+    <div class="fl2" style="margin-top:1.2rem">Rendimiento seco &rarr; elaborado</div>
+    <div style="font-size:.72rem;color:var(--bl);margin:.15rem 0 .5rem">Egresos cotiza el <strong>grano seco</strong>, pero las recetas y los complementos piden <strong>producto servido</strong>. Un kilo de arroz crudo sale de la olla convertido en varios. El factor divide el precio y aplica a cualquier rengl&oacute;n cuyo nombre contenga esa palabra, aqu&iacute; y en las recetas.</div>
+    <div id="cfg-rendimientos"></div>
+    <button class="btn bsec bsm" onclick="cfgAgregarRendimiento()" style="margin:.4rem 0">&#10133; Agregar rendimiento</button>
     <button class="btn bgold bfull" onclick="guardarConfigNegocio()" style="margin-top:.5rem">&#128190; Guardar configuraci&oacute;n</button>
   </div>
 
@@ -509,13 +518,54 @@ function configDefault() {
         ],
         linea_menu: 'comida-completa',  // linea de contrato asociada al menu generado
         costo_produccion: 22.81,        // $ fijos por porcion (§4.2) — editable, se recalcula cada mes
-        costo_complementos: 0,          // $ por pax de arroz/frijoles/postre/refresco/tortillas (§4.3)
+        // §4.3 — lo que la comida completa incluye fuera de las 3 recetas. Los
+        // renglones con 'nombre' se cotizan del banco de Egresos y se actualizan
+        // solos; los que traen 'costo' son fijos porque no pasan por el catalogo.
+        complementos: [
+            {etiqueta:'10 tortillas', nombre:'Tortilla', cantidad:10,  unidad:'pz'},
+            {etiqueta:'Arroz',        nombre:'Arroz',    cantidad:85,  unidad:'g'},
+            {etiqueta:'Frijol',       nombre:'Frijol',   cantidad:110, unidad:'g'},
+            {etiqueta:'Refresco',     nombre:'Refresco', cantidad:1,   unidad:'pz'},
+            {etiqueta:'Postre',       costo:3.00}
+        ],
+        porciones_platillo: 2.5,        // §8b — entre cuantas porciones se reparte el tope
+        // §4.5 — cuanto rinde un kilo seco ya elaborado. Decidido 2026-09-02: 2.5
+        // para arroz y frijol, el extremo conservador del rango medido (2.5–3);
+        // el sobrante absorbe los condimentos que no se desglosan.
+        rendimientos: [
+            {nombre:'Arroz',  factor:2.5},
+            {nombre:'Frijol', factor:2.5}
+        ],
         margen_objetivo: 0.15           // §5.2 — 15% default
     };
 }
 var config = configDefault();
+// Config vieja (o de otra pestaña) traia un solo numero 'costo_complementos'.
+// Se ignora: la canasta lo reemplaza y dejarlo vivo sumaria dos veces.
+function normalizarConfig(c) {
+    if(c && c.costo_complementos != null) delete c.costo_complementos;
+    if(!Array.isArray(c && c.complementos)) c.complementos = configDefault().complementos;
+    if(!Array.isArray(c && c.rendimientos)) c.rendimientos = configDefault().rendimientos;
+    if(!(Number(c.porciones_platillo) > 0)) c.porciones_platillo = 2.5;
+    return c;
+}
 function lineaActiva() {
     return (config.lineas||[]).find(function(l){ return l.id === config.linea_menu; }) || null;
+}
+// Costo por pax de la canasta de complementos (§4.3). Una sola definicion para
+// el semaforo del dia y para el tope por platillo: si cada pantalla dedujera
+// cosas distintas, los dos numeros se contradirian.
+function costoComplementos() {
+    var total = 0, faltantes = [], detalle = [];
+    (config.complementos || []).forEach(function(c) {
+        var v = (c.costo != null && c.nombre == null)
+            ? Number(c.costo)
+            : costoIngredienteEnReceta(c.nombre, c.cantidad, c.unidad);
+        if(v == null || !isFinite(v)) { faltantes.push(c.etiqueta || c.nombre || '?'); return; }
+        total += v;
+        detalle.push({etiqueta: c.etiqueta || c.nombre, costo: v});
+    });
+    return {total: total, faltantes: faltantes, detalle: detalle};
 }
 async function saveConfig() {
     try { localStorage.setItem('cfg_cicsa', JSON.stringify(config)); } catch(e) {}
@@ -532,7 +582,7 @@ window.addEventListener('load', function() {
     // Sin cache -> precios arranca vacio; el sync con Egresos lo llena (no hay defaults propios)
     try { var p = localStorage.getItem('p_cicsa'); if(p) precios = JSON.parse(p); } catch(e) { precios = {}; }
     try { var ac = localStorage.getItem('ac_cicsa'); if(ac) alacarta = JSON.parse(ac); } catch(e) {}
-    try { var cf = localStorage.getItem('cfg_cicsa'); if(cf) config = Object.assign(configDefault(), JSON.parse(cf)); } catch(e) {}
+    try { var cf = localStorage.getItem('cfg_cicsa'); if(cf) config = normalizarConfig(Object.assign(configDefault(), JSON.parse(cf))); } catch(e) {}
     if(typeof renderConfigNegocio === 'function') renderConfigNegocio();
     if(typeof sincronizarSelectorLinea === 'function') sincronizarSelectorLinea();
     genMenu();
@@ -758,7 +808,7 @@ async function sincronizarDesdeFirebase() {
     // Configuracion de negocio (lineas de contrato, costos) — §4
     var cf = await fbGet('datos', 'config');
     if(cf && typeof cf === 'object' && !Array.isArray(cf)) {
-        config = Object.assign(configDefault(), cf);
+        config = normalizarConfig(Object.assign(configDefault(), cf));
         try { localStorage.setItem('cfg_cicsa', JSON.stringify(config)); } catch(e) {}
         renderConfigNegocio();
         sincronizarSelectorLinea();
@@ -899,7 +949,7 @@ function bandaMargen(margen) {
 function umbralesSemaforo() {
     var l = lineaActiva();
     if(!l || !(l.precio > 0)) return null;
-    var fijo = (config.costo_produccion || 0) + (config.costo_complementos || 0);
+    var fijo = (config.costo_produccion || 0) + costoComplementos().total;
     var c = cortesMargen();
     function mpDe(margenPct) { return l.precio * (1 - margenPct / 100) - fijo; }
     return {
@@ -912,7 +962,9 @@ function umbralesSemaforo() {
 // mp = MP del dia por pax. incompleto = alguna receta del dia tiene ingredientes
 // sin precio validado -> "datos incompletos", nunca un color (§5.4).
 function semaforoDia(mp, incompleto) {
-    if(incompleto) return {estado:'incompleto', margen:null};
+    // Un complemento sin precio deja el fijo subestimado y el color saldria
+    // verde de mas. §5.4: datos incompletos nunca pintan color.
+    if(incompleto || costoComplementos().faltantes.length) return {estado:'incompleto', margen:null};
     var u = umbralesSemaforo();
     if(!u) return {estado:'sinlinea', margen:null};
     var margen = ((u.naranja - mp) / u.precio) * 100;  // % del precio que queda tras MP+fijos
@@ -1879,7 +1931,27 @@ function unidadCompatible(nombreIng, unidadReceta) {
     return familiaReceta === 'pieza' && familiaBanco === 'masa' && !!conversionPz(nombreIng);
 }
 
+// Rendimiento seco -> elaborado. El banco de Egresos cotiza el GRANO SECO, pero
+// tanto las recetas como la canasta de complementos piden PRODUCTO SERVIDO: un
+// kilo de arroz crudo sale de la olla convertido en varios kilos. Sin esto se
+// cobra de mas, porque se cotizan gramos servidos a precio de grano crudo.
+// El factor vive en Configuracion, no aqui, para que se corrija sin desplegar.
+function rendimientoDe(nombre) {
+    var nl = _normIng(nombre);
+    if(!nl) return 1;
+    var mejor = 1, largo = -1;
+    (config.rendimientos || []).forEach(function(r) {
+        var clave = _normIng(r.nombre), f = Number(r.factor);
+        if(!clave || !(f > 0)) return;
+        // Palabra completa: "Frijoles refritos" rinde, "pasta de tomate" no.
+        if(_palabraEn(nl, clave) && clave.length > largo) { largo = clave.length; mejor = f; }
+    });
+    return mejor;
+}
 function costoIngrediente(ing, factor) {
+    return _costoIngredienteBruto(ing, factor) / rendimientoDe(ing.nombre);
+}
+function _costoIngredienteBruto(ing, factor) {
     factor = factor || 1;
     var cant = ing.cantidad * factor;
     var base = String(ing.precio_unidad || 'kg').toLowerCase();
@@ -2884,27 +2956,26 @@ function _recRecalcBanco() {
             costo.innerHTML = '&mdash;';
             return;
         }
-        ip.innerHTML = '<span style="color:var(--green)" title="Precio validado en Egresos">&#10003; $' + getPrecio(n).toFixed(2) + '/' + ub + '</span>';
+        // El rendimiento se muestra: un costo que baja solo, sin decir por que,
+        // se lee como error. Aqui queda claro que es grano seco -> elaborado.
+        var rend = rendimientoDe(n);
+        var chipRend = rend === 1 ? '' :
+            ' <span style="color:var(--bl);font-size:.72rem" title="Egresos cotiza grano seco; la receta pide producto elaborado. 1 kg seco rinde ' + rend + ' kg servido.">&divide;' + rend + '</span>';
+        ip.innerHTML = '<span style="color:var(--green)" title="Precio validado en Egresos">&#10003; $' + getPrecio(n).toFixed(2) + '/' + ub + '</span>' + chipRend;
         var cant = row.querySelector('.ing-c');
         var costoLinea = costoIngredienteEnReceta(n, cant ? cant.value : NaN, u ? u.value : '');
         costo.innerHTML = costoLinea == null ? '&mdash;' : '<span title="Costo de ' + (cant ? cant.value : '') + ' ' + (u ? u.value : '') + ' en esta receta">$' + costoLinea.toFixed(2) + '</span>';
     });
     _recResumen();
 }
-// Referencias verificadas para repartir el presupuesto de la comida completa.
-// Los importes NO se escriben aqui: salen del banco de Productos sincronizado
-// desde Egresos y respetan su unidad base (10 tortillas se convierten de pz a kg).
-var COSTEO_REFERENCIA_PLATILLO = {
-    tortillas: {nombre:'tortillas de maiz', cantidad:10, unidad:'pz'},
-    refresco: {nombre:'PEPSI 12 OZ LATA 24', cantidad:1, unidad:'pz'},
-    porciones: 2.5
-};
-
-function calcularTopeCostoPlatillo(precioVenta, margenMinimo, produccion, tortillas, refresco, porciones) {
-    var valores = [precioVenta, margenMinimo, produccion, tortillas, refresco, porciones];
+// Presupuesto que le queda a las 3 recetas del dia (§8b). Deduce la canasta
+// COMPLETA de complementos, no solo tortillas y refresco: si dedujera menos que
+// el semaforo del dia, las dos pantallas darian numeros que se contradicen.
+function calcularTopeCostoPlatillo(precioVenta, margenMinimo, produccion, complementos, porciones) {
+    var valores = [precioVenta, margenMinimo, produccion, complementos, porciones];
     if(valores.some(function(v){ return !isFinite(v); }) || precioVenta <= 0 || margenMinimo < 0 ||
-       produccion < 0 || tortillas < 0 || refresco < 0 || porciones <= 0) return null;
-    return (precioVenta * (1 - margenMinimo) - produccion - tortillas - refresco) / porciones;
+       produccion < 0 || complementos < 0 || porciones <= 0) return null;
+    return (precioVenta * (1 - margenMinimo) - produccion - complementos) / porciones;
 }
 
 function referenciaCostoPlatillo() {
@@ -2912,20 +2983,15 @@ function referenciaCostoPlatillo() {
     var pv = lin && Number(lin.precio);
     var margen = margenObjetivo();
     var prod = Number(config && config.costo_produccion) || 0;
-    var rt = COSTEO_REFERENCIA_PLATILLO.tortillas;
-    var rr = COSTEO_REFERENCIA_PLATILLO.refresco;
-    var costoTortillas = costoIngredienteEnReceta(rt.nombre, rt.cantidad, rt.unidad);
-    var costoRefresco = costoIngredienteEnReceta(rr.nombre, rr.cantidad, rr.unidad);
-    var faltantes = [];
-    if(costoTortillas == null) faltantes.push('10 tortillas de maíz');
-    if(costoRefresco == null) faltantes.push('1 refresco');
-    var tope = (!lin || faltantes.length) ? null : calcularTopeCostoPlatillo(
-        pv, margen, prod, costoTortillas, costoRefresco, COSTEO_REFERENCIA_PLATILLO.porciones
+    var porciones = Number(config && config.porciones_platillo) || 2.5;
+    var comp = costoComplementos();
+    var tope = (!lin || comp.faltantes.length) ? null : calcularTopeCostoPlatillo(
+        pv, margen, prod, comp.total, porciones
     );
     return {
         linea:lin, precioVenta:pv || 0, margen:margen, utilidad:(pv || 0) * margen,
-        produccion:prod, costoTortillas:costoTortillas, costoRefresco:costoRefresco,
-        porciones:COSTEO_REFERENCIA_PLATILLO.porciones, faltantes:faltantes, tope:tope
+        produccion:prod, complementos:comp.total, detalleComplementos:comp.detalle,
+        porciones:porciones, faltantes:comp.faltantes, tope:tope
     };
 }
 
@@ -2964,14 +3030,18 @@ function _recResumen() {
     var valorTope = ref.tope == null ? '&mdash;' : '$' + ref.tope.toFixed(2);
     var detalle = '';
     if(ref.linea && !ref.faltantes.length) {
+        var canasta = ref.detalleComplementos.map(function(c) {
+            return c.etiqueta + ' $' + c.costo.toFixed(2);
+        }).join(' + ');
         detalle = 'Venta $' + ref.precioVenta.toFixed(2)
             + ' &minus; utilidad m&iacute;nima $' + ref.utilidad.toFixed(2)
             + ' &minus; producci&oacute;n $' + ref.produccion.toFixed(2)
-            + ' &minus; 10 tortillas $' + ref.costoTortillas.toFixed(2)
-            + ' &minus; refresco $' + ref.costoRefresco.toFixed(2)
-            + '; restante &divide; ' + ref.porciones + ' porciones.';
+            + ' &minus; complementos $' + ref.complementos.toFixed(2)
+            + '; restante &divide; ' + ref.porciones + ' porciones.'
+            + (canasta ? '<br>Complementos: ' + canasta + '.' : '');
     } else if(ref.faltantes.length) {
-        detalle = 'Falta precio en Productos para ' + ref.faltantes.join(' y ') + '. Sin esos datos no se calcula el tope.';
+        detalle = 'Falta precio en Productos para ' + ref.faltantes.join(' y ')
+            + '. Se da de alta en Egresos; sin ese dato no se calcula el tope.';
     }
     box.innerHTML =
         '<div class="crow rec-cost-row"><span>Costo de ingredientes de esta porci&oacute;n' + avisoSinP + '</span><span class="rec-cost-result">$' + mp.toFixed(2) + '</span></div>'
@@ -3302,8 +3372,116 @@ function renderConfigNegocio() {
         });
     });
     var cp = document.getElementById('cfg-costo-prod'); if(cp) cp.value = config.costo_produccion;
-    var cc = document.getElementById('cfg-complementos'); if(cc) cc.value = config.costo_complementos;
+    var cx = document.getElementById('cfg-porciones'); if(cx) cx.value = config.porciones_platillo;
     var cm = document.getElementById('cfg-margen'); if(cm) cm.value = Math.round(config.margen_objetivo * 100);
+    renderRendimientos();  // antes de la canasta: su total ya depende del factor
+    renderComplementos();
+}
+var CFG_UNIDADES = ['g','ml','pz','kg','lt','$'];
+function _cfgFilaComplemento(c) {
+    var esFijo = (c.costo != null && c.nombre == null);
+    var un = esFijo ? '$' : (c.unidad || 'g');
+    var cant = esFijo ? Number(c.costo) : Number(c.cantidad);
+    return '<div class="cfg-comp" style="display:grid;grid-template-columns:1.1fr 1.5fr .8fr .8fr .9fr .4fr;gap:.4rem;margin-bottom:.4rem;align-items:center">'
+        + '<input class="fi cfg-ce" value="' + String(c.etiqueta||'').replace(/"/g,'&quot;') + '" placeholder="Etiqueta" style="padding:.4rem .6rem">'
+        + '<input class="fi cfg-cn" value="' + String(c.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Producto en Egresos" style="padding:.4rem .6rem"' + (esFijo ? ' disabled' : '') + '>'
+        + '<input class="fi cfg-cc" type="number" step="0.01" min="0" value="' + (isFinite(cant) ? cant : '') + '" style="padding:.4rem .6rem">'
+        + '<select class="fi cfg-cu" style="padding:.4rem .6rem">'
+        + CFG_UNIDADES.map(function(u){ return '<option value="' + u + '"' + (u === un ? ' selected' : '') + '>' + (u === '$' ? '$ fijo' : u) + '</option>'; }).join('')
+        + '</select>'
+        + '<span class="cfg-cv" style="font-size:.78rem;text-align:right"></span>'
+        + '<button class="btn bcrit bsm cfg-cx" style="padding:.4rem" title="Eliminar complemento">&#10005;</button>'
+        + '</div>';
+}
+// Pinta la canasta y su total. El costo de cada renglon se recalcula en vivo
+// contra el banco para que el hueco (producto sin precio) se vea antes de guardar.
+function renderComplementos() {
+    var cont = document.getElementById('cfg-complementos');
+    if(!cont) return;
+    cont.innerHTML = (config.complementos||[]).map(_cfgFilaComplemento).join('');
+    cont.querySelectorAll('.cfg-cx').forEach(function(b) {
+        b.addEventListener('click', function(){ this.closest('.cfg-comp').remove(); refrescarTotalComplementos(); });
+    });
+    cont.querySelectorAll('.cfg-ce,.cfg-cn,.cfg-cc,.cfg-cu').forEach(function(el) {
+        el.addEventListener('input', refrescarTotalComplementos);
+        el.addEventListener('change', refrescarTotalComplementos);
+    });
+    refrescarTotalComplementos();
+}
+function _leerComplementosDelForm() {
+    var out = [];
+    document.querySelectorAll('#cfg-complementos .cfg-comp').forEach(function(row) {
+        var et = row.querySelector('.cfg-ce').value.trim();
+        var nom = row.querySelector('.cfg-cn').value.trim();
+        var cant = parseFloat(row.querySelector('.cfg-cc').value);
+        var un = row.querySelector('.cfg-cu').value;
+        if(un === '$') out.push({etiqueta: et, costo: cant});
+        else out.push({etiqueta: et, nombre: nom, cantidad: cant, unidad: un});
+    });
+    return out;
+}
+function refrescarTotalComplementos() {
+    var filas = document.querySelectorAll('#cfg-complementos .cfg-comp');
+    var lista = _leerComplementosDelForm();
+    var total = 0, faltan = [];
+    filas.forEach(function(row, i) {
+        var c = lista[i], celda = row.querySelector('.cfg-cv');
+        var esFijo = (c.costo != null && c.nombre == null);
+        row.querySelector('.cfg-cn').disabled = esFijo;
+        var v = esFijo ? Number(c.costo) : costoIngredienteEnReceta(c.nombre, c.cantidad, c.unidad);
+        if(v == null || !isFinite(v)) {
+            faltan.push(c.etiqueta || c.nombre || 'renglón ' + (i+1));
+            celda.innerHTML = '<span style="color:var(--crit-ink)">sin precio</span>';
+        } else {
+            total += v;
+            celda.innerHTML = '<span style="color:var(--green)">$' + v.toFixed(2) + '</span>';
+        }
+    });
+    var box = document.getElementById('cfg-comp-total');
+    if(box) box.innerHTML = '<strong>Total complementos: $' + total.toFixed(2) + '/pax</strong>'
+        + (faltan.length ? ' <span style="color:var(--crit-ink)">&#9888; falta dar de alta en Egresos: ' + faltan.join(', ') + '. Mientras tanto el sem&aacute;foro del d&iacute;a no pinta color.</span>' : '');
+}
+function _leerRendimientosDelForm() {
+    var out = [];
+    document.querySelectorAll('#cfg-rendimientos .cfg-rend').forEach(function(row) {
+        out.push({
+            nombre: row.querySelector('.cfg-rn').value.trim(),
+            factor: parseFloat(row.querySelector('.cfg-rf').value)
+        });
+    });
+    return out;
+}
+function renderRendimientos() {
+    var cont = document.getElementById('cfg-rendimientos');
+    if(!cont) return;
+    cont.innerHTML = (config.rendimientos||[]).map(function(r) {
+        return '<div class="cfg-rend" style="display:grid;grid-template-columns:2fr 1fr .4fr;gap:.4rem;margin-bottom:.4rem;align-items:center">'
+            + '<input class="fi cfg-rn" value="' + String(r.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Ingrediente (ej. Arroz)" style="padding:.4rem .6rem">'
+            + '<input class="fi cfg-rf" type="number" step="0.1" min="0.1" value="' + r.factor + '" title="1 kg seco rinde N kg elaborado" style="padding:.4rem .6rem">'
+            + '<button class="btn bcrit bsm cfg-rx" style="padding:.4rem" title="Eliminar">&#10005;</button>'
+            + '</div>';
+    }).join('');
+    cont.querySelectorAll('.cfg-rx').forEach(function(b) {
+        b.addEventListener('click', function(){ this.closest('.cfg-rend').remove(); });
+    });
+    // El rendimiento cambia el costo de la canasta: repintar el total en vivo.
+    cont.querySelectorAll('.cfg-rn,.cfg-rf').forEach(function(el) {
+        el.addEventListener('input', function() {
+            config.rendimientos = _leerRendimientosDelForm();
+            refrescarTotalComplementos();
+        });
+    });
+}
+function cfgAgregarRendimiento() {
+    if(!document.getElementById('cfg-rendimientos')) return;
+    config.rendimientos = _leerRendimientosDelForm().concat([{nombre:'', factor:2.5}]);
+    renderRendimientos();
+}
+function cfgAgregarComplemento() {
+    var cont = document.getElementById('cfg-complementos');
+    if(!cont) return;
+    config.complementos = _leerComplementosDelForm().concat([{etiqueta:'', nombre:'', cantidad:100, unidad:'g'}]);
+    renderComplementos();
 }
 function cfgAgregarLinea() {
     var cont = document.getElementById('cfg-lineas');
@@ -3330,10 +3508,23 @@ async function guardarConfigNegocio() {
     });
     if(!lineas.length) errs.push('Debe existir al menos una línea de contrato.');
     var prod = parseFloat(document.getElementById('cfg-costo-prod').value);
-    var comp = parseFloat(document.getElementById('cfg-complementos').value);
+    var porc = parseFloat(document.getElementById('cfg-porciones').value);
     var marg = parseFloat(document.getElementById('cfg-margen').value);
+    var comps = _leerComplementosDelForm();
+    comps.forEach(function(c, i) {
+        var ref = c.etiqueta || ('Complemento ' + (i+1));
+        if(!c.etiqueta) errs.push('Complemento ' + (i+1) + ': sin etiqueta.');
+        if(!isFinite(c.costo != null ? c.costo : c.cantidad) || (c.costo != null ? c.costo : c.cantidad) < 0)
+            errs.push('Complemento "' + ref + '": cantidad inválida.');
+        if(c.costo == null && !c.nombre) errs.push('Complemento "' + ref + '": falta el producto de Egresos.');
+    });
+    var rends = _leerRendimientosDelForm();
+    rends.forEach(function(r, i) {
+        if(!r.nombre) errs.push('Rendimiento ' + (i+1) + ': sin ingrediente.');
+        if(!isFinite(r.factor) || r.factor <= 0) errs.push('Rendimiento "' + (r.nombre || i+1) + '": debe ser mayor a 0.');
+    });
     if(!isFinite(prod) || prod < 0) errs.push('Costo de producción inválido.');
-    if(!isFinite(comp) || comp < 0) errs.push('Complementos inválidos.');
+    if(!isFinite(porc) || porc <= 0) errs.push('Porciones por platillo debe ser mayor a 0.');
     if(!isFinite(marg) || marg < 0 || marg > 90) errs.push('Margen objetivo debe estar entre 0 y 90%.');
     if(errs.length) { alert('No se puede guardar:\n\n' + errs.join('\n')); return; }
     // §4.2: fuera del rango esperado -> confirmar, no bloquear
@@ -3344,7 +3535,9 @@ async function guardarConfigNegocio() {
     config.lineas = lineas;
     if(!lineas.some(function(l){ return l.id === config.linea_menu; })) config.linea_menu = lineas[0].id;
     config.costo_produccion = prod;
-    config.costo_complementos = comp;
+    config.complementos = comps;
+    config.rendimientos = rends;
+    config.porciones_platillo = porc;
     config.margen_objetivo = marg / 100;
     var ok = await saveConfig();
     sincronizarSelectorLinea();
