@@ -555,9 +555,25 @@ function lineaActiva() {
 // Costo por pax de la canasta de complementos (§4.3). Una sola definicion para
 // el semaforo del dia y para el tope por platillo: si cada pantalla dedujera
 // cosas distintas, los dos numeros se contradirian.
-function costoComplementos() {
-    var total = 0, faltantes = [], detalle = [];
+// Tortilla en cualquiera de sus formas servidas. La masa NO cuenta: sopes,
+// gorditas y huaraches se hacen de masa y ahi si se sirven tortillas aparte.
+var RX_TORTILLA = /(^|\s)(tortillas?|tostadas?|totopos?)($|\s)/;
+// Una garnacha de tortilla —tacos, quesadillas, enchiladas, tostadas,
+// chilaquiles— ya trae la tortilla adentro: ese dia la canasta no la vuelve a
+// cobrar. Las de masa o pan (sopes, gorditas, molletes, pambazos) si la pagan.
+function traeTortillaPropia(rec) {
+    if(!rec || (rec.tipo || '') !== 'garnacha') return false;
+    return (rec.ingredientes || []).some(function(i) {
+        return RX_TORTILLA.test(_normIng(i && i.nombre) || '');
+    });
+}
+function costoComplementos(omitirTortilla) {
+    var total = 0, faltantes = [], detalle = [], omitidos = [];
     (config.complementos || []).forEach(function(c) {
+        if(omitirTortilla && RX_TORTILLA.test(_normIng(c.nombre) || '')) {
+            omitidos.push(c.etiqueta || c.nombre);
+            return;
+        }
         var v = (c.costo != null && c.nombre == null)
             ? Number(c.costo)
             : costoIngredienteEnReceta(c.nombre, c.cantidad, c.unidad);
@@ -565,7 +581,7 @@ function costoComplementos() {
         total += v;
         detalle.push({etiqueta: c.etiqueta || c.nombre, costo: v});
     });
-    return {total: total, faltantes: faltantes, detalle: detalle};
+    return {total: total, faltantes: faltantes, detalle: detalle, omitidos: omitidos};
 }
 async function saveConfig() {
     try { localStorage.setItem('cfg_cicsa', JSON.stringify(config)); } catch(e) {}
@@ -946,10 +962,10 @@ function bandaMargen(margen) {
 }
 // Los umbrales del dia son los mismos cortes traducidos a pesos de materia
 // prima: cuanta MP cabe antes de caer de banda.
-function umbralesSemaforo() {
+function umbralesSemaforo(garnacha) {
     var l = lineaActiva();
     if(!l || !(l.precio > 0)) return null;
-    var fijo = (config.costo_produccion || 0) + costoComplementos().total;
+    var fijo = (config.costo_produccion || 0) + costoComplementos(traeTortillaPropia(garnacha)).total;
     var c = cortesMargen();
     function mpDe(margenPct) { return l.precio * (1 - margenPct / 100) - fijo; }
     return {
@@ -961,11 +977,11 @@ function umbralesSemaforo() {
 }
 // mp = MP del dia por pax. incompleto = alguna receta del dia tiene ingredientes
 // sin precio validado -> "datos incompletos", nunca un color (§5.4).
-function semaforoDia(mp, incompleto) {
+function semaforoDia(mp, incompleto, garnacha) {
     // Un complemento sin precio deja el fijo subestimado y el color saldria
     // verde de mas. §5.4: datos incompletos nunca pintan color.
-    if(incompleto || costoComplementos().faltantes.length) return {estado:'incompleto', margen:null};
-    var u = umbralesSemaforo();
+    if(incompleto || costoComplementos(traeTortillaPropia(garnacha)).faltantes.length) return {estado:'incompleto', margen:null};
+    var u = umbralesSemaforo(garnacha);
     if(!u) return {estado:'sinlinea', margen:null};
     var margen = ((u.naranja - mp) / u.precio) * 100;  // % del precio que queda tras MP+fijos
     return {estado:bandaMargen(margen), margen:margen};
@@ -981,9 +997,9 @@ function badgeSemaforo(s) {
 // Medidor de umbrales (DESIGN.md, componente de firma): ubica la materia prima
 // del dia entre los umbrales de COSTEO.md y avisa cuando esta a punto de
 // cambiar de banda. Solo presenta datos que el semaforo ya calcula.
-function medidorUmbrales(mp, estado) {
+function medidorUmbrales(mp, estado, garnacha) {
     if(estado === 'incompleto' || estado === 'sinlinea') return '';
-    var u = umbralesSemaforo();
+    var u = umbralesSemaforo(garnacha);
     if(!u) return '';
     var max = u.naranja * 1.23;  // aire tras el tope, para que el rojo tenga ancho
     function pct(v) { return Math.max(0, Math.min(100, v / max * 100)); }
@@ -1072,7 +1088,7 @@ function genMenu() {
         var diaIncompleto = [r1, r2, rg].some(function(rec) {
             return rec && (rec.ingredientes||[]).some(function(ing){ return ing && !precioEnBanco(ing.nombre); });
         });
-        var sem = semaforoDia(ct, diaIncompleto);
+        var sem = semaforoDia(ct, diaIncompleto, rg);
         var badge = lk1 ? '<div style="margin-top:3px"><span class="pill pill-especial">Especial</span></div>' : '';
         function pBox(lbl, nom, rec, c, lk, di, po) {
             if(!nom) return '<div class="pl"><div class="plt">' + lbl + '</div><div style="font-size:.8rem;color:var(--bl)">Sin platillos</div></div>';
@@ -1091,7 +1107,7 @@ function genMenu() {
         div.dataset.margen = (sem.margen != null ? sem.margen : -9999);
         div.innerHTML = '<div class="dh"><div><div class="dn">Dia ' + String(i).padStart(2,'0') + '</div><div class="dw">' + dia + '</div>' + badge + '</div>'
             + '<div style="text-align:right"><div class="dc">$' + ct.toFixed(2) + '/pax</div>' + badgeSemaforo(sem) + '</div></div>'
-            + medidorUmbrales(ct, sem.estado)
+            + medidorUmbrales(ct, sem.estado, rg)
             + pBox('GUISADO 1', g1, r1, c1, lk1, i, 1)
             + pBox('GUISADO 2', g2, r2, c2, false, i, 2)
             + pBox('GARNACHA', ga, rg, cg, lkG, i, 3);
@@ -1242,7 +1258,10 @@ function aplicar(dia, pos, nom) {
             var rr = allDB[nm];
             return rr && (rr.ingredientes||[]).some(function(ing){ return ing && !precioEnBanco(ing.nombre); });
         });
-        var semDia = semaforoDia(tot, incDia);
+        // La garnacha del dia decide si la canasta cobra tortillas (§4.6).
+        var rgDia = nombresDia.map(function(nm){ return allDB[nm]; })
+            .find(function(rr){ return rr && rr.tipo === 'garnacha'; }) || null;
+        var semDia = semaforoDia(tot, incDia, rgDia);
         card.dataset.sem = semDia.estado;
         card.dataset.margen = (semDia.margen != null ? semDia.margen : -9999);
         var bAnt = card.querySelector('.sem-badge');
@@ -2978,20 +2997,21 @@ function calcularTopeCostoPlatillo(precioVenta, margenMinimo, produccion, comple
     return (precioVenta * (1 - margenMinimo) - produccion - complementos) / porciones;
 }
 
-function referenciaCostoPlatillo() {
+function referenciaCostoPlatillo(rec) {
     var lin = lineaActiva();
     var pv = lin && Number(lin.precio);
     var margen = margenObjetivo();
     var prod = Number(config && config.costo_produccion) || 0;
     var porciones = Number(config && config.porciones_platillo) || 2.5;
-    var comp = costoComplementos();
+    var comp = costoComplementos(traeTortillaPropia(rec));
     var tope = (!lin || comp.faltantes.length) ? null : calcularTopeCostoPlatillo(
         pv, margen, prod, comp.total, porciones
     );
     return {
         linea:lin, precioVenta:pv || 0, margen:margen, utilidad:(pv || 0) * margen,
         produccion:prod, complementos:comp.total, detalleComplementos:comp.detalle,
-        porciones:porciones, faltantes:comp.faltantes, tope:tope
+        porciones:porciones, faltantes:comp.faltantes, tope:tope,
+        omitidos:comp.omitidos
     };
 }
 
@@ -3012,7 +3032,10 @@ function _recResumen() {
     var incompletos = lista.filter(function(i){
         return !precioEnBanco(i.nombre) || !unidadCompatible(i.nombre, i.unidad);
     }).length;
-    var ref = referenciaCostoPlatillo();
+    // La receta en edicion decide su propio tope: una garnacha de tortilla no
+    // paga las tortillas de la canasta, asi que le queda mas presupuesto (§4.6).
+    var tipoEd = document.getElementById('et');
+    var ref = referenciaCostoPlatillo({tipo: tipoEd ? tipoEd.value : '', ingredientes: lista});
     var avisoSinP = incompletos ? ' <span style="color:var(--crit-ink);font-weight:700">&#9888; ' + incompletos + ' sin costo</span>' : '';
     var estado = '';
     if(!ref.linea) {
@@ -3038,7 +3061,10 @@ function _recResumen() {
             + ' &minus; producci&oacute;n $' + ref.produccion.toFixed(2)
             + ' &minus; complementos $' + ref.complementos.toFixed(2)
             + '; restante &divide; ' + ref.porciones + ' porciones.'
-            + (canasta ? '<br>Complementos: ' + canasta + '.' : '');
+            + (canasta ? '<br>Complementos: ' + canasta + '.' : '')
+            + ((ref.omitidos && ref.omitidos.length)
+                ? '<br><span style="color:var(--green)">Garnacha de tortilla: no se cobra ' + ref.omitidos.join(' ni ') + ' en los complementos &mdash; ya viene en el platillo.</span>'
+                : '');
     } else if(ref.faltantes.length) {
         detalle = 'Falta precio en Productos para ' + ref.faltantes.join(' y ')
             + '. Se da de alta en Egresos; sin ese dato no se calcula el tope.';

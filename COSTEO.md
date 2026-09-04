@@ -292,6 +292,44 @@ prueba contra esos cuatro nombres.
 **Un gramo en una receta es de producto servido**, nunca de grano crudo. Quien
 capture recetas se atiene a eso.
 
+### 4.6 Garnacha de tortilla: la canasta no cobra tortillas dos veces
+
+Decisión de negocio (2026-09-02). Cuando la garnacha del día **ya trae la
+tortilla adentro** —tacos, quesadillas, enchiladas, tostadas, chilaquiles— esa
+tortilla está en el costo de la receta. Cobrar además las 10 tortillas de la
+canasta (§4.3) sería contarlas dos veces.
+
+Ese día la canasta **omite los renglones de tortilla** y el presupuesto queda
+$6.17 más holgado.
+
+**La regla es por contenido, no por tipo.** No basta con que el platillo sea
+garnacha: tiene que traer tortilla, tostada o totopo entre sus ingredientes.
+La **masa no cuenta** — sopes, gorditas y huaraches se hacen de masa y ahí sí
+se sirve la ración de tortillas aparte, igual que con el pan.
+
+| Garnacha | Base | ¿Omite tortillas? |
+|---|---|---|
+| Tacos Dorados, Quesadillas, Enchiladas, Pastel Azteca | tortilla | **sí** |
+| Tostada de Pollo | tostada | **sí** |
+| Chimichangas | tortilla de harina | **sí** |
+| Sopes, Gorditas, Huaraches | masa | no |
+| Molletes, Pambazos | pan | no |
+| Empanadas Fritas | harina | no |
+
+Un guisado con tortilla entre sus ingredientes **no** dispara la regla: la
+condición exige `tipo === 'garnacha'`. Un cambio de fondo aquí se prueba contra
+esa lista y contra ese contraejemplo.
+
+Aplica en las dos superficies, con la misma función: el semáforo del día (que
+conoce la garnacha de ese día) y el tope del editor de recetas (que usa la
+receta en edición, de modo que el tope reacciona al cambiar el tipo o al
+agregar una tortilla). Cuando la omisión ocurre, **se dice en pantalla** — un
+tope más holgado sin explicación se lee como error.
+
+**Hueco de datos conocido.** Las 58 recetas de la nube están todas como
+`tipo: guisado`; hoy solo las precargadas traen garnachas. Mientras no se
+reclasifiquen, la regla no se dispara sobre el recetario real.
+
 ---
 
 ## 5. Semáforo
