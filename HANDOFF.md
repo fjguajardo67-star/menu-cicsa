@@ -39,9 +39,32 @@ a producción.
 
 ## Flujo de trabajo
 
-El agente **no puede crear ni mergear PRs**. Rama → commit → push → pasarle al
-usuario el link `pull/new/<rama>` → él mergea → verificar deploy → borrar rama.
-**Nunca commit directo a `main`** (push a main = deploy).
+Rama → commit → push → **PR** → merge → **verificar el deploy** → borrar la rama.
+**Nunca commit directo a `main`** (push a main = deploy a producción).
+
+El agente **sí crea y mergea PRs** con `gh` (autenticado desde el 9/sep/2026;
+antes no lo estaba, y por eso el flujo viejo terminaba en pasarle el link al
+dueño). **Pero mergea solo cuando el dueño lo pide** — nunca por iniciativa
+propia, ni siquiera "ya que está verde".
+
+Esa condición no es trámite. Viene del incidente del 23/ago/2026 en
+`~/grill-express` (ver su `HANDOFF.md` §3.0): al mergear un PR se desplegó
+trabajo que el dueño no había decidido soltar. **El riesgo no es la capacidad de
+mergear, es perder el control de qué sale y cuándo** — y con dos agentes
+trabajando en paralelo, una rama puede arrastrar cambios de otro.
+
+Antes de mergear, siempre:
+
+1. **Revisar qué lleva la rama de verdad** (`git diff origin/main...<rama>`), no
+   solo el título. Si arrastra trabajo ajeno, decirlo y parar.
+2. **Ensayar el merge** (`git merge --no-commit --no-ff` y luego `--abort`) para
+   descubrir conflictos antes de tocar `main`.
+3. Si la rama es de otra persona, **revisarla**: que exista lo que el código
+   referencia y que los llamadores estén completos.
+
+Después de mergear, **verificar el deploy contra el dominio**, no contra git:
+descargar `index.html` de producción y comprobar que traiga los cambios. GitHub
+Pages tarda uno o dos minutos.
 
 ## BLOQUEADORES ACTIVOS
 
