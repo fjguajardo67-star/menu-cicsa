@@ -79,6 +79,10 @@ construye **encima** de esto:
 
 ## 3. Integridad del dato
 
+> Estas reglas, traducidas a instrucciones para quien captura, viven en
+> **`RECETAS.md`**: plantilla, campos, formato de ingredientes, qué se descarta
+> solo y qué revisar antes de pegar un lote.
+
 ### 3.1 Validación al guardar
 
 Una receta **no se guarda** si algún ingrediente carece de **cantidad** o
