@@ -725,6 +725,89 @@ async function fbGet(col, docId) {
     } catch(e) { return null; }
 }
 
+// ── Guardado sin pisar a nadie ───────────────────────────────────────────────
+// fbSet escribe el arreglo COMPLETO y gana el ultimo: si dos personas capturan
+// a la vez, la segunda borra el trabajo de la primera sin que nadie se entere.
+// Paso 2026-09-09: alguien guardo 58 recetas mientras otro tenia 68 en su
+// navegador.
+//
+// Lo de abajo hace leer-fusionar-escribir con "compare-and-swap": la escritura
+// lleva la precondicion updateTime del documento que se leyo, asi que Firestore
+// la RECHAZA si alguien escribio en medio. Ahi se reintenta sobre lo nuevo en
+// vez de aplastarlo.
+
+// Como fbGet, pero devuelve tambien la version del documento.
+async function fbGetVersion(col, docId) {
+    try {
+        var r = await fetch(FB_BASE + '/' + col + '/' + docId + '?key=' + FB_KEY);
+        if(r.status === 404) return {datos: null, updateTime: null, existe: false};
+        if(!r.ok) return null;
+        var d = await r.json();
+        var datos = (d.fields && d.fields.json) ? JSON.parse(d.fields.json.stringValue) : null;
+        return {datos: datos, updateTime: d.updateTime || null, existe: true};
+    } catch(e) { return null; }
+}
+
+// Escribe solo si el documento sigue en la version que se leyo.
+// Devuelve true | 'conflicto' | false.
+async function fbSetSiSigueIgual(col, docId, data, updateTime, existe) {
+    try {
+        var fields = {json: {stringValue: JSON.stringify(data)}, ts: {stringValue: new Date().toISOString()}};
+        var headers = {'Content-Type': 'application/json'};
+        var tok = await authToken();
+        if(tok) headers['Authorization'] = 'Bearer ' + tok;
+        // Si no existia, exigir que siga sin existir: dos personas creandolo a la
+        // vez tambien es una carrera.
+        var pre = existe
+            ? '&currentDocument.updateTime=' + encodeURIComponent(updateTime)
+            : '&currentDocument.exists=false';
+        var r = await fetch(FB_BASE + '/' + col + '/' + docId + '?key=' + FB_KEY + pre, {
+            method: 'PATCH', headers: headers, body: JSON.stringify({fields: fields})
+        });
+        if(r.ok) return true;
+        // 400/409 con FAILED_PRECONDITION = alguien escribio en medio
+        if(r.status === 409 || r.status === 400) {
+            var t = await r.text();
+            if(t.indexOf('FAILED_PRECONDITION') >= 0 || t.indexOf('precondition') >= 0) return 'conflicto';
+        }
+        if(r.status === 401 || r.status === 403) toast('🔒 No se pudo guardar en la nube: inicia sesión');
+        return false;
+    } catch(e) { console.log('fbSetSiSigueIgual error:', e); return false; }
+}
+
+// Lee, deja que `fusionar(loDeLaNube)` decida el resultado, y escribe con
+// precondicion. Si otro gano la carrera, reintenta sobre lo que quedo.
+async function guardarFusionando(col, docId, fusionar, intentos) {
+    var max = intentos || 4;
+    for (var i = 0; i < max; i++) {
+        var v = await fbGetVersion(col, docId);
+        if(!v) return false;                       // sin red: que el llamador avise
+        var resultado = fusionar(v.datos);
+        var ok = await fbSetSiSigueIgual(col, docId, resultado, v.updateTime, v.existe);
+        if(ok === true) return resultado;          // devuelve lo que quedo guardado
+        if(ok === false) return false;
+        // 'conflicto' -> otra persona escribio; volver a leer y fusionar de nuevo
+    }
+    toast('⚠ La nube está recibiendo cambios de otra persona. Intenta de nuevo.');
+    return false;
+}
+
+// Fusion de recetas: lo local manda sobre lo de la nube para el mismo nombre
+// (quien guarda es quien acaba de editar), la nube aporta lo que aqui no existe
+// (recetas de otra persona que este navegador nunca vio), y las lapidas de
+// `borradas` restan al final para que un borrado no reviva.
+function _fusionarRecetas(nube) {
+    if(!Array.isArray(nube)) return recetas.slice();
+    var porNombre = {};
+    nube.forEach(function(r){ if(r && r.nombre) porNombre[r.nombre.toLowerCase()] = r; });
+    recetas.forEach(function(r){ if(r && r.nombre) porNombre[r.nombre.toLowerCase()] = r; });
+    var muertas = {};
+    (borradas || []).forEach(function(n){ if(n) muertas[String(n).toLowerCase()] = true; });
+    return Object.keys(porNombre)
+        .filter(function(k){ return !muertas[k]; })
+        .map(function(k){ return porNombre[k]; });
+}
+
 // Lee datos/precios del proyecto de EGRESOS (no del de Menu). Mismo formato de wire.
 async function fbGetPreciosEgresos() {
     try {
@@ -740,7 +823,18 @@ async function saveRecetas() {
     try { localStorage.setItem('r_cicsa', JSON.stringify(recetas)); } catch(e) {}
     // Mantener DB_EXTRA sincronizado con recetas guardadas
     recetas.forEach(function(r){ DB_EXTRA[r.nombre] = {region:r.region,carnico:r.carnico,tipo:r.tipo||'guisado',ingredientes:r.ingredientes,procedimiento:r.procedimiento,tiempo:r.tiempo}; });
-    return await fbSet('datos', 'recetas', recetas);  // true/false segun la nube acepte
+    // Fusiona con lo que haya en la nube en vez de pisarlo (ver guardarFusionando)
+    var guardadas = await guardarFusionando('datos', 'recetas', _fusionarRecetas);
+    if(guardadas === false) return false;
+    // Quedarse con lo que realmente quedo guardado: si otra persona habia subido
+    // recetas que este navegador no tenia, ya son parte del catalogo.
+    var llegaron = guardadas.length - recetas.length;
+    recetas = guardadas;
+    try { localStorage.setItem('r_cicsa', JSON.stringify(recetas)); } catch(e) {}
+    recetas.forEach(function(r){ DB_EXTRA[r.nombre] = {region:r.region,carnico:r.carnico,tipo:r.tipo||'guisado',ingredientes:r.ingredientes,procedimiento:r.procedimiento,tiempo:r.tiempo}; });
+    if(llegaron > 0) toast('☁️ Se integraron ' + llegaron + ' receta(s) de otra persona');
+    updCnt();
+    return true;
 }
 function savePrecios() {
     // Menu ya NO escribe precios a Firestore — son de solo-lectura desde cicsa-egresos.
