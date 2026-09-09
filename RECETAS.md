@@ -240,12 +240,28 @@ porque si algo salió mal prefieres revisar 30 recetas y no 200.
 3. ¿Los ingredientes usan `nombre: cantidad unidad`, con dos puntos?
 4. ¿Los nombres son genéricos como los de Egresos, sin la preparación?
 5. ¿Ninguna línea de ingrediente es en realidad un paso?
-6. ¿Estás **con sesión de administrador iniciada**?
+6. ¿Estás **con la sesión de captura iniciada**? Ver §9.1
 
-El punto 6 es el que más se olvida. **Sin sesión de admin la receta se guarda solo
-en tu navegador y nunca sube a la nube** — nadie más la ve, y se pierde al limpiar
-el navegador. Entra con `facturacion@` u `ops@cicsacomedores.com` **antes** de
-cargar.
+### 9.1 La cuenta de captura — esto no es opcional
+
+**Todo el que capture recetas entra con `ops@cicsacomedores.com`.** Es la cuenta
+compartida del equipo y ya está autorizada; no hace falta pedir permisos ni dar
+de alta a nadie.
+
+**Sin esa sesión la receta se guarda solo en tu navegador y nunca sube a la
+nube.** Nadie más la ve, no aparece en el menú de los demás, y se pierde al
+limpiar el navegador. Peor: la app te dice que la carga salió bien, porque la
+carga *sí* funcionó — lo que falló fue la subida.
+
+Ya pasó el **2026-09-09**: un lote de 10 recetas cargado sin sesión quedó atrapado
+en una sola computadora.
+
+**Cómo verificar antes de pegar:** en la barra lateral, abajo, debe decir
+`ops@cicsacomedores.com` con un botón **Salir**. Si en su lugar ves
+"Iniciar sesión (admin)", **no estás autenticado** y lo que cargues no va a subir.
+
+Si al entrar Google no te pregunta por la cuenta y te rechaza sola, es que está
+reutilizando otra sesión: sal de esa cuenta en Google, o usa una ventana privada.
 
 ---
 
