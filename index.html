@@ -206,6 +206,7 @@
       <button class="btn bgold bsm" onclick="exportarTxt()">&#128190; Exportar .TXT</button>
       <button class="btn bok bsm" onclick="recalcularCostos()">&#128260; Recalcular Costos</button>
       <button class="btn bcrit bsm" onclick="reporteFaltantes()">&#129658; Reporte de faltantes</button>
+      <button class="btn bneutro bsm" onclick="descargarRespaldo(this)">&#128190; Respaldo</button>
       <button class="btn bneutro bsm" onclick="limpiezaGuiada()">&#129529; Limpieza guiada</button>
     </div>
     <div id="catcon"></div>
@@ -2536,6 +2537,75 @@ function recalcularCostos(silencioso) {
     else { try { localStorage.setItem('r_cicsa', JSON.stringify(recetas)); } catch(e) {} }
     renderCat();
     if(!silencioso) toast('&#128260; ' + count + ' platillos actualizados con precios vigentes');
+}
+
+// ── Respaldo descargable (COSTEO.md §3.3) ────────────────────────────────────
+// §3.3 exige un respaldo ANTES de la limpieza guiada, pero hasta el 2026-09-10
+// no habia con que hacerlo: el de aquella vez se saco a mano, una sola vez.
+//
+// Guarda las DOS caras a proposito. La nube es la fuente de verdad, pero lo que
+// esta solo en este navegador es justamente lo que se pierde sin dejar rastro
+// —paso el 9/sep con un lote de 10 recetas que nunca subio— y un respaldo que
+// omitiera eso daria una falsa tranquilidad. Si difieren, el archivo lo dice.
+async function descargarRespaldo(btn) {
+    var txt = btn && btn.innerHTML;
+    if(btn) { btn.disabled = true; btn.innerHTML = '&#8987; Leyendo la nube…'; }
+    try {
+        // Se lee fresco de la nube en vez de usar el cache: un respaldo tiene que
+        // retratar lo que esta guardado, no lo que este navegador cree recordar.
+        var nube = {
+            recetas:  await fbGet('datos', 'recetas'),
+            alacarta: await fbGet('datos', 'alacarta'),
+            borradas: await fbGet('datos', 'borradas'),
+            omitidas: await fbGet('datos', 'omitidas'),
+            config:   await fbGet('datos', 'config')
+        };
+        var local = {
+            recetas: recetas, alacarta: alacarta, borradas: borradas,
+            omitidas: omitidas, config: config
+        };
+        // Recetas que existen aqui y NO en la nube: son las que un restore desde
+        // la nube perderia, asi que van senaladas por nombre.
+        var enNube = {};
+        (Array.isArray(nube.recetas) ? nube.recetas : []).forEach(function(r){
+            if(r && r.nombre) enNube[r.nombre.toLowerCase()] = 1;
+        });
+        var soloAqui = (recetas || []).filter(function(r){
+            return r && r.nombre && !enNube[r.nombre.toLowerCase()];
+        }).map(function(r){ return r.nombre; });
+
+        var doc = {
+            _generado: new Date().toISOString(),
+            _app: 'ForX — respaldo de datos (COSTEO.md §3.3)',
+            _proyecto: 'sistema-menu-cicsa',
+            _sesion: (typeof esAdmin === 'function' && esAdmin() && authUser) ? authUser.email : 'sin sesión de administrador',
+            _resumen: {
+                recetas_en_la_nube: Array.isArray(nube.recetas) ? nube.recetas.length : null,
+                recetas_en_este_navegador: (recetas || []).length,
+                solo_en_este_navegador: soloAqui,
+                config_existe_en_la_nube: !!nube.config
+            },
+            nube: nube,
+            local: local
+        };
+        var fecha = new Date().toISOString().slice(0,10);
+        dl(JSON.stringify(doc, null, 2), 'ForX-respaldo-' + fecha + '.json', 'application/json');
+
+        var n = doc._resumen.recetas_en_la_nube;
+        toast('💾 Respaldo descargado — ' + (n == null ? 'la nube no respondió' : n + ' recetas de la nube')
+            + (soloAqui.length ? ' · ⚠ ' + soloAqui.length + ' solo en este navegador' : ''));
+        if(soloAqui.length) {
+            alert('El respaldo se descargó, pero ojo:\n\n'
+                + soloAqui.length + ' receta(s) existen SOLO en este navegador y no en la nube:\n\n  · '
+                + soloAqui.slice(0,12).join('\n  · ') + (soloAqui.length > 12 ? '\n  · …' : '')
+                + '\n\nVan incluidas en el archivo, pero nadie más las ve. Inicia sesión como administrador y guarda para subirlas.');
+        }
+    } catch(e) {
+        console.error('descargarRespaldo error:', e);
+        toast('⚠ No se pudo armar el respaldo: ' + (e.message || e));
+    } finally {
+        if(btn) { btn.disabled = false; btn.innerHTML = txt; }
+    }
 }
 
 // ── Reporte de faltantes (COSTEO.md §3.4) ────────────────────────────────────
