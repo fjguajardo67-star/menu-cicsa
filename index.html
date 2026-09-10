@@ -582,10 +582,33 @@ async function saveConfig() {
 var filtAC = 'todos';
 
 var borradas = [];   // nombres de platillos eliminados (incluye precargados de DB)
+// Recetas fuera de rotacion SIN borrarlas: no entran a la generacion del menu,
+// pero siguen en el Catalogo y se pueden reactivar. Va como lista de nombres,
+// igual que `borradas`, porque los precargados viven en DB (en el codigo) y no
+// admiten guardarles un campo propio.
+var omitidas = [];
 var _tieneRecetasLocales = false;
+function estaOmitida(nombre) {
+    return omitidas.indexOf(nombre) >= 0;
+}
+function saveOmitidas() {
+    try { localStorage.setItem('om_cicsa', JSON.stringify(omitidas)); } catch(e) {}
+    return fbSet('datos', 'omitidas', omitidas);
+}
+// Saca o repone una receta de la rotacion. Devuelve el estado nuevo.
+async function alternarOmitida(nombre) {
+    var i = omitidas.indexOf(nombre);
+    if(i >= 0) omitidas.splice(i, 1); else omitidas.push(nombre);
+    var ok = await saveOmitidas();
+    if(ok === false) toast('🔒 El cambio quedó solo en este navegador — inicia sesión');
+    else toast(i >= 0 ? '↩︎ "' + nombre + '" vuelve al menú' : '⏸ "' + nombre + '" queda fuera del menú');
+    renderCat(); genMenu();
+    return i < 0;
+}
 window.addEventListener('load', function() {
     // Cargar lista de eliminados PRIMERO y aplicarla a DB
     try { var bd = localStorage.getItem('b_cicsa'); if(bd) { borradas = JSON.parse(bd); aplicarBorradas(); } } catch(e) {}
+    try { var om = localStorage.getItem('om_cicsa'); if(om) omitidas = JSON.parse(om); } catch(e) {}
     try { var s = localStorage.getItem('r_cicsa'); if(s) { recetas = JSON.parse(s); _tieneRecetasLocales = true; updCnt(); recetas.forEach(function(r){ DB_EXTRA[r.nombre] = {region:r.region,carnico:r.carnico,tipo:r.tipo||'guisado',ingredientes:r.ingredientes,procedimiento:r.procedimiento,tiempo:r.tiempo}; }); } } catch(e) {}
     // Sin cache -> precios arranca vacio; el sync con Egresos lo llena (no hay defaults propios)
     try { var p = localStorage.getItem('p_cicsa'); if(p) precios = JSON.parse(p); } catch(e) { precios = {}; }
@@ -868,6 +891,11 @@ async function sincronizarDesdeFirebase() {
         try { localStorage.setItem('b_cicsa', JSON.stringify(borradas)); } catch(e) {}
         aplicarBorradas();
     }
+    var om = await fbGet('datos', 'omitidas');
+    if(om && Array.isArray(om)) {
+        omitidas = om;
+        try { localStorage.setItem('om_cicsa', JSON.stringify(omitidas)); } catch(e) {}
+    }
     var r = await fbGet('datos', 'recetas');
     // Acepta tambien el array VACIO: si la nube dice "cero recetas" (tras una limpieza),
     // el cache local debe vaciarse igual — antes `r.length > 0` lo ignoraba y cualquier
@@ -1109,8 +1137,9 @@ function genMenu() {
     var grid = document.getElementById('grid');
     grid.innerHTML = '';
     var allDB = Object.assign({}, DB, DB_EXTRA);
-    var G = Object.keys(allDB).filter(function(n) { var t = allDB[n].tipo; return !t || t === 'guisado'; });
-    var Ga = Object.keys(allDB).filter(function(n) { return allDB[n].tipo === 'garnacha'; });
+    // Las omitidas siguen en el catalogo pero no entran a la rotacion
+    var G = Object.keys(allDB).filter(function(n) { var t = allDB[n].tipo; return (!t || t === 'guisado') && !estaOmitida(n); });
+    var Ga = Object.keys(allDB).filter(function(n) { return allDB[n].tipo === 'garnacha' && !estaOmitida(n); });
     if(!G.length && !Ga.length) {
         grid.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--bl);grid-column:1/-1"><div style="font-size:4rem">&#128466;</div><h3 style="margin-top:1rem">Catalogo vacio</h3></div>';
         return;
@@ -2264,7 +2293,19 @@ function renderCat() {
         });
     }
     if(!todos.length) { el.innerHTML='<div style="text-align:center;padding:3rem;color:var(--bl)"><div style="font-size:3rem">&#128269;</div><h3 style="margin-top:.75rem">Sin resultados</h3><p style="margin-top:.5rem;font-size:.85rem">Prueba con otro nombre, prote&iacute;na o tipo</p></div>'; return; }
-    var html = '<div style="font-size:.8rem;color:var(--bl);margin-bottom:.75rem">' + todos.length + ' platillo' + (todos.length!==1?'s':'') + '</div><div style="display:grid;gap:.75rem">';
+    // Contador: cuantas se ven, de cuantas hay, y cuantas estan fuera de rotacion.
+    // Solo "N platillos" no dice si el filtro escondio algo ni cuantas se omitieron.
+    var totalCat = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
+    var nGuis = todos.filter(function(p){ return p.tipoPl !== 'garnacha'; }).length;
+    var nGarn = todos.length - nGuis;
+    var nOmit = todos.filter(function(p){ return estaOmitida(p.nombre); }).length;
+    var html = '<div style="font-size:.8rem;color:var(--bl);margin-bottom:.75rem;display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">'
+        + '<b style="color:var(--bd);font-size:.95rem">' + todos.length + '</b>'
+        + (todos.length !== totalCat ? '<span>de ' + totalCat + '</span>' : '<span>receta' + (todos.length!==1?'s':'') + '</span>')
+        + '<span>&middot;</span><span>' + nGuis + ' guisado' + (nGuis!==1?'s':'') + '</span>'
+        + '<span>&middot;</span><span>' + nGarn + ' garnacha' + (nGarn!==1?'s':'') + '</span>'
+        + (nOmit ? '<span>&middot;</span><span style="color:var(--bm)">&#9208; ' + nOmit + ' fuera del men&uacute;</span>' : '')
+        + '</div><div style="display:grid;gap:.75rem">';
     todos.forEach(function(p) {
         var esMia = p.origen === 'mia' || p.origen === 'extra';
         var b1 = esMia ? '<span class="pill pill-amarillo">Mi receta</span>'
@@ -2273,10 +2314,13 @@ function renderCat() {
             : '<span class="pill pill-verde" style="margin-left:.3rem">Guisado</span>';
         var b3 = p.carnico ? '<span class="pill pill-sinlinea" style="margin-left:.3rem">' + p.carnico + '</span>' : '';
         var ingP = (p.ingredientes && p.ingredientes.length) ? p.ingredientes.slice(0,3).map(function(i){return (i && i.nombre) ? i.nombre : '';}).filter(function(x){return x;}).join(' · ') + (p.ingredientes.length>3?' +mas':'') : '';
-        html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden">'
+        var fuera = estaOmitida(p.nombre);
+        var b4 = fuera ? '<span class="pill pill-caution" style="margin-left:.3rem">&#9208; Fuera del men&uacute;</span>' : '';
+        html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden' + (fuera ? ';opacity:.6' : '') + '">'
             + '<div style="background:var(--surface-2);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center">'
-            + '<div><div style="font-weight:700">' + (p.codigo ? '<span class="codigo">' + p.codigo + '</span> ' : '') + p.nombre + '</div><div style="margin-top:.2rem">' + b1 + b2 + b3 + '</div></div>'
+            + '<div><div style="font-weight:700">' + (p.codigo ? '<span class="codigo">' + p.codigo + '</span> ' : '') + p.nombre + '</div><div style="margin-top:.2rem">' + b1 + b2 + b3 + b4 + '</div></div>'
             + '<div style="display:flex;gap:.4rem">'
+            + '<button class="btn ' + (fuera ? 'bsec' : 'linea') + ' bsm" data-ao="' + encodeURIComponent(p.nombre) + '" title="' + (fuera ? 'Volver a usarla en el menu' : 'Sacarla del menu sin borrarla') + '">' + (fuera ? '&#8631; Reponer' : '&#9208; Omitir') + '</button>'
             + '<button class="btn bgold bsm" data-ae="' + encodeURIComponent(p.nombre) + '">&#9998;&#65039; Editar</button>'
             + '<button class="btn bcrit bsm" data-ad="' + encodeURIComponent(p.nombre) + '" data-ot="' + p.origen + '">&#128465;&#65039;</button>'
             + '</div></div>'
@@ -2289,7 +2333,9 @@ function renderCat() {
     el.onclick = function(e) {
         var ae = e.target.closest('[data-ae]');
         var ad = e.target.closest('[data-ad]');
-        if(ae) editarPl(decodeURIComponent(ae.getAttribute('data-ae')));
+        var ao = e.target.closest('[data-ao]');
+        if(ao) alternarOmitida(decodeURIComponent(ao.getAttribute('data-ao')));
+        else if(ae) editarPl(decodeURIComponent(ae.getAttribute('data-ae')));
         else if(ad) delPl(decodeURIComponent(ad.getAttribute('data-ad')), ad.getAttribute('data-ot'));
     };
   } catch(err) {
