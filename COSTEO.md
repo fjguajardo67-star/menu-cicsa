@@ -195,11 +195,19 @@ editar cientos.
 
 ### 4.2 Costo de producción — en pesos, nunca porcentaje
 
-Campo global configurable. **Valor inicial: `22.81`.**
+Campo global configurable. **Valor inicial: `20.00`** (era `22.81`; el dueño lo
+recalculó el 2026-09-10).
 
-Es un costo **fijo por porción**, no proporcional al costo de los
+Es un costo **fijo por comida completa**, no proporcional al costo de los
 ingredientes. El cocinero tarda lo mismo en un platillo de $30 que en uno de
 $58; un porcentaje castiga a los platillos caros y perdona a los baratos.
+
+⚠ **Por comida completa, NO por porción.** El denominador de la fórmula de
+abajo son *comidas servidas*, y en el tope de §8b se resta **una sola vez** del
+precio de la línea, antes de repartir el resto entre las porciones. Hasta el
+2026-09-10 esta sección decía "por porción" y el campo del panel se llamaba
+"$/porción": esa etiqueta equivocada es lo que llevó a inflar el divisor de §8b
+a 2.5 para compensar algo que ya estaba restado.
 
 Composición (ejercicio 2025-2026): nómina y transporte de cocina $16.42
 (72 %), hielo y agua $2.97 (13 %), gas LP/basura/fumigación/trampa de grasa
@@ -296,43 +304,27 @@ prueba contra esos cuatro nombres.
 **Un gramo en una receta es de producto servido**, nunca de grano crudo. Quien
 capture recetas se atiene a eso.
 
-### 4.6 Garnacha de tortilla: la canasta no cobra tortillas dos veces
+### 4.6 La canasta SIEMPRE cobra las tortillas
 
-Decisión de negocio (2026-09-02). Cuando la garnacha del día **ya trae la
-tortilla adentro** —tacos, quesadillas, enchiladas, tostadas, chilaquiles— esa
-tortilla está en el costo de la receta. Cobrar además las 10 tortillas de la
-canasta (§4.3) sería contarlas dos veces.
+**Decisión del dueño (2026-09-10): no hay excepción por garnacha.** Los
+complementos de §4.3 se cobran completos siempre, tortillas incluidas.
 
-Ese día la canasta **omite los renglones de tortilla** y el presupuesto queda
-$6.17 más holgado.
+Del 2026-09-02 al 2026-09-10 existió la regla contraria: cuando la garnacha del
+día traía tortilla propia —tacos, quesadillas, enchiladas, tostadas— la canasta
+omitía sus tortillas para no contarlas dos veces. Se quitó al aterrizar qué es
+un platillo (§8b): **una porción de guisado más una de garnacha**. Con esa
+composición el comensal recibe las tortillas igual, así que omitirlas
+subestimaba el costo.
 
-**La regla es por contenido, no por tipo.** No basta con que el platillo sea
-garnacha: tiene que traer tortilla, tostada o totopo entre sus ingredientes.
-La **masa no cuenta** — sopes, gorditas y huaraches se hacen de masa y ahí sí
-se sirve la ración de tortillas aparte, igual que con el pan.
+El caso donde de verdad sobran —una comida entera de puros tacos— **es la
+excepción, no la norma**. Una regla que solo acierta en el caso raro estorba más
+de lo que ayuda: se dispara sola, es difícil de ver en pantalla, y cada quien
+tiene que recordar que existe.
 
-| Garnacha | Base | ¿Omite tortillas? |
-|---|---|---|
-| Tacos Dorados, Quesadillas, Enchiladas, Pastel Azteca | tortilla | **sí** |
-| Tostada de Pollo | tostada | **sí** |
-| Chimichangas | tortilla de harina | **sí** |
-| Sopes, Gorditas, Huaraches | masa | no |
-| Molletes, Pambazos | pan | no |
-| Empanadas Fritas | harina | no |
-
-Un guisado con tortilla entre sus ingredientes **no** dispara la regla: la
-condición exige `tipo === 'garnacha'`. Un cambio de fondo aquí se prueba contra
-esa lista y contra ese contraejemplo.
-
-Aplica en las dos superficies, con la misma función: el semáforo del día (que
-conoce la garnacha de ese día) y el tope del editor de recetas (que usa la
-receta en edición, de modo que el tope reacciona al cambiar el tipo o al
-agregar una tortilla). Cuando la omisión ocurre, **se dice en pantalla** — un
-tope más holgado sin explicación se lee como error.
-
-**Hueco de datos conocido.** Las 58 recetas de la nube están todas como
-`tipo: guisado`; hoy solo las precargadas traen garnachas. Mientras no se
-reclasifiquen, la regla no se dispara sobre el recetario real.
+**Queda abierto, y es distinto:** una receta que lista tortillas entre sus
+ingredientes (los Tacos de Carne de Cerdo traen 3 pz) las cobra además de las 10
+de la canasta. Eso sí es contar dos veces, pero se resuelve en la receta —
+quitando ese renglón— no en la canasta. No se ha decidido.
 
 ---
 
@@ -580,9 +572,25 @@ Deduce la canasta **completa**, no solo tortillas y refresco. Si dedujera menos
 que el semáforo del día, las dos pantallas darían presupuestos distintos para
 el mismo día.
 
+**Por qué `2` porciones** (decidido 2026-09-10). Un platillo es siempre **dos
+porciones de contenido** más las guarniciones, en una de tres formas:
+
+- dos guisados
+- una porción doble del mismo guisado
+- un guisado y una garnacha
+
+Hasta hoy el divisor era `2.5`. Ese medio de más venía de un cálculo viejo donde
+absorbía parte del costo de producción — pero producción **ya es un renglón
+propio** que se resta completo antes de dividir (§4.2). Dividir entre 2.5 lo
+restaba dos veces. **Pasar a 2 no afloja el tope: quita un doble descuento.**
+
 Con la configuración y el banco vigentes: `$77 × 15% = $11.55` de utilidad
-mínima, producción `$22.81`, `2.5` porciones y la canasta de §4.3 en `$21.16`;
-el tope resultante es **`$8.59`** por platillo.
+mínima, producción `$20.00`, `2` porciones y la canasta de §4.3 en `$21.16`;
+el tope resultante es **`$12.15`** por platillo.
+
+**La utilidad mínima es un piso, no una meta.** Lo que sobre de materia prima es
+utilidad adicional: si el día gasta $19.14 de los $24.29 permitidos, la utilidad
+sube de $11.55 a $16.70 — el 21.7% del precio en vez del 15%.
 
 Son una referencia del momento, **no valores hardcodeados**: precio de venta,
 margen, producción, la canasta y las porciones salen de Configuración; los
