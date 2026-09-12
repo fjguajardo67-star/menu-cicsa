@@ -12,6 +12,9 @@ vanilla, sin framework ni build. **Sin tests, sin CI.**
 Documentos que mandan sobre el código:
 - **`COSTEO.md`** — spec funcional. "Si el código y este archivo difieren, gana este archivo."
 - **`PRODUCT.md`** — verdad de producto (marca, voz, renombre a ForX, compromisos).
+- **`PENDIENTES.md`** — lo que quedó abierto, con su contexto para retomarlo.
+- **`DATOS.md`** — opciones de almacenaje y respaldo, medidas contra producción.
+- **`RECETAS.md`** — cómo se capturan recetas.
 
 ## Arquitectura confirmada — cadena de datos
 
@@ -68,14 +71,16 @@ Pages tarda uno o dos minutos.
 
 ## BLOQUEADORES ACTIVOS
 
-1. **`datos/alacarta` da 404** — los platillos de Grill Express viven solo en
-   localStorage, no suben a Firestore. Hay un fix reciente (`70420cf`) pero el
-   documento sigue sin existir. **Ninguna otra app puede leer los platillos.**
-   Reproducir: entrar como admin, guardar un platillo, verificar si el doc se crea.
-2. **`datos/config` da 404** — la config de negocio (líneas de contrato, costo de
-   producción, complementos, margen) nunca se ha guardado desde Admin. Vive solo
-   en el navegador. Falta además el valor real de **complementos** (hoy $0, lo que
-   hace el semáforo optimista).
+> La lista completa de lo abierto, con contexto, está en **`PENDIENTES.md`**.
+
+1. ✅ **`datos/alacarta` — RESUELTO.** Existe desde el 2026-09-10 con 7
+   platillos. Ya se puede leer desde otras apps.
+2. **`datos/config` sigue en 404** — la config de negocio nunca se ha guardado
+   desde Admin, así que vive solo en los valores por omisión del código. Afecta
+   lo decidido el 2026-09-10: **producción $20** y **2 porciones** no se
+   comparten hasta que alguien guarde con sesión de `ops@`.
+   (La canasta de complementos ya se cotiza de Egresos; aquello de "$0" quedó
+   obsoleto.)
 
 ## SKU / código de platillo — DECIDIDO 2026-08-07
 
