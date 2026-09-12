@@ -207,6 +207,7 @@
       <button class="btn bgold bsm" onclick="exportarTxt()">&#128190; Exportar .TXT</button>
       <button class="btn bok bsm" onclick="recalcularCostos()">&#128260; Recalcular Costos</button>
       <button class="btn bcrit bsm" onclick="reporteFaltantes()">&#129658; Reporte de faltantes</button>
+      <button class="btn bok bsm" onclick="clasificarProteina()">&#127991; Clasificar prote&iacute;na</button>
       <button class="btn bneutro bsm" onclick="descargarRespaldo(this)">&#128190; Respaldo</button>
       <button class="btn bneutro bsm" onclick="limpiezaGuiada()">&#129529; Limpieza guiada</button>
     </div>
@@ -513,7 +514,8 @@ var PROTEINA_GRUPOS = [
     {id:'puerco',  etiqueta:'Puerco',       coincide:['cerdo','puerco','carnitas','chorizo']},
     {id:'pollo',   etiqueta:'Pollo',        coincide:['pollo','pechuga']},
     {id:'pescado', etiqueta:'Pescado',      coincide:['pescado','tilapia','atun','marisco','camaron']},
-    {id:'sinprot', etiqueta:'Sin proteína', coincide:['vegetariano','verdura','vegetal','sin proteina']}
+    {id:'vegetariano', etiqueta:'Vegetariano', coincide:['vegetariano','leguminosa','vegetal']},
+    {id:'sinprot',     etiqueta:'Sin proteína', coincide:['sin proteina','verdura','solo verdura']}
 ];
 // Lo que no cae en ningun grupo queda APARTE y visible. Hoy son ~108 recetas en
 // "Mixto", que no dice de que esta hecho el platillo: esconderlas dentro de un
@@ -2633,6 +2635,143 @@ function recalcularCostos(silencioso) {
     else { try { localStorage.setItem('r_cicsa', JSON.stringify(recetas)); } catch(e) {} }
     renderCat();
     if(!silencioso) toast('&#128260; ' + count + ' platillos actualizados con precios vigentes');
+}
+
+// ── Clasificar proteina (accion guiada) ──────────────────────────────────────
+// 103 guisados del catalogo estan como "Mixto", que no dice de que es el
+// platillo. Eso es lo que deja al generador juntar dos dias sin proteina: la
+// regla de no repetir proteina exime a Mixto porque con el 40% del catalogo asi
+// bloquearia demasiado.
+//
+// Se propone una clasificacion LEYENDO LOS INGREDIENTES, con vista previa y
+// confirmacion. Nunca se aplica sola.
+
+// Lleva nombre de animal pero es sazonador, no la proteina del platillo. El
+// dueno confirmo (10/sep/2026) que el consome es POLVO: 2.4 g por porcion.
+// Sin esta exclusion, media lista saldria clasificada como Pollo.
+var CLASIF_SAZONADOR = /consome|caldo de|knorr|cubo de|concentrado|pastilla|sazonador|fondo de/;
+var CLASIF_CARNE = [
+    ['Res',     /(^|\s)(res|bistec|cecina|higado|pancita|barbacoa|falda|chambarete|retazo|aguja|diezmillo)($|\s)/],
+    ['Cerdo',   /(^|\s)(cerdo|puerco|carnitas|chorizo|espinazo|chicharron|lomo|maciza|costilla|tocino|jamon|longaniza|buche|cueritos)($|\s)/],
+    ['Pollo',   /(^|\s)(pollo|pechuga|muslo|alitas)($|\s)/],
+    ['Pescado', /(^|\s)(pescado|tilapia|atun|basa|camaron|marisco|sardina|mojarra)($|\s)/]
+];
+var CLASIF_LACTEO   = /(^|\s)(queso|huevo|crema|requeson|panela|oaxaca|manchego|leche)($|\s)/;
+var CLASIF_LEGUMBRE = /(^|\s)(frijol|lenteja|garbanzo|haba|alubia|soya)($|\s)/;
+
+function _gramosDe(ing) {
+    var c = Number(ing && ing.cantidad) || 0, u = ((ing && ing.unidad) || 'g').toLowerCase();
+    if(u === 'kg') return c * 1000;
+    if(u === 'g')  return c;
+    if(u === 'pz') return c * 50;   // aproximacion conservadora
+    return 0;                        // ml: liquido, no es la proteina
+}
+
+// Propone el `carnico` de una receta a partir de sus ingredientes.
+// Pesa por GRAMOS: 60 g de res con 6 g de tocino es de res, no "mixto".
+function proponerProteina(rec) {
+    var pesos = {}, detalle = [], lacteo = 0, legumbre = 0, dl = [];
+    (rec.ingredientes || []).forEach(function(i) {
+        var n = _normIng(i && i.nombre);
+        if(!n || CLASIF_SAZONADOR.test(n)) return;
+        var g = _gramosDe(i);
+        for(var k = 0; k < CLASIF_CARNE.length; k++) {
+            if(CLASIF_CARNE[k][1].test(n)) {
+                var et = CLASIF_CARNE[k][0];
+                pesos[et] = (pesos[et] || 0) + g;
+                detalle.push(i.nombre);
+                return;
+            }
+        }
+        if(CLASIF_LACTEO.test(n))        { lacteo += g;   dl.push(i.nombre); }
+        else if(CLASIF_LEGUMBRE.test(n)) { legumbre += g; dl.push(i.nombre); }
+    });
+    var cons = Object.keys(pesos).sort(function(a, b){ return pesos[b] - pesos[a]; });
+    if(cons.length) {
+        var dudoso = cons.length > 1 && pesos[cons[1]] > 0 && pesos[cons[0]] < pesos[cons[1]] * 2;
+        return {carnico: cons[0], seguro: !dudoso,
+                razon: cons.map(function(k){ return k + ' ' + Math.round(pesos[k]) + 'g'; }).join(' + '),
+                ingredientes: detalle.join(', ')};
+    }
+    if(legumbre >= 25) return {carnico:'Vegetariano', seguro:true, razon:Math.round(legumbre) + ' g de leguminosa', ingredientes:dl.join(', ')};
+    if(lacteo   >= 15) return {carnico:'Vegetariano', seguro:true, razon:Math.round(lacteo) + ' g de lácteo o huevo', ingredientes:dl.join(', ')};
+    return {carnico:'Sin proteína', seguro:true, razon:'solo verdura', ingredientes:dl.join(', ')};
+}
+
+// Solo se tocan las recetas de la nube: las precargadas viven en el codigo y no
+// admiten guardarles un campo. Hoy las 103 sin clasificar son todas de la nube.
+function _planClasificacion() {
+    var plan = [];
+    (recetas || []).forEach(function(r) {
+        if(!r || !r.nombre) return;
+        if((r.tipo || 'guisado') === 'garnacha') return;
+        if(grupoProteina(r.carnico) !== PROT_SIN_CLASIFICAR.id) return;   // ya clasificada
+        var p = proponerProteina(r);
+        plan.push({nombre: r.nombre, actual: r.carnico || '(vacío)', nuevo: p.carnico,
+                   seguro: p.seguro, razon: p.razon, ingredientes: p.ingredientes});
+    });
+    plan.sort(function(a, b){ return (a.seguro - b.seguro) || a.nuevo.localeCompare(b.nuevo) || a.nombre.localeCompare(b.nombre); });
+    return plan;
+}
+
+function clasificarProteina() {
+    var plan = _planClasificacion();
+    if(!plan.length) {
+        openModal('&#127991; Clasificar prote&iacute;na',
+            '<div style="text-align:center;padding:2rem;color:var(--green)"><div style="font-size:3rem">&#9989;</div>'
+            + '<h3 style="margin-top:.75rem">Nada que clasificar</h3>'
+            + '<p style="margin-top:.5rem;color:var(--bl)">Todos los guisados de la nube ya tienen prote&iacute;na asignada.</p></div>');
+        return;
+    }
+    var porGrupo = {};
+    plan.forEach(function(x){ (porGrupo[x.nuevo] = porGrupo[x.nuevo] || []).push(x); });
+    var dudosos = plan.filter(function(x){ return !x.seguro; });
+
+    var html = '<div class="infobox" style="margin-bottom:1rem">Vista previa &mdash; <strong>no se aplica nada</strong> hasta que confirmes. '
+        + 'Se propone leyendo los ingredientes de cada receta, pesando por gramos. '
+        + 'El consom&eacute; NO cuenta: es sazonador en polvo.</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;text-align:center;margin-bottom:1rem">';
+    Object.keys(porGrupo).sort().forEach(function(k) {
+        html += '<div style="background:var(--cream);padding:.75rem;border-radius:6px"><div style="font-size:1.6rem;font-weight:700;color:var(--tc)">'
+            + porGrupo[k].length + '</div><div style="font-size:.75rem;color:var(--bl)">' + k + '</div></div>';
+    });
+    html += '</div>';
+    if(dudosos.length) {
+        html += '<div style="background:#FFF3CD;color:#5c4400;border-left:4px solid var(--gold);padding:.75rem 1rem;border-radius:6px;margin-bottom:1rem;font-size:.85rem">'
+            + '<strong>&#9888; ' + dudosos.length + ' con m&aacute;s de una carne</strong> &mdash; se propone la de mayor peso, pero convendr&iacute;a revisarlas a mano. Van marcadas abajo.</div>';
+    }
+    plan.forEach(function(x) {
+        html += '<div style="border:1.5px solid ' + (x.seguro ? 'rgba(212,175,55,.25)' : 'var(--gold)') + ';border-radius:8px;padding:.55rem .9rem;margin-bottom:.4rem">'
+            + '<div style="font-weight:700;color:var(--bd)">' + (x.seguro ? '' : '&#9888; ') + x.nombre
+            + ' <span style="font-weight:400;font-size:.8rem;color:var(--bl)">' + x.actual + ' &rarr; </span>'
+            + '<span style="color:var(--green)">' + x.nuevo + '</span></div>'
+            + '<div style="font-size:.78rem;color:var(--bm);margin-top:.15rem">' + x.razon
+            + (x.ingredientes ? ' &mdash; <span style="color:var(--bl)">' + x.ingredientes + '</span>' : '') + '</div></div>';
+    });
+    html += '<div style="margin-top:1rem;display:flex;gap:.6rem;flex-wrap:wrap">'
+        + '<button class="btn primario" id="btn-clasif-aplicar">&#9989; Aplicar a ' + plan.length + ' receta(s)</button>'
+        + '<button class="btn bsec" onclick="closeModal()">Cancelar</button></div>';
+    openModal('&#127991; Clasificar prote&iacute;na &mdash; ' + plan.length + ' recetas', html);
+    setTimeout(function() {
+        var b = document.getElementById('btn-clasif-aplicar');
+        if(b) b.addEventListener('click', function(){ aplicarClasificacion(plan); });
+    }, 50);
+}
+
+async function aplicarClasificacion(plan) {
+    var porNombre = {};
+    plan.forEach(function(x){ porNombre[x.nombre.toLowerCase()] = x.nuevo; });
+    var n = 0;
+    (recetas || []).forEach(function(r) {
+        var nuevo = r && r.nombre ? porNombre[r.nombre.toLowerCase()] : null;
+        if(nuevo) { r.carnico = nuevo; n++; }
+        if(nuevo && DB_EXTRA[r.nombre]) DB_EXTRA[r.nombre].carnico = nuevo;
+    });
+    var ok = await saveRecetas();
+    closeModal(); renderCat(); genMenu();
+    toast(ok === false
+        ? '🔒 Se clasificaron ' + n + ' aquí, pero NO subieron — inicia sesión como administrador'
+        : '🏷 ' + n + ' receta(s) clasificadas y guardadas');
 }
 
 // ── Respaldo descargable (COSTEO.md §3.3) ────────────────────────────────────
