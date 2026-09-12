@@ -1015,6 +1015,17 @@ function getCost(rec) {
     });
     return c;
 }
+// Garnacha obligada de los jueves (requisito del dueno, 10/sep/2026).
+// Va por NOMBRE EXACTO y no por parecido: el catalogo tiene 6 garnachas con
+// "taco" y dos con "dorado", asi que cualquier coincidencia parcial agarra otra.
+var GARNACHA_JUEVES = 'Tacos dorados de papa';
+function buscarGarnachaFija(lista, nombre) {
+    var n = normalizarNombre(nombre);
+    for(var i = 0; i < (lista || []).length; i++) {
+        if(normalizarNombre(lista[i]) === n) return lista[i];
+    }
+    return null;
+}
 function pickFrom(list, used, V, excl, exclCarnico, allDB) {
     if(!list || !list.length) return null;
     // Ventana de no-repetición: últimos V platillos usados
@@ -1176,8 +1187,19 @@ function genMenu() {
             g1 = G.find(function(n) { return n.toLowerCase().indexOf('pozole') >= 0; }) || Glibre[0] || null;
             var c1 = g1 && allDB[g1] ? allDB[g1].carnico : '';
             g2 = pickFrom(Glibre, uG, V, [g1], [c1], allDB);
-            ga = Ga.find(function(n) { return n.toLowerCase().indexOf('taco') >= 0; }) || Ga[0] || null;
-            lk1 = true; lkG = true;
+            // Requisito del dueno (10/sep/2026): el jueves lleva SIEMPRE esta
+            // garnacha. Antes decia indexOf('taco'), que tomaba la primera de las
+            // 6 garnachas con "taco" en el nombre —salia Tacos de Carnitas
+            // Michoacanas— y de paso clavaba carnitas un dia de cada siete.
+            // Se nombra el platillo exacto, comparando normalizado para que un
+            // acento o una mayuscula no lo tumben.
+            ga = buscarGarnachaFija(Ga, GARNACHA_JUEVES);
+            // El candado solo se pone si de verdad se encontro: si alguien borra
+            // u omite esa receta, mentir con un candado esconderia el problema.
+            lkG = !!ga;
+            if(!ga) { ga = pickFrom(Ga, uGa, V, [], null, allDB);
+                      console.warn('[genMenu] No se encontro la garnacha fija del jueves: ' + GARNACHA_JUEVES); }
+            lk1 = true;
         } else if(dia === 'Domingo') {
             domN++;
             g1 = domN % 2 === 1
