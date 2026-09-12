@@ -83,7 +83,7 @@
         <div>
           <div class="fl2" style="margin-bottom:.75rem">Personalizado</div>
           <div style="display:flex;gap:.5rem;align-items:center">
-            <input type="number" id="dcustom" class="fi" min="1" max="60" value="30" style="flex:1">
+            <input type="number" id="dcustom" class="fi" min="1" max="60" value="30" style="flex:1" autocomplete="off">
             <button class="btn bgold bsm" onclick="setDiasC()">Aplicar</button>
           </div>
         </div>
@@ -100,7 +100,7 @@
       <button class="fb" id="btn-orden" onclick="toggleOrdenMenu(this)">&#8645; Peor margen primero</button>
       <button class="btn bgold bsm" onclick="genMenu()">&#128260; Regenerar</button>
       <span class="fl">Comensales:</span>
-      <input type="number" id="comensalesDia" class="fi" value="500" min="50" max="500" step="50" style="width:80px;padding:.45rem .6rem">
+      <input type="number" id="comensalesDia" class="fi" value="500" min="50" max="500" step="50" style="width:80px;padding:.45rem .6rem" autocomplete="off">
       <button class="btn bsm" onclick="listaCompras()">&#128722; Lista Compras</button>
       <button class="btn bsec bsm" onclick="imprimirMenu()">&#128424; Imprimir</button>
     </div>
@@ -125,7 +125,7 @@
       <textarea id="rtxt" class="ft" style="min-height:280px" placeholder="Nombre del platillo&#10;&#10;Ingredientes:&#10;500g de pollo&#10;2 jitomates...&#10;&#10;Preparacion:&#10;1. Cocinar el pollo..."></textarea>
     </div>
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:1rem;margin-bottom:1.5rem">
-      <div class="fg"><label class="fl2">Nombre (opcional)</label><input type="text" id="rnombre" class="fi" placeholder="Se detecta auto..."></div>
+      <div class="fg"><label class="fl2">Nombre (opcional)</label><input type="text" id="rnombre" class="fi" placeholder="Se detecta auto..." autocomplete="off"></div>
       <div class="fg"><label class="fl2">Tipo</label>
         <select id="rtipo" class="fs">
           <option value="guisado">&#127858; Guisado</option>
@@ -144,10 +144,10 @@
           <option value="CDMX">CDMX</option>
         </select>
       </div>
-      <div class="fg"><label class="fl2">Porciones originales</label><input type="number" id="rpax" class="fi" value="4" min="1"></div>
+      <div class="fg"><label class="fl2">Porciones originales</label><input type="number" id="rpax" class="fi" value="4" min="1" autocomplete="off"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:end;margin-bottom:0">
-      <div class="fg" style="margin:0"><label class="fl2">&#127999; Escalar a (comensales)</label><input type="number" id="rdest" class="fi" value="500" min="1" max="9999" placeholder="500"></div>
+      <div class="fg" style="margin:0"><label class="fl2">&#127999; Escalar a (comensales)</label><input type="number" id="rdest" class="fi" value="500" min="1" max="9999" placeholder="500" autocomplete="off"></div>
       <button class="btn bgold" style="height:42px" onclick="agregarReceta()">&#10024; Agregar y Escalar</button>
     </div>
     <div id="prev" style="display:none;margin-top:2rem"></div>
@@ -164,7 +164,7 @@
       <textarea id="rbatch" class="ft" style="min-height:240px;font-family:monospace;font-size:.82rem" placeholder="NOMBRE: Pollo Ranchero&#10;REGION: Mexico&#10;CARNICO: Pollo&#10;TIPO: Guisado&#10;PORCIONES_BASE: 50&#10;INGREDIENTES:&#10;* Pollo: 7500 g&#10;...&#10;PROCEDIMIENTO:&#10;1. ...&#10;&#10;---&#10;&#10;NOMBRE: Pollo en Salsa Verde&#10;..."></textarea>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:1rem;align-items:end">
-      <div class="fg" style="margin:0"><label class="fl2">Escalar a (comensales)</label><input type="number" id="rbatch-dest" class="fi" value="500" min="1" max="9999"></div>
+      <div class="fg" style="margin:0"><label class="fl2">Escalar a (comensales)</label><input type="number" id="rbatch-dest" class="fi" value="500" min="1" max="9999" autocomplete="off"></div>
       <div class="fg" style="margin:0"><label class="fl2">Si hay duplicado</label>
         <select id="rbatch-dup" class="fs">
           <option value="omitir">Omitir (no tocar el existente)</option>
@@ -183,7 +183,7 @@
     <div class="ch">&#128218; Cat&aacute;logo de Platillos</div>
     <div class="infobox">Cat&aacute;logo completo: platillos del sistema + tus recetas. Edita ingredientes, cambia tipo y elimina platillos.</div>
     <div style="margin-bottom:1rem">
-      <input type="text" id="catbuscar" class="fi" placeholder="&#128269; Buscar por nombre o c&oacute;digo..." oninput="renderCat()">
+      <input type="search" id="catbuscar" class="fi" placeholder="&#128269; Buscar por nombre o c&oacute;digo..." oninput="renderCat()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="q-catalogo">
     </div>
     <div class="fbar">
       <span class="fl">Tipo:</span>
@@ -219,7 +219,7 @@
     <div class="ch" style="display:flex;align-items:center;gap:12px"><span class="brand-plate"><img src="/grill-express.png" alt="CICSA Grill Express" width="56" height="56"></span>Grill Express</div>
     <div class="infobox">Costeo de productos a la carta (hamburguesas, boneless, ensaladas, etc.) y desarrollo de nuevos platillos (R&amp;D). Usan el mismo banco de precios pero viven aparte del men&uacute; de comedor: <strong>no entran en la rotaci&oacute;n de d&iacute;as</strong>. Los ingredientes se capturan a mano.</div>
     <div style="display:grid;grid-template-columns:1fr auto auto;gap:1rem;margin-bottom:1rem;align-items:end">
-      <div><input type="text" id="acbuscar" class="fi" placeholder="&#128269; Buscar platillo..." oninput="renderAlacarta()"></div>
+      <div><input type="search" id="acbuscar" class="fi" placeholder="&#128269; Buscar platillo..." oninput="renderAlacarta()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="q-alacarta"></div>
       <button class="btn bsec" onclick="verMenuAlacarta()">&#128065;&#65039; Ver / Imprimir men&uacute;</button>
       <button class="btn bgold" onclick="nuevoAlacarta()">&#10133; Nuevo Platillo</button>
     </div>
@@ -242,7 +242,7 @@
     <div style="padding:1.5rem;background:var(--surface);border-radius:8px;border:1px solid var(--border)">
       <h3 style="margin-bottom:1rem">&#128202; Tabla de Precios</h3>
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-bottom:1rem">
-        <input type="text" class="fi" placeholder="&#128269; Buscar ingrediente..." oninput="filtrarPrecios(this.value)">
+        <input type="search" class="fi" placeholder="&#128269; Buscar ingrediente..." oninput="filtrarPrecios(this.value)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="q-precios">
         <button class="btn bsec bsm" onclick="exportarPrecios()">&#128229; Exportar CSV</button>
       </div>
       <div class="stat-row">
@@ -262,9 +262,9 @@
   <div class="card">
     <div class="ch">&#10024; Generar Receta</div>
     <div class="infobox">Escribe el nombre del platillo y el sistema genera una receta <strong>institucional CICSA</strong>: validada para comedor industrial (ingredientes accesibles, sin proteína cruda, coccion segura, alta aceptacion) y escalada con ingredientes y costos.</div>
-    <div class="fg"><label class="fl2">Nombre del Platillo</label><input type="text" id="gnombre" class="fi" placeholder="Ej: Pozole, Tinga de Pollo, Quesadillas"></div>
+    <div class="fg"><label class="fl2">Nombre del Platillo</label><input type="text" id="gnombre" class="fi" placeholder="Ej: Pozole, Tinga de Pollo, Quesadillas" autocomplete="off"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-      <div class="fg"><label class="fl2">N&uacute;mero de Comensales</label><input type="number" id="gpax" class="fi" value="500" min="1"></div>
+      <div class="fg"><label class="fl2">N&uacute;mero de Comensales</label><input type="number" id="gpax" class="fi" value="500" min="1" autocomplete="off"></div>
       <div class="fg"><label class="fl2">Tipo</label>
         <select id="gtipo" class="fs">
           <option value="guisado">Guisado Principal (150g)</option>
@@ -333,11 +333,11 @@
     <div id="cfg-lineas"></div>
     <button class="btn bsec bsm" onclick="cfgAgregarLinea()" style="margin:.4rem 0 1rem">&#10133; Agregar l&iacute;nea</button>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
-      <div class="fg"><label class="fl2">Costo de producci&oacute;n ($/comida)</label><input type="number" id="cfg-costo-prod" class="fi" step="0.01" min="0">
+      <div class="fg"><label class="fl2">Costo de producci&oacute;n ($/comida)</label><input type="number" id="cfg-costo-prod" class="fi" step="0.01" min="0" autocomplete="off">
         <div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Fijo por porci&oacute;n (n&oacute;mina, gas, agua...). Rango esperado: $17&ndash;$33. Se recalcula cada mes.</div></div>
-      <div class="fg"><label class="fl2">Porciones por platillo</label><input type="number" id="cfg-porciones" class="fi" step="0.1" min="0.1">
+      <div class="fg"><label class="fl2">Porciones por platillo</label><input type="number" id="cfg-porciones" class="fi" step="0.1" min="0.1" autocomplete="off">
         <div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Entre cu&aacute;ntas porciones se reparte el presupuesto que queda para las recetas del d&iacute;a. Default 2.5.</div></div>
-      <div class="fg"><label class="fl2">Margen objetivo (%)</label><input type="number" id="cfg-margen" class="fi" step="1" min="0" max="90">
+      <div class="fg"><label class="fl2">Margen objetivo (%)</label><input type="number" id="cfg-margen" class="fi" step="1" min="0" max="90" autocomplete="off">
         <div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Default 15%. De aqu&iacute; salen <strong>las cuatro bandas</strong> del sem&aacute;foro, tanto del men&uacute; del d&iacute;a como de Grill Express: verde al objetivo, amarillo a dos tercios, naranja arriba de 0, rojo pierde.</div></div>
     </div>
     <div class="fl2" style="margin-top:1.2rem">Complementos de la comida ($/pax)</div>
@@ -2149,7 +2149,7 @@ function mostrarPreview(rec, paxO, paxD) {
             + '<td style="padding:.5rem;text-align:center">' + (cO<10?cO.toFixed(1):Math.round(cO)) + ' ' + uO + '</td>'
             + '<td style="padding:.5rem;text-align:center;font-weight:700">' + (cE<10?cE.toFixed(1):Math.round(cE)) + ' ' + uE + '</td>'
             + '<td style="padding:.5rem;text-align:center">'
-            + '<input type="number" class="precio-edit" value="' + ing.precio_kg.toFixed(2) + '" min="0" step="0.5" style="' + precioStyle + '" oninput="recalcPreview()" title="Precio por kg/l/pz">'
+            + '<input type="number" class="precio-edit" value="' + ing.precio_kg.toFixed(2) + '" min="0" step="0.5" style="' + precioStyle + '" oninput="recalcPreview()" title="Precio por kg/l/pz" autocomplete="off">'
             + '</td>'
             + '<td style="padding:.5rem;text-align:right;color:var(--tc)" class="costo-cell">$' + c.toFixed(2) + '</td></tr>';
     });
@@ -2172,7 +2172,7 @@ function mostrarPreview(rec, paxO, paxD) {
         + '<div style="font-size:1.5rem">&#8594;</div>'
         + '<div style="text-align:center"><div style="font-size:.75rem;color:var(--bl);margin-bottom:.25rem">Escalar a:</div>'
         + '<div style="display:flex;gap:.5rem;align-items:center;justify-content:center">'
-        + '<input type="number" id="epax" value="' + paxD + '" min="1" max="5000" style="width:80px;padding:.5rem;border:2px solid var(--gold);border-radius:6px;font-size:1rem;font-weight:700;text-align:center">'
+        + '<input type="number" id="epax" value="' + paxD + '" min="1" max="5000" style="width:80px;padding:.5rem;border:2px solid var(--gold);border-radius:6px;font-size:1rem;font-weight:700;text-align:center" autocomplete="off">'
         + '<button class="btn bgold bsm" id="bree">&#8635; Actualizar</button>'
         + '</div></div></div></div>'
         + '<h4 style="margin-bottom:1rem">Ingredientes:</h4>'
@@ -2405,7 +2405,7 @@ function editarPl(nombre) {
         + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">'
         + '<div class="fg"><label class="fl2">Region</label><input id="er" class="fi" value="' + (r.region||'Mexico') + '"></div>'
         + '<div class="fg"><label class="fl2">Tipo</label><select id="et" class="fs"><option value="guisado"' + (r.tipo!=='garnacha'?' selected':'') + '>Guisado</option><option value="garnacha"' + (r.tipo==='garnacha'?' selected':'') + '>Garnacha</option></select></div>'
-        + '<div class="fg"><label class="fl2">Tiempo (min)</label><input id="eti" class="fi" type="number" value="' + (r.tiempo||60) + '"></div></div>'
+        + '<div class="fg"><label class="fl2">Tiempo (min)</label><input id="eti" class="fi" type="number" value="' + (r.tiempo||60) + '" autocomplete="off"></div></div>'
         + '<h4 style="margin:1rem 0 .5rem">Ingredientes <small style="font-weight:400;color:var(--bl)">(por porcion — precio del banco de Egresos)</small></h4>'
         + '<div class="rec-ing-scroll">'
         + '<div class="rec-ing-grid" style="display:grid;' + REC_GRID + ';gap:.4rem;font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;color:var(--bl);margin-bottom:.3rem;padding:0 .2rem"><span>Ingrediente</span><span>Cant</span><span>Unidad</span><span style="text-align:right">Precio en Egresos</span><span style="text-align:right">Costo en receta</span><span></span></div>'
@@ -3133,7 +3133,7 @@ function _recIngRow(ing) {
     var cant = (ing.cantidad!=null) ? Number(ing.cantidad).toFixed(3) : '0.100';
     return '<div class="ing-row rec-ing-grid" style="' + REC_GRID + ';margin-bottom:.4rem">'
         + '<input class="fi ing-n" list="dl-ingredientes" autocomplete="off" value="' + (ing.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Buscar producto..." style="padding:.4rem .6rem">'
-        + '<input class="fi ing-c" type="number" value="' + cant + '" style="padding:.4rem .6rem">'
+        + '<input class="fi ing-c" type="number" value="' + cant + '" style="padding:.4rem .6rem" autocomplete="off">'
         + '<select class="fs ing-u" style="padding:.4rem">'
         + UNIDADES_VALIDAS.map(function(u){ return '<option value="'+u+'"'+((ing.unidad||'g')===u?' selected':'')+'>'+u+'</option>'; }).join('')
         + '</select>'
@@ -3276,7 +3276,7 @@ function _acIngRow(ing, defUnidad, defCant) {
     ing = ing || {nombre:'', cantidad:dc, unidad:du};
     return '<div class="ing-row" style="' + AC_GRID + ';margin-bottom:.4rem">'
         + '<input class="fi ac-in" list="dl-ingredientes" autocomplete="off" value="' + (ing.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Buscar producto..." style="padding:.4rem .6rem">'
-        + '<input class="fi ac-ic" type="number" value="' + (ing.cantidad!=null?ing.cantidad:dc) + '" style="padding:.4rem .6rem">'
+        + '<input class="fi ac-ic" type="number" value="' + (ing.cantidad!=null?ing.cantidad:dc) + '" style="padding:.4rem .6rem" autocomplete="off">'
         + '<select class="fs ac-iu" style="padding:.4rem">'
         + UNIDADES_VALIDAS.map(function(u){ return '<option value="'+u+'"'+((ing.unidad||du)===u?' selected':'')+'>'+u+'</option>'; }).join('')
         + '</select>'
@@ -3316,9 +3316,9 @@ function _editorAlacarta(p) {
         + '<button class="btn bsec bsm" id="ac-add-des" style="margin:.5rem 0">&#10133; Agregar desechable</button>'
         // ── Produccion y precio de venta ──
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:.75rem">'
-        + '<div class="fg"><label class="fl2">Costo de produccion ($/porcion)</label><input type="number" id="ac-prod" class="fi" step="0.01" min="0" value="' + (p&&p.costo_produccion!=null?p.costo_produccion:'') + '" placeholder="0.00">'
+        + '<div class="fg"><label class="fl2">Costo de produccion ($/porcion)</label><input type="number" id="ac-prod" class="fi" step="0.01" min="0" value="' + (p&&p.costo_produccion!=null?p.costo_produccion:'') + '" placeholder="0.00" autocomplete="off">'
         + '<div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Mano de obra, gas y energia de ESTE platillo. Es propio de Grill Express, no el del comedor.</div></div>'
-        + '<div class="fg"><label class="fl2">Precio de venta ($)</label><input type="number" id="ac-pv" class="fi" step="0.01" min="0" value="' + (p&&p.precio_venta!=null?p.precio_venta:'') + '" placeholder="0.00">'
+        + '<div class="fg"><label class="fl2">Precio de venta ($)</label><input type="number" id="ac-pv" class="fi" step="0.01" min="0" value="' + (p&&p.precio_venta!=null?p.precio_venta:'') + '" placeholder="0.00" autocomplete="off">'
         + '<div style="font-size:.72rem;color:var(--bl);margin-top:.25rem">Lo que cobras al comensal. Sin esto no se puede calcular margen.</div></div></div>'
         // ── Desglose y semaforo ──
         + '<div class="csum" style="margin:.75rem 0;display:block">'
@@ -3581,8 +3581,8 @@ function renderConfigNegocio() {
     if(!cont) return;
     cont.innerHTML = (config.lineas||[]).map(function(l, i) {
         return '<div class="cfg-linea" data-id="' + l.id + '" style="display:grid;grid-template-columns:2fr 1fr .4fr;gap:.4rem;margin-bottom:.4rem">'
-            + '<input class="fi cfg-ln" value="' + (l.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Nombre de la linea" style="padding:.4rem .6rem">'
-            + '<input class="fi cfg-lp" type="number" step="0.01" min="0" value="' + l.precio + '" style="padding:.4rem .6rem">'
+            + '<input class="fi cfg-ln" value="' + (l.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Nombre de la linea" autocomplete="off" style="padding:.4rem .6rem">'
+            + '<input class="fi cfg-lp" type="number" step="0.01" min="0" value="' + l.precio + '" style="padding:.4rem .6rem" autocomplete="off">'
             + '<button class="btn bcrit bsm cfg-lx" style="padding:.4rem" title="Eliminar linea">&#10005;</button>'
             + '</div>';
     }).join('');
@@ -3604,9 +3604,9 @@ function _cfgFilaComplemento(c) {
     var un = esFijo ? '$' : (c.unidad || 'g');
     var cant = esFijo ? Number(c.costo) : Number(c.cantidad);
     return '<div class="cfg-comp" style="display:grid;grid-template-columns:1.1fr 1.5fr .8fr .8fr .9fr .4fr;gap:.4rem;margin-bottom:.4rem;align-items:center">'
-        + '<input class="fi cfg-ce" value="' + String(c.etiqueta||'').replace(/"/g,'&quot;') + '" placeholder="Etiqueta" style="padding:.4rem .6rem">'
-        + '<input class="fi cfg-cn" value="' + String(c.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Producto en Egresos" style="padding:.4rem .6rem"' + (esFijo ? ' disabled' : '') + '>'
-        + '<input class="fi cfg-cc" type="number" step="0.01" min="0" value="' + (isFinite(cant) ? cant : '') + '" style="padding:.4rem .6rem">'
+        + '<input class="fi cfg-ce" value="' + String(c.etiqueta||'').replace(/"/g,'&quot;') + '" placeholder="Etiqueta" autocomplete="off" style="padding:.4rem .6rem">'
+        + '<input class="fi cfg-cn" value="' + String(c.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Producto en Egresos" autocomplete="off" style="padding:.4rem .6rem"' + (esFijo ? ' disabled' : '') + '>'
+        + '<input class="fi cfg-cc" type="number" step="0.01" min="0" value="' + (isFinite(cant) ? cant : '') + '" style="padding:.4rem .6rem" autocomplete="off">'
         + '<select class="fi cfg-cu" style="padding:.4rem .6rem">'
         + CFG_UNIDADES.map(function(u){ return '<option value="' + u + '"' + (u === un ? ' selected' : '') + '>' + (u === '$' ? '$ fijo' : u) + '</option>'; }).join('')
         + '</select>'
@@ -3677,8 +3677,8 @@ function renderRendimientos() {
     if(!cont) return;
     cont.innerHTML = (config.rendimientos||[]).map(function(r) {
         return '<div class="cfg-rend" style="display:grid;grid-template-columns:2fr 1fr .4fr;gap:.4rem;margin-bottom:.4rem;align-items:center">'
-            + '<input class="fi cfg-rn" value="' + String(r.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Ingrediente (ej. Arroz)" style="padding:.4rem .6rem">'
-            + '<input class="fi cfg-rf" type="number" step="0.1" min="0.1" value="' + r.factor + '" title="1 kg seco rinde N kg elaborado" style="padding:.4rem .6rem">'
+            + '<input class="fi cfg-rn" value="' + String(r.nombre||'').replace(/"/g,'&quot;') + '" placeholder="Ingrediente (ej. Arroz)" autocomplete="off" style="padding:.4rem .6rem">'
+            + '<input class="fi cfg-rf" type="number" step="0.1" min="0.1" value="' + r.factor + '" title="1 kg seco rinde N kg elaborado" style="padding:.4rem .6rem" autocomplete="off">'
             + '<button class="btn bcrit bsm cfg-rx" style="padding:.4rem" title="Eliminar">&#10005;</button>'
             + '</div>';
     }).join('');
@@ -3710,8 +3710,8 @@ function cfgAgregarLinea() {
     var d = document.createElement('div');
     var id = 'linea-' + Date.now();
     d.innerHTML = '<div class="cfg-linea" data-id="' + id + '" style="display:grid;grid-template-columns:2fr 1fr .4fr;gap:.4rem;margin-bottom:.4rem">'
-        + '<input class="fi cfg-ln" placeholder="Nombre de la linea" style="padding:.4rem .6rem">'
-        + '<input class="fi cfg-lp" type="number" step="0.01" min="0" placeholder="0.00" style="padding:.4rem .6rem">'
+        + '<input class="fi cfg-ln" placeholder="Nombre de la linea" autocomplete="off" style="padding:.4rem .6rem">'
+        + '<input class="fi cfg-lp" type="number" step="0.01" min="0" placeholder="0.00" style="padding:.4rem .6rem" autocomplete="off">'
         + '<button class="btn bcrit bsm cfg-lx" style="padding:.4rem">&#10005;</button></div>';
     var el = d.firstChild;
     el.querySelector('.cfg-lx').addEventListener('click', function(){ el.remove(); });
@@ -4062,9 +4062,9 @@ function editarIngRec(idx) {
     openModal('&#9998;&#65039; Editar Ingrediente',
         '<div class="fg"><label class="fl2">Nombre</label><input id="ei-n" class="fi" value="' + ing.nombre + '"></div>'
         + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">'
-        + '<div class="fg"><label class="fl2">Cantidad (base ' + window._recMeta.base + ' pax)</label><input id="ei-c" class="fi" type="number" value="' + ing.cantidad + '"></div>'
+        + '<div class="fg"><label class="fl2">Cantidad (base ' + window._recMeta.base + ' pax)</label><input id="ei-c" class="fi" type="number" value="' + ing.cantidad + '" autocomplete="off"></div>'
         + '<div class="fg"><label class="fl2">Unidad</label><select id="ei-u" class="fs"><option value="g"'+(ing.unidad==='g'?' selected':'')+'>g</option><option value="kg"'+(ing.unidad==='kg'?' selected':'')+'>kg</option><option value="ml"'+(ing.unidad==='ml'?' selected':'')+'>ml</option><option value="l"'+(ing.unidad==='l'?' selected':'')+'>l</option><option value="pz"'+(ing.unidad==='pz'?' selected':'')+'>pz</option></select></div>'
-        + '<div class="fg"><label class="fl2">Precio ($/kg·l, o $/pz si la unidad es pz)</label><input id="ei-p" class="fi" type="number" value="' + ing.precio_kg + '"></div></div>'
+        + '<div class="fg"><label class="fl2">Precio ($/kg·l, o $/pz si la unidad es pz)</label><input id="ei-p" class="fi" type="number" value="' + ing.precio_kg + '" autocomplete="off"></div></div>'
         + '<div class="fg"><label class="fl2">Sustitucion (opcional)</label><input id="ei-s" class="fi" value="' + (ing.sustitucion||'') + '" placeholder="Ej: pechuga por muslo de pollo"></div>'
         + '<div style="display:flex;gap:1rem;margin-top:1rem">'
         + '<button class="btn bgold" id="bsave-ing" style="flex:1">&#128190; Guardar</button>'
@@ -4092,7 +4092,7 @@ function sustituirIngRec(idx) {
     openModal('&#8646; Sustituir: ' + ing.nombre,
         '<div class="fg"><label class="fl2">Reemplazar con' + sug + '</label><input id="sust-n" class="fi" placeholder="Ej: ' + (ing.sustitucion||'Otro ingrediente') + '"></div>'
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">'
-        + '<div class="fg"><label class="fl2">Cantidad (base ' + window._recMeta.base + ' pax)</label><input id="sust-c" class="fi" type="number" value="' + ing.cantidad + '"></div>'
+        + '<div class="fg"><label class="fl2">Cantidad (base ' + window._recMeta.base + ' pax)</label><input id="sust-c" class="fi" type="number" value="' + ing.cantidad + '" autocomplete="off"></div>'
         + '<div class="fg"><label class="fl2">Unidad</label><select id="sust-u" class="fs"><option value="g"'+(ing.unidad==='g'?' selected':'')+'>g</option><option value="kg"'+(ing.unidad==='kg'?' selected':'')+'>kg</option><option value="ml"'+(ing.unidad==='ml'?' selected':'')+'>ml</option><option value="l"'+(ing.unidad==='l'?' selected':'')+'>l</option><option value="pz"'+(ing.unidad==='pz'?' selected':'')+'>pz</option></select></div></div>'
         + '<div style="display:flex;gap:1rem;margin-top:1rem">'
         + '<button class="btn bgold" id="bsust" style="flex:1">&#8646; Sustituir</button>'
@@ -4125,9 +4125,9 @@ function agregarIngRec() {
     openModal('&#10133; Agregar Ingrediente',
         '<div class="fg"><label class="fl2">Nombre</label><input id="ai-n" class="fi" placeholder="Ej: Chile ancho"></div>'
         + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">'
-        + '<div class="fg"><label class="fl2">Cantidad (base ' + window._recMeta.base + ' pax)</label><input id="ai-c" class="fi" type="number" value="100"></div>'
+        + '<div class="fg"><label class="fl2">Cantidad (base ' + window._recMeta.base + ' pax)</label><input id="ai-c" class="fi" type="number" value="100" autocomplete="off"></div>'
         + '<div class="fg"><label class="fl2">Unidad</label><select id="ai-u" class="fs"><option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="l">l</option><option value="pz">pz</option></select></div>'
-        + '<div class="fg"><label class="fl2">Precio ($/kg·l, o $/pz si la unidad es pz)</label><input id="ai-p" class="fi" type="number" value="50"></div></div>'
+        + '<div class="fg"><label class="fl2">Precio ($/kg·l, o $/pz si la unidad es pz)</label><input id="ai-p" class="fi" type="number" value="50" autocomplete="off"></div></div>'
         + '<div style="display:flex;gap:1rem;margin-top:1rem">'
         + '<button class="btn bgold" id="bai-save" style="flex:1">&#10133; Agregar</button>'
         + '<button class="btn bsec" style="flex:1" onclick="closeModal()">Cancelar</button></div>');
