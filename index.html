@@ -1048,6 +1048,27 @@ function getCost(rec) {
     });
     return c;
 }
+// ── Regla del dueno (10/sep/2026): nunca dos guisados sin proteina el mismo
+// dia, ni en dias consecutivos ─────────────────────────────────────────────
+// Un dia de calabacitas y nopales deja al comensal sin nada que lo sostenga, y
+// dos dias seguidos se nota. La regla vieja de "no repetir proteina" no lo
+// atajaba: eximia a Mixto, Vegetariano y vacio, que eran el 40% del catalogo.
+//
+// Solo aplica a lo que se SABE que no tiene proteina. Una receta sin clasificar
+// no se trata como si no la tuviera: eso seria adivinar, y la adivinanza es lo
+// que produjo el problema. Mientras queden recetas en "Mixto", la regla las
+// ignora — se clasifican con la accion guiada del Catalogo.
+function sinProteina(nombre, allDB) {
+    var r = allDB && allDB[nombre];
+    return !!r && grupoProteina(r.carnico) === 'sinprot';
+}
+// Quita de la lista los guisados sin proteina. Si al hacerlo no queda ninguno,
+// devuelve la lista intacta: es preferible repetir a no poder generar el menu.
+function conProteina(lista, allDB) {
+    var av = (lista || []).filter(function(n){ return !sinProteina(n, allDB); });
+    return av.length ? av : lista;
+}
+
 // Garnacha obligada de los jueves (requisito del dueno, 10/sep/2026).
 // Va por NOMBRE EXACTO y no por parecido: el catalogo tiene 6 garnachas con
 // "taco" y dos con "dorado", asi que cualquier coincidencia parcial agarra otra.
@@ -1212,14 +1233,18 @@ function genMenu() {
 
     var uG = [], uGa = [], V = Math.max(diasMenu, 15), domN = 0;
     var dias = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
+    var ayerSinProteina = false;   // ¿el dia anterior sirvio un guisado sin proteina?
     for(var i = 1; i <= diasMenu; i++) {
         var dia = dias[(i-1) % 7];
         var Glibre = guisadosLibres(dia);  // guisados permitidos hoy
+        // Si ayer hubo uno sin proteina, hoy NINGUNO de los dos guisados puede
+        // serlo. Si no, todavia cabe uno — pero el segundo tendra que llevar.
+        var GlibreHoy = ayerSinProteina ? conProteina(Glibre, allDB) : Glibre;
         var g1, g2, ga, lk1 = false, lkG = false;
         if(dia === 'Jueves') {
             g1 = G.find(function(n) { return n.toLowerCase().indexOf('pozole') >= 0; }) || Glibre[0] || null;
             var c1 = g1 && allDB[g1] ? allDB[g1].carnico : '';
-            g2 = pickFrom(Glibre, uG, V, [g1], [c1], allDB);
+            g2 = pickFrom(sinProteina(g1, allDB) ? conProteina(GlibreHoy, allDB) : GlibreHoy, uG, V, [g1], [c1], allDB);
             // Requisito del dueno (10/sep/2026): el jueves lleva SIEMPRE esta
             // garnacha. Antes decia indexOf('taco'), que tomaba la primera de las
             // 6 garnachas con "taco" en el nombre —salia Tacos de Carnitas
@@ -1239,15 +1264,16 @@ function genMenu() {
                 ? (G.find(function(n) { return n.toLowerCase().indexOf('barbacoa') >= 0; }) || Glibre[0])
                 : (G.find(function(n) { return n.toLowerCase().indexOf('menudo') >= 0; }) || Glibre[0]);
             var c1 = g1 && allDB[g1] ? allDB[g1].carnico : '';
-            g2 = pickFrom(Glibre, uG, V, [g1], [c1], allDB);
+            g2 = pickFrom(sinProteina(g1, allDB) ? conProteina(GlibreHoy, allDB) : GlibreHoy, uG, V, [g1], [c1], allDB);
             ga = pickFrom(Ga, uGa, V, [], null, allDB);
             lk1 = true;
         } else {
-            g1 = pickFrom(Glibre, uG, V, [], null, allDB);
+            g1 = pickFrom(GlibreHoy, uG, V, [], null, allDB);
             var c1 = g1 && allDB[g1] ? allDB[g1].carnico : '';
-            g2 = pickFrom(Glibre, uG, V, [g1], [c1], allDB);
+            g2 = pickFrom(sinProteina(g1, allDB) ? conProteina(GlibreHoy, allDB) : GlibreHoy, uG, V, [g1], [c1], allDB);
             ga = pickFrom(Ga, uGa, V, [], null, allDB);
         }
+        ayerSinProteina = sinProteina(g1, allDB) || sinProteina(g2, allDB);
         if(g1) uG.push(g1); if(g2) uG.push(g2); if(ga) uGa.push(ga);
         if(uG.length > V * 2) { uG.shift(); uG.shift(); }
         if(uGa.length > V) uGa.shift();
