@@ -196,11 +196,12 @@
     <div class="fbar">
       <span class="fl">Prote&iacute;na:</span>
       <button class="fb on" data-fprot onclick="setFiltProt('todas',this)">Todas</button>
-      <button class="fb" data-fprot onclick="setFiltProt('Pollo',this)">Pollo</button>
-      <button class="fb" data-fprot onclick="setFiltProt('Res',this)">Res</button>
-      <button class="fb" data-fprot onclick="setFiltProt('Cerdo',this)">Cerdo</button>
-      <button class="fb" data-fprot onclick="setFiltProt('Pescado',this)">Pescado</button>
-      <button class="fb" data-fprot onclick="setFiltProt('Verdura',this)">Verdura</button>
+      <button class="fb" data-fprot onclick="setFiltProt('res',this)">Res</button>
+      <button class="fb" data-fprot onclick="setFiltProt('puerco',this)">Puerco</button>
+      <button class="fb" data-fprot onclick="setFiltProt('pollo',this)">Pollo</button>
+      <button class="fb" data-fprot onclick="setFiltProt('pescado',this)">Pescado</button>
+      <button class="fb" data-fprot onclick="setFiltProt('sinprot',this)">Sin prote&iacute;na</button>
+      <button class="fb" data-fprot onclick="setFiltProt('nc',this)">Sin clasificar</button>
     </div>
     <div class="fbar">
       <button class="btn bgold bsm" onclick="exportarTxt()">&#128190; Exportar .TXT</button>
@@ -503,6 +504,36 @@ var recetas = [];
 var precios = {};
 var diasMenu = 30;
 var filtCat = 'todos';
+// Grupos de proteina del Catalogo. El campo `carnico` de las recetas trae
+// valores sueltos que no coinciden con los filtros ("Carne Molida", "Filete de
+// Tilapia", "Vegetariano"), asi que se normalizan a un grupo. Antes los chips
+// comparaban el texto crudo: por eso "Pescado" y "Verdura" no devolvian nada.
+var PROTEINA_GRUPOS = [
+    {id:'res',     etiqueta:'Res',          coincide:['res','carne molida']},
+    {id:'puerco',  etiqueta:'Puerco',       coincide:['cerdo','puerco','carnitas','chorizo']},
+    {id:'pollo',   etiqueta:'Pollo',        coincide:['pollo','pechuga']},
+    {id:'pescado', etiqueta:'Pescado',      coincide:['pescado','tilapia','atun','marisco','camaron']},
+    {id:'sinprot', etiqueta:'Sin proteína', coincide:['vegetariano','verdura','vegetal','sin proteina']}
+];
+// Lo que no cae en ningun grupo queda APARTE y visible. Hoy son ~108 recetas en
+// "Mixto", que no dice de que esta hecho el platillo: esconderlas dentro de un
+// grupo cualquiera le daria al generador de menus una certeza que no existe.
+var PROT_SIN_CLASIFICAR = {id:'nc', etiqueta:'Sin clasificar'};
+function grupoProteina(carnico) {
+    var c = _normIng(carnico || '');
+    if(!c) return PROT_SIN_CLASIFICAR.id;
+    for(var i = 0; i < PROTEINA_GRUPOS.length; i++) {
+        var g = PROTEINA_GRUPOS[i];
+        for(var j = 0; j < g.coincide.length; j++) {
+            if(c.indexOf(g.coincide[j]) >= 0) return g.id;
+        }
+    }
+    return PROT_SIN_CLASIFICAR.id;
+}
+function etiquetaProteina(id) {
+    for(var i = 0; i < PROTEINA_GRUPOS.length; i++) if(PROTEINA_GRUPOS[i].id === id) return PROTEINA_GRUPOS[i].etiqueta;
+    return PROT_SIN_CLASIFICAR.etiqueta;
+}
 var filtProt = 'todas';
 
 var alacarta = [];   // platillos a la carta / R&D — viven aparte del menu de comedor
@@ -2305,7 +2336,7 @@ function renderCat() {
     else todos = [].concat(prec, mis);
     // Filtro por proteína (carnico)
     if(filtProt !== 'todas') {
-        todos = todos.filter(function(p){ return (p.carnico||'') === filtProt; });
+        todos = todos.filter(function(p){ return grupoProteina(p.carnico) === filtProt; });
     }
     // Filtro por texto de búsqueda (nombre)
     var q = (document.getElementById('catbuscar') ? document.getElementById('catbuscar').value : '').toLowerCase().trim();
@@ -2322,24 +2353,31 @@ function renderCat() {
     var nGuis = todos.filter(function(p){ return p.tipoPl !== 'garnacha'; }).length;
     var nGarn = todos.length - nGuis;
     var nOmit = todos.filter(function(p){ return estaOmitida(p.nombre); }).length;
+    // Contador: cuantas se ven, de cuantas hay, y cuantas estan fuera de rotacion.
+    var totalCat = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
+    var nGuis = todos.filter(function(p){ return p.tipoPl !== 'garnacha'; }).length;
+    var nGarn = todos.length - nGuis;
+    var nOmit = todos.filter(function(p){ return estaOmitida(p.nombre); }).length;
     var html = '<div style="font-size:.8rem;color:var(--bl);margin-bottom:.75rem;display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">'
         + '<b style="color:var(--bd);font-size:.95rem">' + todos.length + '</b>'
         + (todos.length !== totalCat ? '<span>de ' + totalCat + '</span>' : '<span>receta' + (todos.length!==1?'s':'') + '</span>')
         + '<span>&middot;</span><span>' + nGuis + ' guisado' + (nGuis!==1?'s':'') + '</span>'
         + '<span>&middot;</span><span>' + nGarn + ' garnacha' + (nGarn!==1?'s':'') + '</span>'
         + (nOmit ? '<span>&middot;</span><span style="color:var(--bm)">&#9208; ' + nOmit + ' fuera del men&uacute;</span>' : '')
-        + '</div><div style="display:grid;gap:.75rem">';
-    todos.forEach(function(p) {
+        + '</div>';
+
+    // Un renglon del catalogo. Se saca a funcion para reusarlo en cada grupo.
+    function renglon(p) {
         var esMia = p.origen === 'mia' || p.origen === 'extra';
         var b1 = esMia ? '<span class="pill pill-amarillo">Mi receta</span>'
             : '<span class="pill pill-sinlinea">Precargado</span>';
         var b2 = p.tipoPl==='garnacha' ? '<span class="pill pill-caution" style="margin-left:.3rem">Garnacha</span>'
             : '<span class="pill pill-verde" style="margin-left:.3rem">Guisado</span>';
         var b3 = p.carnico ? '<span class="pill pill-sinlinea" style="margin-left:.3rem">' + p.carnico + '</span>' : '';
-        var ingP = (p.ingredientes && p.ingredientes.length) ? p.ingredientes.slice(0,3).map(function(i){return (i && i.nombre) ? i.nombre : '';}).filter(function(x){return x;}).join(' · ') + (p.ingredientes.length>3?' +mas':'') : '';
         var fuera = estaOmitida(p.nombre);
         var b4 = fuera ? '<span class="pill pill-caution" style="margin-left:.3rem">&#9208; Fuera del men&uacute;</span>' : '';
-        html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden' + (fuera ? ';opacity:.6' : '') + '">'
+        var ingP = (p.ingredientes && p.ingredientes.length) ? p.ingredientes.slice(0,3).map(function(i){return (i && i.nombre) ? i.nombre : '';}).filter(function(x){return x;}).join(' &middot; ') + (p.ingredientes.length>3?' +mas':'') : '';
+        return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden' + (fuera ? ';opacity:.6' : '') + '">'
             + '<div style="background:var(--surface-2);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center">'
             + '<div><div style="font-weight:700">' + (p.codigo ? '<span class="codigo">' + p.codigo + '</span> ' : '') + p.nombre + '</div><div style="margin-top:.2rem">' + b1 + b2 + b3 + b4 + '</div></div>'
             + '<div style="display:flex;gap:.4rem">'
@@ -2348,8 +2386,44 @@ function renderCat() {
             + '<button class="btn bcrit bsm" data-ad="' + encodeURIComponent(p.nombre) + '" data-ot="' + p.origen + '">&#128465;&#65039;</button>'
             + '</div></div>'
             + '<div style="padding:.5rem 1rem;font-size:.8rem;color:var(--bm)">' + ingP + '</div></div>';
-    });
-    html += '</div>';
+    }
+    function encabezado(txt, n, sub) {
+        return '<div style="margin:1.25rem 0 .6rem;padding-bottom:.35rem;border-bottom:2px solid var(--border)">'
+            + '<span style="font-weight:700;font-size:' + (sub ? '.9rem' : '1.05rem') + ';color:var(--bd)">' + txt + '</span>'
+            + '<span style="margin-left:.5rem;font-size:.8rem;color:var(--bl)">' + n + '</span></div>';
+    }
+    function bloque(lista) {
+        return '<div style="display:grid;gap:.75rem">' + lista.map(renglon).join('') + '</div>';
+    }
+
+    // GUISADOS por proteina, y despues GARNACHAS. Orden pedido por el dueno.
+    var guisados = todos.filter(function(p){ return p.tipoPl !== 'garnacha'; });
+    var garnachas = todos.filter(function(p){ return p.tipoPl === 'garnacha'; });
+    if(guisados.length) {
+        html += encabezado('&#127858; Guisados', guisados.length);
+        var orden = PROTEINA_GRUPOS.map(function(g){ return g.id; }).concat([PROT_SIN_CLASIFICAR.id]);
+        orden.forEach(function(gid) {
+            var sub = guisados.filter(function(p){ return grupoProteina(p.carnico) === gid; });
+            if(!sub.length) return;
+            var aviso = (gid === PROT_SIN_CLASIFICAR.id)
+                ? ' <span style="color:var(--bm);font-weight:400">&mdash; el generador de men&uacute;s no puede evitar repetir prote&iacute;na con estas</span>' : '';
+            html += encabezado(etiquetaProteina(gid) + aviso, sub.length, true) + bloque(sub);
+        });
+    }
+    if(garnachas.length) {
+        // Las garnachas se subdividen igual: las 7 de pescado del catalogo son
+        // TODAS garnachas, asi que sin subgrupo no se veia el pescado por ningun
+        // lado aunque estuviera bien etiquetado.
+        html += encabezado('&#129368; Garnachas', garnachas.length);
+        var ordenGa = PROTEINA_GRUPOS.map(function(g){ return g.id; }).concat([PROT_SIN_CLASIFICAR.id]);
+        ordenGa.forEach(function(gid) {
+            var sub = garnachas.filter(function(p){ return grupoProteina(p.carnico) === gid; });
+            if(!sub.length) return;
+            var aviso = (gid === PROT_SIN_CLASIFICAR.id)
+                ? ' <span style="color:var(--bm);font-weight:400">&mdash; el generador de men&uacute;s no puede evitar repetir prote&iacute;na con estas</span>' : '';
+            html += encabezado(etiquetaProteina(gid) + aviso, sub.length, true) + bloque(sub);
+        });
+    }
     el.innerHTML = html;
     // Actualizar contador en header
     document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
