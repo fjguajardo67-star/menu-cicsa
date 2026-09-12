@@ -3628,16 +3628,67 @@ function exportarLibro() {
 }
 
 // PRECIOS
+// Agrupa el banco de Egresos por producto, ignorando mayusculas y acentos.
+// El banco trae ALIAS a proposito —'Atun', 'atun', 'ATUN' como entradas
+// separadas, para que el match exacto de §2 funcione escriba como escriba quien
+// captura— asi que listar las 380 entradas mostraba cada producto 2 a 4 veces.
+function _agruparPrecios() {
+    var porProducto = {};
+    Object.keys(precios).forEach(function(k) {
+        var n = _normIng(k);
+        if(!n) return;
+        if(!porProducto[n]) porProducto[n] = {clave: n, variantes: [], etiqueta: k};
+        porProducto[n].variantes.push(k);
+        // Etiqueta preferida: la escrita en Capitalizado, ni todo en minusculas
+        // ni GRITADA. Es la que una persona reconoce.
+        var actual = porProducto[n].etiqueta;
+        var buena = function(x){ return x !== x.toLowerCase() && x !== x.toUpperCase(); };
+        if(buena(k) && !buena(actual)) porProducto[n].etiqueta = k;
+    });
+    return Object.keys(porProducto).map(function(n) {
+        var g = porProducto[n];
+        var vistos = {}, precs = [], unidades = {};
+        g.variantes.forEach(function(v) {
+            var i = precios[v];
+            var u = i.unidad_base || 'kg';
+            unidades[u] = 1;
+            var firma = i.precio + '|' + u;
+            if(!vistos[firma]) { vistos[firma] = 1; precs.push({variante: v, precio: i.precio, unidad: u, fecha: i.fecha}); }
+        });
+        // Si dos formas del MISMO producto traen precio distinto, el costo de una
+        // receta depende de como se escribio el ingrediente. Eso no se arregla
+        // aqui —los precios son de Egresos— pero callarlo lo deja escondido.
+        g.conflicto = precs.length > 1;
+        g.precios = precs;
+        g.principal = precs[0];
+        return g;
+    }).sort(function(a, b) { return a.clave.localeCompare(b.clave, 'es'); });
+}
+
 function renderPrecios() {
     var tbody = document.getElementById('tpre');
     if(!tbody) return;
     var html = '';
-    Object.keys(precios).sort().forEach(function(n) {
-        var i = precios[n];
-        html += '<tr data-pn="' + n.toLowerCase() + '">'
-            + '<td><strong>' + n + '</strong></td>'
-            + '<td class="num">$' + i.precio.toFixed(2) + '/' + (i.unidad_base || 'kg') + '</td>'
-            + '<td class="num">' + i.fecha + '</td></tr>';
+    _agruparPrecios().forEach(function(g) {
+        var busca = g.variantes.join(' ').toLowerCase() + ' ' + g.clave;
+        if(!g.conflicto) {
+            var i = g.principal;
+            html += '<tr data-pn="' + busca + '">'
+                + '<td><strong>' + g.etiqueta + '</strong>'
+                + (g.variantes.length > 1 ? ' <span style="font-size:.7rem;color:var(--bl)">' + g.variantes.length + ' formas</span>' : '')
+                + '</td>'
+                + '<td class="num">$' + i.precio.toFixed(2) + '/' + i.unidad + '</td>'
+                + '<td class="num">' + i.fecha + '</td></tr>';
+        } else {
+            html += '<tr data-pn="' + busca + '" style="background:rgba(212,175,55,.10)">'
+                + '<td><strong>' + g.etiqueta + '</strong>'
+                + '<div style="font-size:.72rem;color:var(--bm);margin-top:.2rem">&#9888; Las formas de este nombre NO coinciden en precio &mdash; el costo depende de c&oacute;mo se escriba. Se corrige en Egresos.</div>'
+                + '<div style="font-size:.72rem;color:var(--bl);margin-top:.15rem">'
+                + g.precios.map(function(x){ return '&quot;' + x.variante + '&quot; $' + x.precio.toFixed(2) + '/' + x.unidad; }).join(' &middot; ')
+                + '</div></td>'
+                + '<td class="num">$' + g.principal.precio.toFixed(2) + '/' + g.principal.unidad + '</td>'
+                + '<td class="num">' + g.principal.fecha + '</td></tr>';
+        }
     });
     tbody.innerHTML = html;
     updPStats();
@@ -3647,10 +3698,12 @@ function filtrarPrecios(v) {
     document.querySelectorAll('#tpre tr').forEach(function(r) { r.style.display = r.dataset.pn && r.dataset.pn.indexOf(v) >= 0 ? '' : 'none'; });
 }
 function updPStats() {
-    var ks = Object.keys(precios);
+    // Cuenta PRODUCTOS, no entradas: el banco trae alias y contar 380 cuando hay
+    // 157 productos distintos da una idea equivocada de la cobertura.
+    var g = _agruparPrecios();
     var h = hoy();
-    var hc = ks.filter(function(k){ return precios[k].fecha === h; }).length;
-    var t = document.getElementById('pst'); if(t) t.textContent = ks.length;
+    var hc = g.filter(function(x){ return x.principal && x.principal.fecha === h; }).length;
+    var t = document.getElementById('pst'); if(t) t.textContent = g.length;
     var hh = document.getElementById('psh'); if(hh) hh.textContent = hc;
 }
 // Escritura de precios eliminada: los precios son de solo-lectura desde cicsa-egresos.
