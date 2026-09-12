@@ -2411,7 +2411,18 @@ function renderCat() {
         });
     }
     if(garnachas.length) {
-        html += encabezado('&#129368; Garnachas', garnachas.length) + bloque(garnachas);
+        // Las garnachas se subdividen igual: las 7 de pescado del catalogo son
+        // TODAS garnachas, asi que sin subgrupo no se veia el pescado por ningun
+        // lado aunque estuviera bien etiquetado.
+        html += encabezado('&#129368; Garnachas', garnachas.length);
+        var ordenGa = PROTEINA_GRUPOS.map(function(g){ return g.id; }).concat([PROT_SIN_CLASIFICAR.id]);
+        ordenGa.forEach(function(gid) {
+            var sub = garnachas.filter(function(p){ return grupoProteina(p.carnico) === gid; });
+            if(!sub.length) return;
+            var aviso = (gid === PROT_SIN_CLASIFICAR.id)
+                ? ' <span style="color:var(--bm);font-weight:400">&mdash; el generador de men&uacute;s no puede evitar repetir prote&iacute;na con estas</span>' : '';
+            html += encabezado(etiquetaProteina(gid) + aviso, sub.length, true) + bloque(sub);
+        });
     }
     el.innerHTML = html;
     // Actualizar contador en header
