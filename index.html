@@ -3295,7 +3295,7 @@ function imprimirAlacarta(conCostos, soloActivos) {
             + '<style>body{font-family:Arial,sans-serif;max-width:820px;margin:0 auto;padding:2rem;color:#1a1a1a}'
             + '.h{display:flex;align-items:center;gap:1rem;border-bottom:3px solid #0A4B26;padding-bottom:.75rem;margin-bottom:1rem}'
             + '@media print{body{padding:.5rem}}</style></head><body>'
-            + '<div class="h">' + (logo ? '<img src="' + logo + '" alt="CICSA Grill Express" width="88" height="88">' : '')
+            + '<div class="h">' + (logo ? '<img src="' + logo + '" alt="CICSA Grill Express" width="252" height="88">' : '')
             + '<div><h1 style="margin:0;color:#0A4B26">Grill Express&trade;</h1>'
             + '<div style="font-size:.85rem;color:#555;margin-top:.25rem">CICSA &middot; ' + hoy() + (conCostos ? ' &middot; costos en materia prima' : '') + '</div></div></div>'
             + body + '</body></html>';
@@ -3310,7 +3310,10 @@ function imprimirAlacarta(conCostos, soloActivos) {
 var _logoGrillCache = null;
 function _logoGrill(cb) {
     if(_logoGrillCache) { cb(_logoGrillCache); return; }
-    fetch('/grill-express.png').then(function(r){ return r.ok ? r.blob() : null; }).then(function(b){
+    // El LOCKUP (emblema + palabras) va en los impresos, donde hay espacio para
+    // leerlo. En el encabezado de pantalla va solo el emblema: a 56 px de alto el
+    // lockup dejaria el "by CICSA" en unos 5 px, ilegible.
+    fetch('/grill-express-lockup.png').then(function(r){ return r.ok ? r.blob() : null; }).then(function(b){
         if(!b) { cb(null); return; }
         var fr = new FileReader();
         fr.onload = function(){ _logoGrillCache = fr.result; cb(_logoGrillCache); };
