@@ -1816,14 +1816,15 @@ async function parsearRecetaIA(txt, pax) {
             'anthropic-dangerous-direct-browser-access': 'true'
         },
         body: JSON.stringify({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 1500,
+            model: MODELO_CLAUDE,
+            max_tokens: 8000,
             messages: [{role: 'user', content: prompt}]
         })
     });
     if(!resp.ok) throw new Error('API error ' + resp.status);
     var data = await resp.json();
     if(data.error) throw new Error(data.error.message || 'Error API');
+    if(data.stop_reason === 'refusal') throw new Error('El modelo declino procesar este texto.');
     var raw = (data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('');
     raw = raw.replace(/```json|```/g,'').trim();
     var jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -4100,6 +4101,18 @@ function cambiarLineaMenu(id) {
 // ============================================================
 // API KEY
 // ============================================================
+// Modelo de Claude que usan el generador y el parser de recetas.
+// Opus 5 (cambiado el 20/sep/2026, antes claude-sonnet-4-6). Notas de su API que
+// afectan a este codigo:
+//  - El razonamiento viene ACTIVADO por omision y consume del max_tokens, por eso
+//    los topes de abajo subieron. Con los viejos (1500 y 4000) la respuesta se
+//    cortaba a media receta — de ahi venia repararJSONReceta().
+//  - No acepta temperature / top_p / top_k: devuelven 400. Aqui no se mandan.
+//  - Los bloques de razonamiento llegan en content; se filtran por type==='text'.
+//  - Puede declinar con HTTP 200 y stop_reason 'refusal'; se maneja aparte para
+//    no reportarlo como "no se pudo parsear".
+var MODELO_CLAUDE = 'claude-opus-5';
+
 function getApiKey() { try { return localStorage.getItem('cicsa_apikey') || ''; } catch(e) { return ''; } }
 
 // ── PIN Admin ─────────────────────────────────────────────────────────────
@@ -4340,14 +4353,18 @@ async function generarReceta() {
             method: 'POST',
             headers: {'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
             body: JSON.stringify({
-                model: 'claude-sonnet-4-6',
-                max_tokens: 4000,
-                tools: [{"type":"web_search_20250305","name":"web_search"}],
+                model: MODELO_CLAUDE,
+                max_tokens: 16000,
+                // Variante con filtrado dinamico, la que soporta Opus 5
+                tools: [{"type":"web_search_20260209","name":"web_search"}],
                 messages: [{role:'user', content:prompt}]
             })
         });
         var data = await resp.json();
         if(data.error) throw new Error(data.error.message);
+        // Opus 5 puede declinar con HTTP 200: content llega vacio y sin esto se
+        // reportaba como "no se pudo parsear", que manda a buscar el error donde no esta.
+        if(data.stop_reason === 'refusal') throw new Error('El modelo declino generar esta receta. Prueba con otro nombre de platillo.');
         var txt = (data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('');
         var m = txt.match(/\{[\s\S]*\}/);
         if(!m) throw new Error('No se pudo parsear la receta');
