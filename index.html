@@ -4222,6 +4222,60 @@ function repararJSONReceta(raw) {
     return null;
 }
 
+// ── Generador: ingredientes verificados (GENERADOR_RECETAS_FORX_CICSA §11, §18) ──
+// El generador NO le decia al modelo que ingredientes existen en el banco de
+// Egresos. Inventaba nombres razonables —"Cebolla blanca", "Pollo deshebrado"—
+// que no cruzan con `resolverClaveBanco`, asi que costeaban $0 y caian en el
+// reporte de faltantes. De ahi salen buena parte de los ingredientes sin precio.
+//
+// Ahora el catalogo verificado viaja DENTRO del prompt y la receta se revisa al
+// volver. No se bloquea nada: se marca, igual que el resto de la app (§19 pide
+// "rechazar o pedir revision", y aqui quien decide es una persona).
+
+// Sazonadores que el banco NO cotiza pero la receta necesita (§12). Sin esta
+// excepcion el modelo dejaria las recetas sin sal: "Sal" y "Pimienta" no estan
+// en el banco y aparecen en 53 y 7 recetas del catalogo.
+var COND_PERMITIDOS = ['sal','pimienta','pimienta negra','comino','oregano','laurel','tomillo',
+    'mejorana','paprika','ajo en polvo','cebolla en polvo','sal con ajo','clavo','canela',
+    'hoja de laurel','chile en polvo','azucar'];
+function esCondimentoPermitido(nombre) {
+    var n = _normIng(nombre);
+    for(var i = 0; i < COND_PERMITIDOS.length; i++) if(n === COND_PERMITIDOS[i]) return true;
+    return false;
+}
+
+// Los nombres canonicos del banco, uno por producto (no los alias).
+function catalogoVerificado() {
+    return _agruparPrecios().map(function(g){ return g.etiqueta; })
+        .sort(function(a,b){ return a.localeCompare(b,'es'); });
+}
+
+// Revisa una receta ya generada contra el banco. Devuelve el detalle por
+// ingrediente y el % del PESO que viene de ingredientes verificados (§18).
+function verificarIngredientesReceta(ings) {
+    var filas = [], pesoTotal = 0, pesoOk = 0, pesoCond = 0;
+    (ings || []).forEach(function(ing) {
+        var u = (ing.unidad || 'g').toLowerCase();
+        // Solo pesan los solidos y liquidos; las piezas no son comparables en gramos
+        var peso = (u === 'g' || u === 'ml') ? (Number(ing.cantidad) || 0)
+                 : (u === 'kg' || u === 'l') ? (Number(ing.cantidad) || 0) * 1000 : 0;
+        var clave = resolverClaveBanco(ing.nombre);
+        var cond = !clave && esCondimentoPermitido(ing.nombre);
+        pesoTotal += peso;
+        if(clave) pesoOk += peso; else if(cond) pesoCond += peso;
+        filas.push({nombre: ing.nombre, verificado: !!clave, condimento: cond,
+                    cruzaCon: clave || null, peso: peso});
+    });
+    return {
+        filas: filas,
+        verificados: filas.filter(function(f){ return f.verificado; }).length,
+        condimentos: filas.filter(function(f){ return f.condimento; }).length,
+        sinCruce:    filas.filter(function(f){ return !f.verificado && !f.condimento; }),
+        pctPeso: pesoTotal > 0 ? pesoOk / pesoTotal * 100 : 0,
+        pctCondimentos: pesoTotal > 0 ? pesoCond / pesoTotal * 100 : 0
+    };
+}
+
 async function generarReceta() {
     var nombre = document.getElementById('gnombre').value.trim();
     var pax = parseInt(document.getElementById('gpax').value) || 500;
@@ -4236,14 +4290,33 @@ async function generarReceta() {
             + '<span style="font-size:.88rem;color:var(--bm)">Los usuarios sin API key pueden agregar recetas manualmente en el tab "Agregar Receta".</span></div>';
         return;
     }
+    // Sin banco sincronizado no hay catalogo que mandar, y el modelo volveria a
+    // inventar nombres. Se avisa en vez de generar algo que costeara $0.
+    if(!Object.keys(precios).length) {
+        if(!confirm('El banco de precios no ha sincronizado todavia.\n\nSin el, la receta se generara con ingredientes inventados que no cruzan con Egresos y costearan $0.\n\nACEPTAR = generar de todos modos.\nCANCELAR = espera unos segundos y vuelve a intentar.')) return;
+    }
     document.getElementById('gloader').classList.add('on');
     document.getElementById('gres').style.display = 'none';
     // Base SIEMPRE fija en 10 porciones para escalado correcto
     var BASE_PORCIONES = 10;
+    // El catalogo verificado viaja en el prompt: sin el, el modelo inventa nombres
+    // que no cruzan con el banco de Egresos y la receta costea $0 (§11).
+    var catalogo = catalogoVerificado();
+    var bloqueCatalogo = '';
+    if(catalogo.length) {
+        bloqueCatalogo = '\n\nCATALOGO DE INGREDIENTES VERIFICADOS (' + catalogo.length + ' productos con precio real):\n'
+            + catalogo.join(' | ')
+            + '\n\nREGLA DE INGREDIENTES — es la mas importante de todas:\n'
+            + '- Los ingredientes PRINCIPALES (proteina, verduras, abarrotes, lacteos, tortillas, pastas, panes) deben salir TEXTUALMENTE del catalogo de arriba. Copia el nombre EXACTO, sin agregarle preparacion, corte ni estado.\n'
+            + '- Si el platillo tradicional pide algo que no esta en el catalogo, elige el equivalente mas cercano QUE SI ESTE, y anotalo en "sustitucion".\n'
+            + '- Unica excepcion: condimentos y sazonadores (sal, pimienta, comino, oregano, laurel, ajo en polvo) pueden ir aunque no esten en el catalogo, porque el banco no los cotiza. NUNCA pueden ser el ingrediente principal ni pasar del 3% del peso total.\n'
+            + '- Un ingrediente principal fuera del catalogo hace la receta inservible: costea $0 y rompe el semaforo.\n';
+    }
     var prompt = 'Eres el chef institucional del Sistema Menu CICSA, comedor industrial mexicano de alto volumen. '
-        + 'NO copies recetas literales de internet ni generes cocina libre: convierte "' + nombre + '" en una receta INSTITUCIONAL CICSA validada.\n\n'
+        + 'NO copies recetas literales de internet ni generes cocina libre: convierte "' + nombre + '" en una receta INSTITUCIONAL CICSA validada.'
+        + bloqueCatalogo + '\n\n'
         + 'VALIDA ANTES DE GENERAR:\n'
-        + '1. INVENTARIO: usa ingredientes comunes de alta rotacion. Si la version tradicional usa algo caro/exotico/importado, sustituyelo por un equivalente accesible.\n'
+        + '1. INVENTARIO: usa los ingredientes del catalogo verificado. Si la version tradicional usa algo caro/exotico/importado, sustituyelo por un equivalente del catalogo.\n'
         + '2. COSTO: viable para comedor industrial. Evita ingredientes gourmet, exoticos, importados o de baja rotacion.\n'
         + '3. ACEPTACION: familiar para el comensal mexicano promedio (obreros y personal). Nada de sabores muy novedosos, picante extremo ni preparaciones gourmet.\n'
         + '4. INOCUIDAD: PROHIBIDA la proteina cruda. Adapta a coccion segura segun el tipo de platillo:\n'
@@ -4258,7 +4331,7 @@ async function generarReceta() {
         + '"ingredientes":[{"nombre":"ingrediente","cantidad":500,"unidad":"g","sustitucion":"alternativa accesible"}],'
         + '"procedimiento":["paso 1","paso 2","paso 3","paso 4","paso 5"]}\n\n'
         + 'Reglas de formato:\n- porciones_base SIEMPRE = ' + BASE_PORCIONES + '\n'
-        + '- cantidades en g o ml UNICAMENTE (NUNCA tazas, cdas, piezas, "al gusto")\n'
+        + '- cantidades en g o ml UNICAMENTE (NUNCA tazas, cdas, piezas, "al gusto", "cantidad necesaria")\n'
         + '- minimo 6 ingredientes con gramos precisos para ' + BASE_PORCIONES + ' porciones\n'
         + '- minimo 5 pasos claros y ejecutables en cocina industrial\n'
         + '- carnico EXACTAMENTE uno de: Pollo, Res, Cerdo, Pescado, Verdura, Mixto (usa "Verdura" para platillos sin carne, NUNCA "Vegetariano")';
@@ -4310,6 +4383,31 @@ function mostrarRecetaGenerada(rec, pax, tipo) {
     renderRecetaGenerada();
 }
 
+// Panel de verificacion (§18): cuantos ingredientes cruzan con el banco y que
+// porcentaje del PESO viene de ellos. Marca, no bloquea: §19 pide "rechazar o
+// pedir revision", y quien decide es una persona con la receta enfrente.
+function panelVerificacion(ings) {
+    var v = verificarIngredientesReceta(ings);
+    var total = v.filas.length;
+    if(!total) return '';
+    var meta = v.pctPeso >= 85;   // §18: al menos 85% del peso verificado
+    var col = meta ? 'var(--green)' : 'var(--gold)';
+    var h = '<div style="background:var(--cream);border-left:4px solid ' + col + ';padding:.8rem 1.1rem;border-radius:6px;margin-bottom:1rem;font-size:.85rem">'
+        + '<div style="display:flex;gap:1.2rem;flex-wrap:wrap;align-items:center">'
+        + '<span><strong style="font-size:1.1rem;color:' + col + '">' + v.pctPeso.toFixed(0) + '%</strong> del peso viene de ingredientes verificados'
+        + '<span style="color:var(--bl)"> (meta 85%)</span></span>'
+        + '<span style="color:var(--bm)">' + v.verificados + ' de ' + total + ' cruzan con Egresos</span>'
+        + (v.condimentos ? '<span style="color:var(--bm)">' + v.condimentos + ' condimento(s) permitido(s)</span>' : '')
+        + '</div>';
+    if(v.sinCruce.length) {
+        h += '<div style="margin-top:.5rem;color:var(--crit-ink)"><strong>&#9888; ' + v.sinCruce.length
+           + ' sin precio en el banco</strong> &mdash; costean $0 y bajan el costo por pax artificialmente. '
+           + 'Sustit&uacute;yelos por un equivalente del cat&aacute;logo, o d&aacute;los de alta en Egresos:<br>'
+           + '<span style="color:var(--bm)">' + v.sinCruce.map(function(f){ return f.nombre; }).join(' &middot; ') + '</span></div>';
+    }
+    return h + '</div>';
+}
+
 function renderRecetaGenerada() {
     var m = window._recMeta, ings = window._recIngredientes, proc = window._recProcedimiento;
     var factor = m.pax / m.base;
@@ -4352,7 +4450,8 @@ function renderRecetaGenerada() {
     res.innerHTML = '<div class="card">'
         + '<div class="ch">' + m.nombre + '</div>'
         + '<div style="color:var(--bm);font-size:.88rem;margin-bottom:1rem"><strong>Region:</strong> ' + m.region + ' &nbsp;|&nbsp; <strong>Carnico:</strong> ' + m.carnico + ' &nbsp;|&nbsp; <strong>Tiempo:</strong> ' + m.tiempo + ' min</div>'
-        + (m.nota_adaptacion ? '<div style="background:#FFF3CD;border-left:4px solid var(--gold);padding:.9rem 1.1rem;border-radius:6px;margin-bottom:1rem;font-size:.86rem;color:var(--bm)"><strong>&#9888;&#65039; Versi&oacute;n adaptada CICSA:</strong> ' + m.nota_adaptacion + '</div>' : '')
+        + (m.nota_adaptacion ? '<div style="background:#FFF3CD;color:#5c4400;border-left:4px solid var(--gold);padding:.9rem 1.1rem;border-radius:6px;margin-bottom:1rem;font-size:.86rem"><strong>&#9888;&#65039; Versi&oacute;n adaptada CICSA:</strong> ' + m.nota_adaptacion + '</div>' : '')
+        + panelVerificacion(ings)
         + '<div style="background:var(--cream);padding:.6rem 1rem;border-radius:6px;margin-bottom:1.5rem;font-size:.85rem">Base: <strong>' + m.base + ' porciones</strong> &rarr; Escalada a <strong>' + m.pax + ' comensales</strong></div>'
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem">'
         + '<div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">'
