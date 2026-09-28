@@ -29,6 +29,21 @@ PROCEDIMIENTO:
 2. Agregar la salsa y dejar a fuego bajo 20 minutos
 ```
 
+**Guarniciones, postres y aguas** pueden ir solo con nombre y tipo:
+
+```
+NOMBRE: Arroz rojo
+TIPO: Guarnición
+
+---
+
+NOMBRE: Agua de jamaica
+TIPO: Agua
+```
+
+Para darlas de alta de una en una, sin lote, está el botón **➕ Nuevo postre,
+agua o guarnición** en el Catálogo.
+
 Para varias recetas, sepáralas con una línea que tenga `---`:
 
 ```
@@ -54,8 +69,8 @@ cálculo, hay que convertirlas a este formato antes de pegarlas.
 |---|---|---|---|
 | `NOMBRE:` | **Sí** | — | Texto libre. Es la llave de la receta |
 | `REGION:` | No | `Mexico` | Texto libre |
-| `CARNICO:` | No | `Mixto` | Texto libre |
-| `TIPO:` | No | `guisado` | Solo distingue si contiene "garnacha" |
+| `CARNICO:` | No | `Mixto` (vacío en guarnición, postre y agua) | Texto libre |
+| `TIPO:` | No | `guisado` | Guisado, Garnacha, Guarnición, Postre o Agua |
 | `TIEMPO:` | No | `60` | Minutos. Extrae solo los dígitos |
 | `PORCIONES_BASE:` | No | `50` | También `PORCIONES BASE:` con espacio |
 
@@ -64,9 +79,22 @@ cálculo, hay que convertirlas a este formato antes de pegarlas.
 **Sin `NOMBRE:` el bloque entero se ignora**, sin aviso individual. Es el único
 campo que no tiene default.
 
-`TIPO:` solo tiene dos valores reales: cualquier cosa que contenga "garnacha" es
-garnacha, y **todo lo demás es guisado**. Escribir `TIPO: Postre` produce un
-guisado, no un error.
+`TIPO:` busca la palabra dentro de lo que escribas, sin importar mayúsculas ni
+acentos: `Guarnición`, `guarnicion` y `Guarnición de arroz` son guarnición;
+`Agua fresca` o `Bebida` son agua. **Lo que no reconoce es guisado**, no un
+error — revisa el tipo en el resumen si escribiste algo distinto.
+
+| Tipo | ¿Ingredientes? | Qué es |
+|---|---|---|
+| Guisado | **Obligatorios** | Plato fuerte, con proteína |
+| Garnacha | **Obligatorios** | Plato fuerte, con proteína |
+| Guarnición | Opcionales | Arroz, frijoles, pasta, puré |
+| Postre | Opcionales | — |
+| Agua | Opcionales | Aguas de fruta |
+
+Guarniciones, postres y aguas **no llevan proteína**: si no escribes `CARNICO:`
+se quedan sin él, en vez de caer en `Mixto`. Los detalles de cada tipo están en
+`COSTEO.md` §3.5.
 
 ---
 
@@ -162,8 +190,12 @@ el resumen. No se guarda a medias ni se inventan valores. Se descarta cuando:
 Esa última regla existe porque cargas viejas metieron pasos como si fueran
 ingredientes. Si un ingrediente legítimo empieza con esas palabras, renómbralo.
 
-**Una receta sin ningún ingrediente válido no se guarda** — aparece en la lista de
-errores del resumen.
+**Un guisado o una garnacha sin ningún ingrediente válido no se guarda** —
+aparece en la lista de errores del resumen.
+
+Una guarnición, un postre o un agua **sí se guardan** aunque todos sus
+ingredientes se hayan descartado: quedan solo con el nombre, y las líneas
+descartadas aparecen en el resumen para que las corrijas si las querías.
 
 ---
 

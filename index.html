@@ -117,7 +117,7 @@
       <ol style="margin-left:1.5rem;line-height:2.2;color:var(--bd)">
         <li>Copia la receta completa de cualquier sitio web</li>
         <li>P&eacute;gala en el cuadro de texto</li>
-        <li>Selecciona el tipo: Guisado o Garnacha</li>
+        <li>Selecciona el tipo: guisado, garnacha, guarnici&oacute;n, postre o agua</li>
         <li>Click en "Agregar al Sistema"</li>
       </ol>
     </div>
@@ -129,7 +129,10 @@
       <div class="fg"><label class="fl2">Tipo</label>
         <select id="rtipo" class="fs">
           <option value="guisado">&#127858; Guisado</option>
-          <option value="garnacha">&#129362; Garnacha</option>
+          <option value="garnacha">&#127790; Garnacha</option>
+          <option value="guarnicion">&#127834; Guarnici&oacute;n</option>
+          <option value="postre">&#127854; Postre</option>
+          <option value="agua">&#129380; Agua</option>
         </select>
       </div>
       <div class="fg"><label class="fl2">Regi&oacute;n</label>
@@ -159,6 +162,7 @@
     <div class="infobox">
       <h3>&#128203; Sube 10 o m&aacute;s recetas de una vez</h3>
       <p style="color:var(--bd);font-size:.9rem;line-height:1.7">Pega varias recetas en el formato de la plantilla. Sep&aacute;ralas con una l&iacute;nea que tenga <strong>&#8259;</strong> o <strong>---</strong>, o simplemente deja que el sistema detecte cada bloque <strong>NOMBRE:</strong>. El sistema escala a 500 comensales, calcula costos y <strong>omite duplicados</strong> autom&aacute;ticamente.</p>
+      <p style="color:var(--bd);font-size:.9rem;line-height:1.7;margin-top:.5rem"><strong>TIPO:</strong> Guisado, Garnacha, Guarnici&oacute;n, Postre o Agua. Las guarniciones, postres y aguas pueden ir <strong>solo con NOMBRE y TIPO</strong>, sin ingredientes.</p>
     </div>
     <div class="fg"><label class="fl2">Pega aqu&iacute; todas las recetas</label>
       <textarea id="rbatch" class="ft" style="min-height:240px;font-family:monospace;font-size:.82rem" placeholder="NOMBRE: Pollo Ranchero&#10;REGION: Mexico&#10;CARNICO: Pollo&#10;TIPO: Guisado&#10;PORCIONES_BASE: 50&#10;INGREDIENTES:&#10;* Pollo: 7500 g&#10;...&#10;PROCEDIMIENTO:&#10;1. ...&#10;&#10;---&#10;&#10;NOMBRE: Pollo en Salsa Verde&#10;..."></textarea>
@@ -181,7 +185,7 @@
 <div id="cat" class="page">
   <div class="card">
     <div class="ch">&#128218; Cat&aacute;logo de Platillos</div>
-    <div class="infobox">Cat&aacute;logo completo: platillos del sistema + tus recetas. Edita ingredientes, cambia tipo y elimina platillos.</div>
+    <div class="infobox">Cat&aacute;logo completo: platillos del sistema + tus recetas. Edita ingredientes, cambia tipo y elimina platillos. Las guarniciones, postres y aguas se dan de alta <strong>solo con el nombre</strong>; los ingredientes se agregan despu&eacute;s, si se quieren costear.</div>
     <div style="margin-bottom:1rem">
       <input type="search" id="catbuscar" class="fi" placeholder="&#128269; Buscar por nombre o c&oacute;digo..." oninput="renderCat()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="q-catalogo">
     </div>
@@ -191,7 +195,10 @@
       <button class="fb" data-fcat onclick="setFiltCat('precargados',this)">&#127869;&#65039; Precargados</button>
       <button class="fb" data-fcat onclick="setFiltCat('misrecetas',this)">&#11088; Mis Recetas</button>
       <button class="fb" data-fcat onclick="setFiltCat('guisado',this)">&#127858; Guisados</button>
-      <button class="fb" data-fcat onclick="setFiltCat('garnacha',this)">&#129362; Garnachas</button>
+      <button class="fb" data-fcat onclick="setFiltCat('garnacha',this)">&#127790; Garnachas</button>
+      <button class="fb" data-fcat onclick="setFiltCat('guarnicion',this)">&#127834; Guarniciones</button>
+      <button class="fb" data-fcat onclick="setFiltCat('postre',this)">&#127854; Postres</button>
+      <button class="fb" data-fcat onclick="setFiltCat('agua',this)">&#129380; Aguas</button>
     </div>
     <div class="fbar">
       <span class="fl">Prote&iacute;na:</span>
@@ -204,6 +211,7 @@
       <button class="fb" data-fprot onclick="setFiltProt('nc',this)">Sin clasificar</button>
     </div>
     <div class="fbar">
+      <button class="btn bgold bsm" onclick="nuevoPl()">&#10133; Nuevo postre, agua o guarnici&oacute;n</button>
       <button class="btn bgold bsm" onclick="exportarTxt()">&#128190; Exportar .TXT</button>
       <button class="btn bok bsm" onclick="recalcularCostos()">&#128260; Recalcular Costos</button>
       <button class="btn bcrit bsm" onclick="reporteFaltantes()">&#129658; Reporte de faltantes</button>
@@ -537,6 +545,42 @@ function etiquetaProteina(id) {
     return PROT_SIN_CLASIFICAR.etiqueta;
 }
 var filtProt = 'todas';
+
+// Tipos de receta. El menu del comedor es 2 guisados, garnacha, 2 guarniciones,
+// postre y agua (definido por el dueno el 2026-09-28). Guisado y garnacha son el
+// plato FUERTE: llevan proteina, entran al generador y se comparan contra el
+// tope por platillo. Guarnicion, postre y agua se dan de alta con SOLO EL
+// NOMBRE; los ingredientes son opcionales, para costearlos cuando haya precios.
+// Hasta entonces el codigo solo conocia guisado y garnacha, y varias pantallas
+// trataban "todo lo que no es garnacha" como guisado: un postre habria salido
+// contado y agrupado como guisado. Por eso aqui se pregunta por el tipo exacto.
+var TIPOS_RECETA = [
+    {id:'guisado',    etiqueta:'Guisado',    plural:'Guisados',     icono:'&#127858;', fuerte:true,  pill:'pill-verde'},
+    {id:'garnacha',   etiqueta:'Garnacha',   plural:'Garnachas',    icono:'&#127790;', fuerte:true,  pill:'pill-caution'},
+    {id:'guarnicion', etiqueta:'Guarnición', plural:'Guarniciones', icono:'&#127834;', fuerte:false, pill:'pill-sinlinea'},
+    {id:'postre',     etiqueta:'Postre',     plural:'Postres',      icono:'&#127854;', fuerte:false, pill:'pill-sinlinea'},
+    {id:'agua',       etiqueta:'Agua',       plural:'Aguas',        icono:'&#129380;', fuerte:false, pill:'pill-sinlinea'}
+];
+// Sin tipo = guisado, como siempre lo ha leido el generador.
+function tipoReceta(id) {
+    for(var i = 0; i < TIPOS_RECETA.length; i++) if(TIPOS_RECETA[i].id === id) return TIPOS_RECETA[i];
+    return TIPOS_RECETA[0];
+}
+function esTipoReceta(id) {
+    return TIPOS_RECETA.some(function(t){ return t.id === id; });
+}
+// Lo que alguien escribio en "TIPO:" de un lote. Tolera mayusculas, acentos,
+// plurales y palabras de mas ("Agua fresca", "Guarnicion de arroz"). Los tipos
+// nuevos van por palabra completa: "Aguachile" no es un agua. Garnacha conserva
+// su regla de siempre (contenerla basta). Lo que no reconoce es guisado.
+function tipoDesdeTexto(txt) {
+    var s = _normIng(txt);
+    if(s.indexOf('garnacha') >= 0) return 'garnacha';
+    if(_palabraEn(s, 'guarnicion')) return 'guarnicion';
+    if(_palabraEn(s, 'postre')) return 'postre';
+    if(_palabraEn(s, 'agua') || _palabraEn(s, 'bebida')) return 'agua';
+    return 'guisado';
+}
 
 var alacarta = [];   // platillos a la carta / R&D — viven aparte del menu de comedor
 
@@ -1630,7 +1674,7 @@ async function agregarReceta() {
 function parsearRecetaEstructurada(bloque) {
     var lineas = bloque.split('\n');
     var rec = {nombre:'', region:'Mexico', carnico:'Mixto', tipo:'guisado', tiempo:60, base:50, ingredientes:[], procedimiento:[], descartados:[]};
-    var seccion = '';
+    var seccion = '', carnicoDado = false;
     lineas.forEach(function(linea) {
         var l = linea.trim();
         if(!l) return;
@@ -1638,8 +1682,8 @@ function parsearRecetaEstructurada(bloque) {
         // Encabezados de campo
         if(up.indexOf('NOMBRE:') === 0)      { rec.nombre = l.substring(l.indexOf(':')+1).trim(); seccion=''; return; }
         if(up.indexOf('REGION:') === 0 || up.indexOf('REGIÓN:') === 0) { rec.region = l.substring(l.indexOf(':')+1).trim() || 'Mexico'; seccion=''; return; }
-        if(up.indexOf('CARNICO:') === 0 || up.indexOf('CÁRNICO:') === 0) { rec.carnico = l.substring(l.indexOf(':')+1).trim() || 'Mixto'; seccion=''; return; }
-        if(up.indexOf('TIPO:') === 0)        { var t = l.substring(l.indexOf(':')+1).trim().toLowerCase(); rec.tipo = (t.indexOf('garnacha')>=0?'garnacha':'guisado'); seccion=''; return; }
+        if(up.indexOf('CARNICO:') === 0 || up.indexOf('CÁRNICO:') === 0) { rec.carnico = l.substring(l.indexOf(':')+1).trim() || 'Mixto'; carnicoDado = true; seccion=''; return; }
+        if(up.indexOf('TIPO:') === 0)        { rec.tipo = tipoDesdeTexto(l.substring(l.indexOf(':')+1)); seccion=''; return; }
         if(up.indexOf('TIEMPO:') === 0)      { rec.tiempo = parseInt(l.replace(/\D/g,'')) || 60; seccion=''; return; }
         if(up.indexOf('PORCIONES_BASE:') === 0 || up.indexOf('PORCIONES BASE:') === 0) { rec.base = parseInt(l.replace(/\D/g,'')) || 50; seccion=''; return; }
         if(up.indexOf('INGREDIENTES:') === 0){ seccion='ing'; return; }
@@ -1665,6 +1709,9 @@ function parsearRecetaEstructurada(bloque) {
             if(paso.length > 3) rec.procedimiento.push(paso);
         }
     });
+    // Un postre o un agua no llevan proteina: el "Mixto" por omision diria algo
+    // que nadie capturo.
+    if(!carnicoDado && !tipoReceta(rec.tipo).fuerte) rec.carnico = '';
     return rec.nombre ? rec : null;
 }
 
@@ -1708,7 +1755,8 @@ function cargarLote() {
         if(rec && rec.descartados && rec.descartados.length) {
             rec.descartados.forEach(function(d){ lineasDescartadas.push((rec.nombre||'?') + ': "' + d + '"'); });
         }
-        if(!rec || !rec.ingredientes.length) { errores.push(rec ? (rec.nombre + ' — sin ingredientes validos') : 'bloque sin nombre'); return; }
+        // Guarnicion, postre y agua entran con solo el nombre; el plato fuerte no.
+        if(!rec || (!rec.ingredientes.length && tipoReceta(rec.tipo).fuerte)) { errores.push(rec ? (rec.nombre + ' — sin ingredientes validos') : 'bloque sin nombre'); return; }
         var key = rec.nombre.toLowerCase();
         // Duplicado dentro del mismo lote pegado
         if(nombresLote[key]) { duplicadas.push(rec.nombre + ' (repetida en el lote)'); return; }
@@ -1998,7 +2046,7 @@ function getUnidadPrecio(n) {
 // numero. Un SKU escaneado en caja habria abierto el pedido de otra persona en
 // vez de fallar. Se renombro el 7/ago/2026, cuando ningun codigo de platillo
 // habia llegado a la nube todavia y cambiarlo no costaba nada.
-var COD_PREFIJO = {guisado:'G', garnacha:'GN', grill:'GX'};
+var COD_PREFIJO = {guisado:'G', garnacha:'GN', guarnicion:'GU', postre:'PO', agua:'AG', grill:'GX'};
 
 // Normaliza un nombre para comparar: sin acentos, sin mayusculas, sin espacios
 // de mas. "Tinga de Pollo" y "tinga  de pollo" colapsan al mismo texto.
@@ -2039,7 +2087,7 @@ function asignarCodigosFaltantes() {
     Object.keys(todas).sort().forEach(function(nombre){
         var r = todas[nombre];
         if(!r || r.codigo) return;
-        r.codigo = siguienteCodigo(r.tipo === 'garnacha' ? 'garnacha' : 'guisado');
+        r.codigo = siguienteCodigo(tipoReceta(r.tipo).id);
         if(DB[nombre]) DB[nombre].codigo = r.codigo;
         if(DB_EXTRA[nombre]) DB_EXTRA[nombre].codigo = r.codigo;
         n++;
@@ -2349,9 +2397,9 @@ function renderCat() {
     var allDB = Object.assign({}, DB, DB_EXTRA);
     // Separar precargados (DB) de los extra (DB_EXTRA = pegados manualmente)
     var prec = Object.keys(DB).map(function(n) {
-        return {nombre:n, codigo:DB[n].codigo||'', origen:'precargado', tipoPl:DB[n].tipo||'guisado', region:DB[n].region, carnico:DB[n].carnico, ingredientes:DB[n].ingredientes, tiempo:DB[n].tiempo};
+        return {nombre:n, codigo:DB[n].codigo||'', origen:'precargado', tipoPl:tipoReceta(DB[n].tipo).id, region:DB[n].region, carnico:DB[n].carnico, ingredientes:DB[n].ingredientes, tiempo:DB[n].tiempo};
     });
-    var mis = recetas.map(function(r) { return Object.assign({},r,{origen:'mia',tipoPl:r.tipo||'guisado'}); });
+    var mis = recetas.map(function(r) { return Object.assign({},r,{origen:'mia',tipoPl:tipoReceta(r.tipo).id}); });
     // Blindaje: descartar entradas sin nombre válido (evita que el catálogo quede en blanco)
     prec = prec.filter(function(p){ return p && typeof p.nombre === 'string' && p.nombre.trim(); });
     mis = mis.filter(function(p){ return p && typeof p.nombre === 'string' && p.nombre.trim(); });
@@ -2359,12 +2407,12 @@ function renderCat() {
     var todos;
     if(filtCat==='precargados') todos = prec;
     else if(filtCat==='misrecetas') todos = mis;
-    else if(filtCat==='guisado') todos = [].concat(prec, mis).filter(function(p){ return p.tipoPl==='guisado'; });
-    else if(filtCat==='garnacha') todos = [].concat(prec, mis).filter(function(p){ return p.tipoPl==='garnacha'; });
+    else if(esTipoReceta(filtCat)) todos = [].concat(prec, mis).filter(function(p){ return p.tipoPl===filtCat; });
     else todos = [].concat(prec, mis);
-    // Filtro por proteína (carnico)
+    // Filtro por proteína (carnico). La proteina es del plato fuerte: un postre
+    // no es "sin clasificar", simplemente no lleva, asi que no entra al filtro.
     if(filtProt !== 'todas') {
-        todos = todos.filter(function(p){ return grupoProteina(p.carnico) === filtProt; });
+        todos = todos.filter(function(p){ return tipoReceta(p.tipoPl).fuerte && grupoProteina(p.carnico) === filtProt; });
     }
     // Filtro por texto de búsqueda (nombre)
     var q = (document.getElementById('catbuscar') ? document.getElementById('catbuscar').value : '').toLowerCase().trim();
@@ -2374,23 +2422,31 @@ function renderCat() {
                 || String(p.codigo||'').toLowerCase().indexOf(q) >= 0;
         });
     }
+    // Catalogo nuevo todavia vacio: decir como se llena en vez de "sin resultados".
+    if(!todos.length && esTipoReceta(filtCat) && !tipoReceta(filtCat).fuerte && !q && filtProt === 'todas') {
+        var tv = tipoReceta(filtCat);
+        el.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--bl)"><div style="font-size:3rem">' + tv.icono + '</div>'
+            + '<h3 style="margin-top:.75rem">Todav&iacute;a no hay ' + tv.plural.toLowerCase() + '</h3>'
+            + '<p style="margin-top:.5rem;font-size:.85rem">Se dan de alta solo con el nombre, o varias a la vez desde Carga por Lotes con <code>TIPO: ' + tv.etiqueta + '</code>.</p>'
+            + '<button class="btn bgold bsm" style="margin-top:1rem" onclick="nuevoPl()">&#10133; Agregar ' + tv.etiqueta.toLowerCase() + '</button></div>';
+        return;
+    }
     if(!todos.length) { el.innerHTML='<div style="text-align:center;padding:3rem;color:var(--bl)"><div style="font-size:3rem">&#128269;</div><h3 style="margin-top:.75rem">Sin resultados</h3><p style="margin-top:.5rem;font-size:.85rem">Prueba con otro nombre, prote&iacute;na o tipo</p></div>'; return; }
     // Contador: cuantas se ven, de cuantas hay, y cuantas estan fuera de rotacion.
     // Solo "N platillos" no dice si el filtro escondio algo ni cuantas se omitieron.
     var totalCat = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
-    var nGuis = todos.filter(function(p){ return p.tipoPl !== 'garnacha'; }).length;
-    var nGarn = todos.length - nGuis;
     var nOmit = todos.filter(function(p){ return estaOmitida(p.nombre); }).length;
-    // Contador: cuantas se ven, de cuantas hay, y cuantas estan fuera de rotacion.
-    var totalCat = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
-    var nGuis = todos.filter(function(p){ return p.tipoPl !== 'garnacha'; }).length;
-    var nGarn = todos.length - nGuis;
-    var nOmit = todos.filter(function(p){ return estaOmitida(p.nombre); }).length;
+    // Guisados y garnachas se cuentan siempre, aunque sean cero; los demas tipos
+    // solo cuando hay alguno, para no llenar la linea de ceros.
+    var conteoTipos = TIPOS_RECETA.map(function(t) {
+        var n = todos.filter(function(p){ return p.tipoPl === t.id; }).length;
+        if(!n && !t.fuerte) return '';
+        return '<span>&middot;</span><span>' + n + ' ' + (n !== 1 ? t.plural : t.etiqueta).toLowerCase() + '</span>';
+    }).join('');
     var html = '<div style="font-size:.8rem;color:var(--bl);margin-bottom:.75rem;display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">'
         + '<b style="color:var(--bd);font-size:.95rem">' + todos.length + '</b>'
         + (todos.length !== totalCat ? '<span>de ' + totalCat + '</span>' : '<span>receta' + (todos.length!==1?'s':'') + '</span>')
-        + '<span>&middot;</span><span>' + nGuis + ' guisado' + (nGuis!==1?'s':'') + '</span>'
-        + '<span>&middot;</span><span>' + nGarn + ' garnacha' + (nGarn!==1?'s':'') + '</span>'
+        + conteoTipos
         + (nOmit ? '<span>&middot;</span><span style="color:var(--bm)">&#9208; ' + nOmit + ' fuera del men&uacute;</span>' : '')
         + '</div>';
 
@@ -2399,12 +2455,13 @@ function renderCat() {
         var esMia = p.origen === 'mia' || p.origen === 'extra';
         var b1 = esMia ? '<span class="pill pill-amarillo">Mi receta</span>'
             : '<span class="pill pill-sinlinea">Precargado</span>';
-        var b2 = p.tipoPl==='garnacha' ? '<span class="pill pill-caution" style="margin-left:.3rem">Garnacha</span>'
-            : '<span class="pill pill-verde" style="margin-left:.3rem">Guisado</span>';
-        var b3 = p.carnico ? '<span class="pill pill-sinlinea" style="margin-left:.3rem">' + p.carnico + '</span>' : '';
+        var tp = tipoReceta(p.tipoPl);
+        var b2 = '<span class="pill ' + tp.pill + '" style="margin-left:.3rem">' + tp.etiqueta + '</span>';
+        var b3 = (p.carnico && tp.fuerte) ? '<span class="pill pill-sinlinea" style="margin-left:.3rem">' + p.carnico + '</span>' : '';
         var fuera = estaOmitida(p.nombre);
         var b4 = fuera ? '<span class="pill pill-caution" style="margin-left:.3rem">&#9208; Fuera del men&uacute;</span>' : '';
-        var ingP = (p.ingredientes && p.ingredientes.length) ? p.ingredientes.slice(0,3).map(function(i){return (i && i.nombre) ? i.nombre : '';}).filter(function(x){return x;}).join(' &middot; ') + (p.ingredientes.length>3?' +mas':'') : '';
+        var ingP = (p.ingredientes && p.ingredientes.length) ? p.ingredientes.slice(0,3).map(function(i){return (i && i.nombre) ? i.nombre : '';}).filter(function(x){return x;}).join(' &middot; ') + (p.ingredientes.length>3?' +mas':'')
+            : (tp.fuerte ? '' : '<span style="color:var(--text-3)">Solo el nombre &mdash; sin ingredientes todav&iacute;a</span>');
         return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden' + (fuera ? ';opacity:.6' : '') + '">'
             + '<div style="background:var(--surface-2);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center">'
             + '<div><div style="font-weight:700">' + (p.codigo ? '<span class="codigo">' + p.codigo + '</span> ' : '') + p.nombre + '</div><div style="margin-top:.2rem">' + b1 + b2 + b3 + b4 + '</div></div>'
@@ -2424,34 +2481,25 @@ function renderCat() {
         return '<div style="display:grid;gap:.75rem">' + lista.map(renglon).join('') + '</div>';
     }
 
-    // GUISADOS por proteina, y despues GARNACHAS. Orden pedido por el dueno.
-    var guisados = todos.filter(function(p){ return p.tipoPl !== 'garnacha'; });
-    var garnachas = todos.filter(function(p){ return p.tipoPl === 'garnacha'; });
-    if(guisados.length) {
-        html += encabezado('&#127858; Guisados', guisados.length);
-        var orden = PROTEINA_GRUPOS.map(function(g){ return g.id; }).concat([PROT_SIN_CLASIFICAR.id]);
-        orden.forEach(function(gid) {
-            var sub = guisados.filter(function(p){ return grupoProteina(p.carnico) === gid; });
+    // GUISADOS por proteina, despues GARNACHAS. Orden pedido por el dueno. Las
+    // garnachas se subdividen igual: las 7 de pescado del catalogo son TODAS
+    // garnachas, asi que sin subgrupo no se veia el pescado por ningun lado
+    // aunque estuviera bien etiquetado. Guarniciones, postres y aguas van al
+    // final y sin subgrupos: no llevan proteina.
+    var ordenProt = PROTEINA_GRUPOS.map(function(g){ return g.id; }).concat([PROT_SIN_CLASIFICAR.id]);
+    TIPOS_RECETA.forEach(function(t) {
+        var deTipo = todos.filter(function(p){ return p.tipoPl === t.id; });
+        if(!deTipo.length) return;
+        html += encabezado(t.icono + ' ' + t.plural, deTipo.length);
+        if(!t.fuerte) { html += bloque(deTipo); return; }
+        ordenProt.forEach(function(gid) {
+            var sub = deTipo.filter(function(p){ return grupoProteina(p.carnico) === gid; });
             if(!sub.length) return;
             var aviso = (gid === PROT_SIN_CLASIFICAR.id)
                 ? ' <span style="color:var(--bm);font-weight:400">&mdash; el generador de men&uacute;s no puede evitar repetir prote&iacute;na con estas</span>' : '';
             html += encabezado(etiquetaProteina(gid) + aviso, sub.length, true) + bloque(sub);
         });
-    }
-    if(garnachas.length) {
-        // Las garnachas se subdividen igual: las 7 de pescado del catalogo son
-        // TODAS garnachas, asi que sin subgrupo no se veia el pescado por ningun
-        // lado aunque estuviera bien etiquetado.
-        html += encabezado('&#129368; Garnachas', garnachas.length);
-        var ordenGa = PROTEINA_GRUPOS.map(function(g){ return g.id; }).concat([PROT_SIN_CLASIFICAR.id]);
-        ordenGa.forEach(function(gid) {
-            var sub = garnachas.filter(function(p){ return grupoProteina(p.carnico) === gid; });
-            if(!sub.length) return;
-            var aviso = (gid === PROT_SIN_CLASIFICAR.id)
-                ? ' <span style="color:var(--bm);font-weight:400">&mdash; el generador de men&uacute;s no puede evitar repetir prote&iacute;na con estas</span>' : '';
-            html += encabezado(etiquetaProteina(gid) + aviso, sub.length, true) + bloque(sub);
-        });
-    }
+    });
     el.innerHTML = html;
     // Actualizar contador en header
     document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
@@ -2513,24 +2561,40 @@ function setFiltProt(p, btn) {
     renderCat();
 }
 
-function editarPl(nombre) {
+// Alta a mano desde el Catalogo, reusando el editor. Es para lo que se da de
+// alta con solo el nombre (guarnicion, postre, agua): el plato fuerte necesita
+// proteina, y el editor no la captura — ese entra por lote o por pegado.
+function nuevoPl() {
+    var t = (esTipoReceta(filtCat) && !tipoReceta(filtCat).fuerte) ? filtCat : 'postre';
+    editarPl(null, t);
+}
+
+function editarPl(nombre, tipoNuevo) {
+    var esNueva = (nombre == null);
     var allDB = Object.assign({}, DB, DB_EXTRA);
-    var r = allDB[nombre];
+    var r = esNueva
+        ? {region:'Mexico', carnico:'', tipo:tipoNuevo, ingredientes:[], procedimiento:[], tiempo:60}
+        : allDB[nombre];
     if(!r) {
         // Try finding by partial match in case of encoding issues
         var key = Object.keys(allDB).find(function(k){ return k === nombre || k.toLowerCase() === nombre.toLowerCase(); });
         if(key) r = allDB[key];
     }
     if(!r) { toast('No encontrado: ' + nombre.substring(0,20)); return; }
-    window._editando = nombre;
+    window._editando = esNueva ? null : nombre;
+    var tipoActual = tipoReceta(r.tipo).id;
+    // Al dar de alta solo se ofrecen los tipos que se capturan sin proteina.
+    var opcionesTipo = TIPOS_RECETA.filter(function(t){ return !esNueva || !t.fuerte; }).map(function(t) {
+        return '<option value="' + t.id + '"' + (t.id === tipoActual ? ' selected' : '') + '>' + t.etiqueta + '</option>';
+    }).join('');
     var ingsHTML = (r.ingredientes||[]).map(_recIngRow).join('');
-    openModal('&#9998;&#65039; Editar: ' + nombre,
-        '<div class="fg"><label class="fl2">Nombre</label><input id="en" class="fi" value="' + nombre + '"></div>'
+    openModal(esNueva ? '&#10133; Nueva receta' : '&#9998;&#65039; Editar: ' + nombre,
+        '<div class="fg"><label class="fl2">Nombre</label><input id="en" class="fi" value="' + (esNueva ? '' : String(nombre).replace(/"/g,'&quot;')) + '"' + (esNueva ? ' placeholder="Ej. Agua de jamaica" autocomplete="off"' : '') + '></div>'
         + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">'
         + '<div class="fg"><label class="fl2">Region</label><input id="er" class="fi" value="' + (r.region||'Mexico') + '"></div>'
-        + '<div class="fg"><label class="fl2">Tipo</label><select id="et" class="fs"><option value="guisado"' + (r.tipo!=='garnacha'?' selected':'') + '>Guisado</option><option value="garnacha"' + (r.tipo==='garnacha'?' selected':'') + '>Garnacha</option></select></div>'
+        + '<div class="fg"><label class="fl2">Tipo</label><select id="et" class="fs">' + opcionesTipo + '</select></div>'
         + '<div class="fg"><label class="fl2">Tiempo (min)</label><input id="eti" class="fi" type="number" value="' + (r.tiempo||60) + '" autocomplete="off"></div></div>'
-        + '<h4 style="margin:1rem 0 .5rem">Ingredientes <small style="font-weight:400;color:var(--bl)">(por porcion — precio del banco de Egresos)</small></h4>'
+        + '<h4 style="margin:1rem 0 .5rem">Ingredientes <small style="font-weight:400;color:var(--bl)">(por porcion — precio del banco de Egresos)</small> <small id="ei-opc" style="font-weight:400;color:var(--bl)"></small></h4>'
         + '<div class="rec-ing-scroll">'
         + '<div class="rec-ing-grid" style="display:grid;' + REC_GRID + ';gap:.4rem;font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;color:var(--bl);margin-bottom:.3rem;padding:0 .2rem"><span>Ingrediente</span><span>Cant</span><span>Unidad</span><span style="text-align:right">Precio en Egresos</span><span style="text-align:right">Costo en receta</span><span></span></div>'
         + '<div id="ei">' + ingsHTML + '</div></div>'
@@ -2547,6 +2611,13 @@ function editarPl(nombre) {
             ei.addEventListener('input', _recRecalcBanco);  // actualiza el indicador de banco al escribir/elegir
         }
         _recRecalcBanco();  // pinta el estado inicial de cada ingrediente
+        // Los ingredientes son opcionales o no segun el tipo elegido.
+        var et = document.getElementById('et');
+        function pintarOpcional() {
+            var opc = document.getElementById('ei-opc');
+            if(opc) opc.textContent = tipoReceta(et.value).fuerte ? '' : '· opcionales: se puede guardar solo con el nombre';
+        }
+        if(et) { pintarOpcional(); et.addEventListener('change', function(){ pintarOpcional(); _recResumen(); }); }
         var bai = document.getElementById('bai');
         if(bai) bai.addEventListener('click', function() {
             var c = document.getElementById('ei'), d = document.createElement('div');
@@ -2560,6 +2631,14 @@ function editarPl(nombre) {
             var reg = document.getElementById('er').value.trim();
             var tipo = document.getElementById('et').value;
             var tpo = parseInt(document.getElementById('eti').value)||60;
+            // El nombre es la llave de la receta: sin el no hay que guardar.
+            if(!nn) { alert('Escribe el nombre de la receta.'); return; }
+            // Y como es la llave, dos recetas no pueden llamarse igual: guardar
+            // encima de otra la sustituiria sin avisar.
+            if(nn !== window._editando) {
+                var choca = Object.keys(Object.assign({}, DB, DB_EXTRA)).find(function(k){ return k !== window._editando && k.toLowerCase() === nn.toLowerCase(); });
+                if(choca) { alert('Ya existe una receta llamada "' + choca + '".\n\nUsa otro nombre, o edita esa receta desde el Catalogo.'); return; }
+            }
             // COSTEO.md 3.1: toda fila debe estar completa (nombre+cantidad+unidad).
             // Sin coerciones silenciosas (antes una cantidad vacia se volvia 0.1).
             var filas = [];
@@ -2567,7 +2646,9 @@ function editarPl(nombre) {
                 var n = row.querySelector('.ing-n'), c = row.querySelector('.ing-c'), u = row.querySelector('.ing-u');
                 filas.push({nombre:(n?n.value.trim():''), cantidad:parseFloat(c?c.value:NaN), unidad:(u?u.value:'')});
             });
-            var errsV = validarIngredientes(filas);
+            // Guarnicion, postre y agua pueden ir sin filas; las que traigan se
+            // validan igual que en cualquier receta.
+            var errsV = (filas.length || tipoReceta(tipo).fuerte) ? validarIngredientes(filas) : [];
             if(errsV.length) { alert('No se puede guardar la receta:\n\n' + errsV.join('\n')); return; }
             // Aviso de posible duplicado: informa y deja decidir. Dos guisados
             // pueden llamarse parecido y ser distintos de verdad, asi que no bloquea.
@@ -2576,11 +2657,23 @@ function editarPl(nombre) {
                 var lista = dups.slice(0,5).map(function(d){ return '  \u2022 ' + (d.codigo ? d.codigo + ' ' : '') + d.nombre + '  (' + d.motivo + ')'; }).join('\n');
                 if(!confirm('Ya existe' + (dups.length>1?'n':'') + ' ' + dups.length + ' platillo' + (dups.length>1?'s':'') + ' con nombre parecido:\n\n' + lista + '\n\nAceptar = guardar de todos modos (es otro platillo).\nCancelar = volver y corregir el nombre.')) return;
             }
+            // Un nombre que alguna vez se borro deja lapida en `borradas`, y al
+            // sincronizar se llevaria la receta nueva que lo reuse (borrar el
+            // guisado "Arroz rojo" y dar de alta la guarnicion "Arroz rojo"). La
+            // carga por lotes ya la quita al re-agregar; aqui igual.
+            var quitoLapida = false;
+            if(nn !== window._editando) {
+                var nLapidas = borradas.length;
+                borradas = borradas.filter(function(b){ return String(b).toLowerCase() !== nn.toLowerCase(); });
+                quitoLapida = borradas.length !== nLapidas;
+            }
             var ings = filas.map(function(f){ return {nombre:f.nombre, cantidad:f.cantidad, unidad:f.unidad, precio_kg:getPrecio(f.nombre), precio_unidad:getUnidadPrecio(f.nombre)}; });
-            var updated = Object.assign({}, allDB[window._editando], {region:reg, tipo:tipo, tiempo:tpo, ingredientes:ings});
+            // Sobre `r` y no sobre allDB[window._editando]: en una receta nueva no
+            // hay nada en allDB, y r ya trae carnico y procedimiento vacios.
+            var updated = Object.assign({}, r, {region:reg, tipo:tipo, tiempo:tpo, ingredientes:ings});
             var eraPrecargada = !!DB[window._editando];
             if(DB[window._editando]) { DB[window._editando] = updated; }
-            else { if(nn !== window._editando) delete DB_EXTRA[window._editando]; DB_EXTRA[nn] = updated; }
+            else { if(!esNueva && nn !== window._editando) delete DB_EXTRA[window._editando]; DB_EXTRA[nn] = updated; }
             if(nn !== window._editando && DB[window._editando]) { delete DB[window._editando]; DB[nn] = updated; }
             // Si era precargada (vive en DB hardcodeado), marcar original como borrada
             // para que al refrescar no reaparezca la version vieja junto a la editada.
@@ -2594,15 +2687,15 @@ function editarPl(nombre) {
             if(idxR >= 0) {
                 recetas[idxR] = Object.assign(recetas[idxR], updated, {nombre: nn});
             } else {
-                // Si no estaba en recetas (era de DB_EXTRA o precargada), agregarlo
-                recetas.push(Object.assign({id:Date.now()}, updated, {nombre: nn}));
+                // Si no estaba en recetas (era de DB_EXTRA o precargada, o es nueva), agregarlo
+                recetas.push(Object.assign({id:Date.now()}, updated, {nombre: nn}, esNueva ? {fecha:new Date().toLocaleString('es-MX')} : {}));
             }
-            if(eraPrecargada) await saveBorradas();
+            if(eraPrecargada || quitoLapida) await saveBorradas();
             await saveRecetas(); updCnt();
             closeModal(); renderCat();
             genMenu();
             document.getElementById('stat-plat').textContent = Object.keys(DB).length + Object.keys(DB_EXTRA).length;
-            toast('"' + nn + '" actualizado');
+            toast('"' + nn + '" ' + (esNueva ? 'agregada' : 'actualizado'));
         });
     }, 50);
 }
@@ -2730,7 +2823,7 @@ function _planClasificacion() {
     var plan = [];
     (recetas || []).forEach(function(r) {
         if(!r || !r.nombre) return;
-        if((r.tipo || 'guisado') === 'garnacha') return;
+        if(tipoReceta(r.tipo).id !== 'guisado') return;   // solo guisados, como siempre
         if(grupoProteina(r.carnico) !== PROT_SIN_CLASIFICAR.id) return;   // ya clasificada
         var p = proponerProteina(r);
         plan.push({nombre: r.nombre, actual: r.carnico || '(vacío)', nuevo: p.carnico,
@@ -3064,7 +3157,9 @@ function _planLimpieza() {
             var invalida = !n || esBasuraParser(n) || !isFinite(ing.cantidad) || !(ing.cantidad > 0) || UNIDADES_VALIDAS.indexOf(ing.unidad) < 0;
             if(invalida) fuera.push(n || '(sin nombre)'); else buenas.push(ing);
         });
-        if(!buenas.length) { plan.quitarIdx[i] = 'vacia'; plan.eliminar.push(r.nombre); return; }
+        // Un postre, agua o guarnicion sin ingredientes esta completo: se dan de
+        // alta con solo el nombre. Borrarlo por "vacio" se llevaria el catalogo.
+        if(!buenas.length && tipoReceta(r.tipo).fuerte) { plan.quitarIdx[i] = 'vacia'; plan.eliminar.push(r.nombre); return; }
         if(fuera.length) plan.stripFilas.push({idx:i, nombre:r.nombre, filas:fuera});
         // Doble division: peso/porcion absurdo cuya inversa ×base cae en rango plausible
         var peso = buenas.reduce(function(s,ing){ return s + ((ing.unidad==='g'||ing.unidad==='ml') ? ing.cantidad : 0); }, 0);
@@ -3494,11 +3589,18 @@ function _recResumen() {
     var incompletos = lista.filter(function(i){
         return !precioEnBanco(i.nombre) || !unidadCompatible(i.nombre, i.unidad);
     }).length;
-    // La receta en edicion decide su propio tope: una garnacha de tortilla no
-    // paga las tortillas de la canasta, asi que le queda mas presupuesto (§4.6).
-    var tipoEd = document.getElementById('et');
-    var ref = referenciaCostoPlatillo({tipo: tipoEd ? tipoEd.value : '', ingredientes: lista});
     var avisoSinP = incompletos ? ' <span style="color:var(--crit-ink);font-weight:700">&#9888; ' + incompletos + ' sin costo</span>' : '';
+    // El tope por platillo es del plato fuerte. Guarnicion, postre y agua no lo
+    // tienen: la comida completa los cobra en la canasta de complementos (§4.3).
+    var tipoEd = document.getElementById('et');
+    if(tipoEd && !tipoReceta(tipoEd.value).fuerte) {
+        box.innerHTML = lista.length
+            ? '<div class="crow rec-cost-row"><span>Costo de ingredientes de esta porci&oacute;n' + avisoSinP + '</span><span class="rec-cost-result">$' + mp.toFixed(2) + '</span></div>'
+            : '<div class="rec-cost-detail">Sin ingredientes: se guarda solo con el nombre y se costea cuando los captures.</div>';
+        box.innerHTML += '<div class="rec-cost-detail">No lleva tope por platillo: en la comida completa se cobra dentro de los complementos (pesta&ntilde;a Exportar &rarr; Costeo).</div>';
+        return;
+    }
+    var ref = referenciaCostoPlatillo();
     var estado = '';
     if(!ref.linea) {
         estado = '<span class="pill pill-sinlinea">sin l&iacute;nea de contrato</span>';
@@ -3752,7 +3854,7 @@ function exportarTxt() {
     var txt = 'CATALOGO DE PLATILLOS CICSA\n' + hoy() + '\n' + '='.repeat(40) + '\n\n';
     todos.forEach(function(r, i) {
         txt += (i+1) + '. ' + (r.nombre||'').toUpperCase() + '\n' + '--'.repeat(20) + '\n';
-        txt += 'Tipo: ' + (r.tipo==='garnacha'?'Garnacha':'Guisado') + ' | Carnico: ' + (r.carnico||'-') + ' | Tiempo: ' + (r.tiempo||60) + ' min\n';
+        txt += 'Tipo: ' + tipoReceta(r.tipo).etiqueta + ' | Carnico: ' + (r.carnico||'-') + ' | Tiempo: ' + (r.tiempo||60) + ' min\n';
         txt += 'Ingredientes:\n';
         (r.ingredientes||[]).forEach(function(i) { txt += '  - ' + i.nombre + ': ' + i.cantidad + ' ' + i.unidad + '\n'; });
         txt += '\n';

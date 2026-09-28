@@ -90,6 +90,10 @@ Una receta **no se guarda** si algún ingrediente carece de **cantidad** o
 está vacío. Esos campos dependen solo de quien captura; el dato malo no debe
 poder entrar.
 
+Guisado y garnacha exigen además **al menos un ingrediente**. Guarnición,
+postre y agua se pueden guardar **solo con el nombre** (§3.5); si traen
+ingredientes, cada renglón se valida igual.
+
 **El precio no bloquea el guardado.** El precio no lo controla quien captura
 la receta: lo controla la validación en Egresos. Un ingrediente sin precio en
 el banco se guarda, cuesta $0 y deja la receta en estado **"datos
@@ -127,7 +131,7 @@ borrarlas. Lo dañado se repara mecánicamente:
 | Doble división (4–6 g/porción) | 10 | Multiplicar cantidades × su base — la inversa exacta del bug |
 | Con filas basura | 3 | Quitar solo esas filas (8 en total) |
 | Duplicados exactos | ~7 pares | Conservar la más reciente |
-| Vacías (solo basura) | 2 | Borrar — no hay receta adentro |
+| Vacías (solo basura) | 2 | Borrar — no hay receta adentro (solo guisado y garnacha, ver §3.5) |
 | Fila con cantidad inválida | 1 | Mostrar y decidir a mano |
 
 La reparación se ejecuta con una **acción de limpieza guiada** en la app:
@@ -171,6 +175,45 @@ costo de producción— pero solo cuando el ingrediente **es** agua (`agua`,
 `taza de agua`), nunca cuando la menciona (`chiles remojados en agua caliente`
 sí necesita precio). Un falso positivo aquí manda a no costear algo real, que es
 peor que no avisar.
+
+### 3.5 Tipos de receta
+
+Decidido con el dueño el 2026-09-28. El menú del comedor lleva **dos guisados,
+garnacha, dos guarniciones, postre y agua de frutas o refresco**. Hasta esa
+fecha el catálogo solo conocía guisado y garnacha; ahora hay cinco tipos:
+
+| Tipo | Clase | Ingredientes | Código |
+|---|---|---|---|
+| Guisado | plato fuerte | obligatorios | `G-` |
+| Garnacha | plato fuerte | obligatorios | `GN-` |
+| Guarnición | acompañamiento | **opcionales** | `GU-` |
+| Postre | acompañamiento | **opcionales** | `PO-` |
+| Agua | acompañamiento | **opcionales** | `AG-` |
+
+**El plato fuerte** lleva proteína, entra al generador del menú y se compara
+contra el tope por platillo (§8b).
+
+**Los acompañamientos se dan de alta con solo el nombre.** El catálogo tiene que
+existir antes de que el generador los use, y exigir ingredientes habría frenado
+armarlo mientras el banco de precios no está completo. Los ingredientes se
+agregan después, si se quieren costear.
+
+Lo que eso implica, y no debe romperse:
+
+- **No llevan proteína.** No entran a los filtros de proteína del Catálogo ni a
+  *Clasificar proteína*, y la carga por lotes no les pone `Mixto` por omisión.
+- **No tienen tope por platillo.** El editor muestra su costo de ingredientes,
+  si los hay, pero no los compara contra §8b.
+- **La limpieza guiada no los borra por vacíos.** Un postre sin ingredientes
+  está completo, no dañado.
+- **No cambian el costo del día.** Arroz, frijol y postre siguen cobrándose en
+  la canasta de §4.3. Las recetas de acompañamiento sirven para **armar el
+  menú**; si algún día reemplazan renglones de la canasta, es una decisión
+  aparte — sumar las dos cosas cobraría el arroz dos veces.
+
+**Estado (2026-09-28):** paso 1 hecho — los tipos existen, se capturan y se ven
+en el Catálogo. **Paso 2 pendiente:** que el generador los reparta por día
+(por omisión, arroz y frijol) y que se puedan editar por día antes de imprimir.
 
 ---
 
@@ -614,6 +657,9 @@ referirse a un platillo sin depender del nombre.
 ```
 G-001    guisado
 GN-001   garnacha
+GU-001   guarnición      (desde 2026-09-28, §3.5)
+PO-001   postre          (desde 2026-09-28, §3.5)
+AG-001   agua            (desde 2026-09-28, §3.5)
 GX-001   Grill Express
 ```
 
